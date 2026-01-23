@@ -64,7 +64,7 @@ export interface CashSession {
   id: string;
   storeId: string;
   storeName: string;
-  registerName: string; // Ex: Caixa 01
+  registerName: string; 
   openingTime?: string;
   openingOperatorId?: string;
   openingOperatorName?: string;
@@ -74,7 +74,7 @@ export interface CashSession {
   closingOperatorName?: string;
   closingValue?: number;
   status: CashSessionStatus;
-  priceTable: string; // Ex: Tabela Padrão
+  priceTable: string; 
 }
 
 export interface ServiceOrder {
@@ -146,6 +146,7 @@ export interface RolePermissions {
   financial: boolean;
   settings: boolean;
   serviceOrders: boolean;
+  cardManagement: boolean;
 }
 
 export interface Customer {

@@ -12,7 +12,7 @@ export default async function handler(req: any, res: any) {
     await sql`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT UNIQUE, password TEXT DEFAULT '123456', role TEXT NOT NULL, store_id TEXT, active BOOLEAN DEFAULT TRUE, avatar TEXT, commission_active BOOLEAN DEFAULT FALSE, commission_rate NUMERIC DEFAULT 0)`;
     await sql`CREATE TABLE IF NOT EXISTS establishments (id TEXT PRIMARY KEY, name TEXT NOT NULL, cnpj TEXT, location TEXT, has_stock_access BOOLEAN DEFAULT TRUE, active BOOLEAN DEFAULT TRUE, logo_url TEXT)`;
     
-    // Tabela Products com todas as colunas necessárias
+    // Tabela Products base
     await sql`CREATE TABLE IF NOT EXISTS products (
       id TEXT PRIMARY KEY, 
       name TEXT NOT NULL, 
@@ -26,34 +26,17 @@ export default async function handler(req: any, res: any) {
       brand TEXT, 
       unit TEXT, 
       location TEXT, 
-      is_service BOOLEAN DEFAULT FALSE,
-      min_stock INTEGER DEFAULT 0,
-      other_costs_percent NUMERIC DEFAULT 0,
-      margin_percent NUMERIC DEFAULT 0,
-      max_discount_percent NUMERIC DEFAULT 0,
-      commission_percent NUMERIC DEFAULT 0,
-      conversion_factor NUMERIC DEFAULT 1,
-      weight TEXT DEFAULT '0'
+      is_service BOOLEAN DEFAULT FALSE
     )`;
 
-    // Migração: Adicionar colunas caso a tabela já exista mas esteja incompleta
-    const columns = [
-      { name: 'min_stock', type: 'INTEGER DEFAULT 0' },
-      { name: 'other_costs_percent', type: 'NUMERIC DEFAULT 0' },
-      { name: 'margin_percent', type: 'NUMERIC DEFAULT 0' },
-      { name: 'max_discount_percent', type: 'NUMERIC DEFAULT 0' },
-      { name: 'commission_percent', type: 'NUMERIC DEFAULT 0' },
-      { name: 'conversion_factor', type: 'NUMERIC DEFAULT 1' },
-      { name: 'weight', type: 'TEXT DEFAULT \'0\'' }
-    ];
-
-    for (const col of columns) {
-      try {
-        await sql.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS ${col.name} ${col.type}`);
-      } catch (e) {
-        console.log(`Coluna ${col.name} já existe ou erro ignorado.`);
-      }
-    }
+    // Migração individual de colunas (Sintaxe compatível com Neon Serverless)
+    try { await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS min_stock INTEGER DEFAULT 0`; } catch (e) {}
+    try { await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS other_costs_percent NUMERIC DEFAULT 0`; } catch (e) {}
+    try { await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS margin_percent NUMERIC DEFAULT 0`; } catch (e) {}
+    try { await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS max_discount_percent NUMERIC DEFAULT 0`; } catch (e) {}
+    try { await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS commission_percent NUMERIC DEFAULT 0`; } catch (e) {}
+    try { await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS conversion_factor NUMERIC DEFAULT 1`; } catch (e) {}
+    try { await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS weight TEXT DEFAULT '0'`; } catch (e) {}
 
     await sql`CREATE TABLE IF NOT EXISTS transactions (id TEXT PRIMARY KEY, date TEXT, due_date TEXT, description TEXT, store TEXT, category TEXT, status TEXT, value NUMERIC, shipping_value NUMERIC DEFAULT 0, type TEXT, method TEXT, client TEXT, client_id TEXT, vendor_id TEXT, items JSONB, installments INTEGER, auth_number TEXT, transaction_sku TEXT, card_operator_id TEXT, card_brand_id TEXT)`;
     await sql`CREATE TABLE IF NOT EXISTS customers (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT, phone TEXT, birth_date TEXT, cpf_cnpj TEXT, zip_code TEXT, address TEXT, number TEXT, complement TEXT, neighborhood TEXT, city TEXT, state TEXT, notes TEXT)`;
@@ -64,7 +47,7 @@ export default async function handler(req: any, res: any) {
     await sql`CREATE TABLE IF NOT EXISTS card_operators (id TEXT PRIMARY KEY, name TEXT NOT NULL, active BOOLEAN DEFAULT TRUE)`;
     await sql`CREATE TABLE IF NOT EXISTS card_brands (id TEXT PRIMARY KEY, name TEXT NOT NULL, operator_id TEXT NOT NULL, active BOOLEAN DEFAULT TRUE)`;
 
-    return res.status(200).json({ message: 'Banco de Dados Neon Sincronizado com Sucesso!' });
+    return res.status(200).json({ message: 'OK' });
   } catch (error: any) {
     return res.status(500).json({ error: error.message });
   }

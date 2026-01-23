@@ -98,9 +98,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     try {
       const res = await fetch(url);
       if (!res.ok) return null;
-      return await res.json();
+      const text = await res.text();
+      if (!text) return null;
+      try {
+        return JSON.parse(text);
+      } catch (e) {
+        console.error(`Malformed JSON at ${url}:`, text.substring(0, 100));
+        return null;
+      }
     } catch (e) {
-      console.error(`Fetch error at ${url}:`, e);
+      console.error(`Network error at ${url}:`, e);
       return null;
     }
   };
@@ -173,7 +180,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const addProduct = async (p: Product) => { 
-    await fetch('/api/products', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(p)}); 
+    const res = await fetch('/api/products', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(p)}); 
+    if (!res.ok) {
+       const err = await res.json();
+       throw new Error(err.error || 'Erro ao salvar produto');
+    }
     await refreshData(); 
   };
   const addTransaction = async (t: Transaction) => { await fetch('/api/transactions', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(t)}); await refreshData(); };
