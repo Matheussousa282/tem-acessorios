@@ -98,16 +98,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     try {
       const res = await fetch(url);
       if (!res.ok) return null;
-      const text = await res.text();
-      if (!text) return null;
-      try {
-        return JSON.parse(text);
-      } catch (e) {
-        console.error(`Malformed JSON at ${url}:`, text.substring(0, 100));
-        return null;
-      }
+      return await res.json();
     } catch (e) {
-      console.error(`Network error at ${url}:`, e);
+      console.error(`Erro ao carregar ${url}:`, e);
       return null;
     }
   };
@@ -154,9 +147,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       const savedUser = localStorage.getItem(SESSION_KEY);
       if (savedUser && u) {
-        const parsed = JSON.parse(savedUser);
-        const valid = u.find((x: any) => x.id === parsed.id && x.active);
-        if (valid) setCurrentUser(valid);
+        try {
+          const parsed = JSON.parse(savedUser);
+          const valid = u.find((x: any) => x.id === parsed.id && x.active);
+          if (valid) setCurrentUser(valid);
+        } catch (e) {}
       }
     } catch (error) {
       console.error("Erro geral na sincronização:", error);
@@ -180,13 +175,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const addProduct = async (p: Product) => { 
-    const res = await fetch('/api/products', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(p)}); 
+    const res = await fetch('/api/products', { 
+      method: 'POST', 
+      headers: {'Content-Type': 'application/json'}, 
+      body: JSON.stringify(p)
+    }); 
     if (!res.ok) {
-       const err = await res.json();
+       const err = await res.json().catch(() => ({ error: 'Falha no servidor' }));
        throw new Error(err.error || 'Erro ao salvar produto');
     }
     await refreshData(); 
   };
+
   const addTransaction = async (t: Transaction) => { await fetch('/api/transactions', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(t)}); await refreshData(); };
   const addCustomer = async (c: Customer) => { await fetch('/api/customers', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(c)}); await refreshData(); };
   const addUser = async (u: User) => { await fetch('/api/users', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(u)}); await refreshData(); };
@@ -266,7 +266,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   return (
     <AppContext.Provider value={{ 
       currentUser, systemConfig, rolePermissions, products, transactions, customers, users, serviceOrders, establishments, cashSessions, cashEntries, cardOperators, cardBrands, loading, login, logout, 
-      addProduct, updateProduct: addProduct, deleteProduct: async () => {}, addTransaction, addCustomer, addUser, updateSelf: addUser, addServiceOrder, updateServiceOrder: addServiceOrder,
+      addProduct, updateProduct: addProduct, deleteProduct: async (id) => { await fetch(`/api/products?id=${id}`, {method: 'DELETE'}); await refreshData(); }, addTransaction, addCustomer, addUser, updateSelf: addUser, addServiceOrder, updateServiceOrder: addServiceOrder,
       deleteUser: async () => {}, addEstablishment, deleteEstablishment: async () => {}, processSale, updateStock: async () => {}, bulkUpdateStock, refreshData, saveCashSession, addCashEntry,
       saveCardOperator, deleteCardOperator, saveCardBrand, deleteCardBrand,
       updateConfig: async (conf) => { await fetch('/api/config', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(conf)}); refreshData(); }, 
