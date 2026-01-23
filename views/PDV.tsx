@@ -40,7 +40,7 @@ const PDV: React.FC = () => {
   const [lastSaleData, setLastSaleData] = useState<any>(null);
   const [isFinalizing, setIsFinalizing] = useState(false);
 
-  // Estados de Cartão (Novos)
+  // Estados de Cartão
   const [cardInstallments, setCardInstallments] = useState(1);
   const [cardAuthNumber, setCardAuthNumber] = useState('');
   const [cardNsu, setCardNsu] = useState('');
@@ -54,6 +54,10 @@ const PDV: React.FC = () => {
   const [shippingValue, setShippingValue] = useState(0);
   const [priceInquirySearch, setPriceInquirySearch] = useState('');
   const [cancelSearchId, setCancelSearchId] = useState('');
+
+  // Estados de Troca (Returns)
+  const [returnSearchTerm, setReturnSearchTerm] = useState('');
+  const [selectedReturnSale, setSelectedReturnSale] = useState<Transaction | null>(null);
 
   const initialCustomerForm: Omit<Customer, 'id'> = { 
     name: '', phone: '', email: '', birthDate: new Date().toISOString().split('T')[0],
@@ -180,6 +184,45 @@ const PDV: React.FC = () => {
     setSelectedCustomerId(newId);
     setShowCustomerModal(false);
     setCustomerForm(initialCustomerForm);
+  };
+
+  const filteredReturnSales = useMemo(() => {
+    if (!returnSearchTerm) return [];
+    return transactions.filter(t => 
+      t.type === 'INCOME' && 
+      (t.id.toLowerCase().includes(returnSearchTerm.toLowerCase()) || 
+       t.client?.toLowerCase().includes(returnSearchTerm.toLowerCase()))
+    ).slice(0, 10);
+  }, [transactions, returnSearchTerm]);
+
+  const handleProcessReturn = async () => {
+     if(!selectedReturnSale) return;
+     if(confirm('Confirmar estorno integral desta venda? O estoque será devolvido.')) {
+        const estorno: Transaction = {
+          ...selectedReturnSale,
+          id: `CANCEL-${Date.now()}`,
+          description: `ESTORNO: ${selectedReturnSale.id}`,
+          type: 'EXPENSE',
+          category: 'Devolução',
+          date: new Date().toISOString().split('T')[0],
+          value: selectedReturnSale.value
+        };
+        
+        // Devolução manual de estoque baseada nos itens da venda
+        const stockUpdates = (selectedReturnSale.items || []).map(item => {
+           const p = products.find(x => x.id === item.id);
+           if(p && !p.isService) {
+              return addProduct({ ...p, stock: p.stock + item.quantity });
+           }
+           return Promise.resolve();
+        });
+
+        await Promise.all([...stockUpdates, addTransaction(estorno)]);
+        setSelectedReturnSale(null);
+        setShowReturnsModal(false);
+        setSuccessType('RETURN');
+        setShowSuccessModal(true);
+     }
   };
 
   if (!isCashOpen) {
@@ -405,6 +448,68 @@ const PDV: React.FC = () => {
         </div>
       )}
 
+      {/* MODAL TROCAS (RETURNS) */}
+      {showReturnsModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-in fade-in">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 h-[600px] flex flex-col">
+              <div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-amber-500 text-white flex justify-between items-center">
+                 <h3 className="text-xl font-black uppercase">Trocas e Devoluções</h3>
+                 <button onClick={() => { setShowReturnsModal(false); setSelectedReturnSale(null); }} className="material-symbols-outlined">close</button>
+              </div>
+              <div className="p-8 flex-1 overflow-y-auto space-y-6 custom-scrollbar">
+                 {!selectedReturnSale ? (
+                    <div className="space-y-4">
+                       <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Localizar venda por Cliente ou Ticket:</p>
+                       <input 
+                          autoFocus 
+                          value={returnSearchTerm} 
+                          onChange={e => setReturnSearchTerm(e.target.value)} 
+                          placeholder="Digite o nome do cliente ou ID da venda..." 
+                          className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold uppercase" 
+                       />
+                       <div className="space-y-2 pt-4">
+                          {filteredReturnSales.map(sale => (
+                             <div key={sale.id} onClick={() => setSelectedReturnSale(sale)} className="p-4 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl hover:border-amber-500 cursor-pointer transition-all flex justify-between items-center">
+                                <div>
+                                   <p className="text-[10px] font-black text-primary uppercase">{sale.id}</p>
+                                   <p className="text-xs font-black uppercase text-slate-700 dark:text-slate-200">{sale.client}</p>
+                                   <p className="text-[9px] text-slate-400 font-bold uppercase">{sale.date} • {sale.method}</p>
+                                </div>
+                                <span className="text-sm font-black text-slate-900 dark:text-white tabular-nums">R$ {sale.value.toLocaleString('pt-BR')}</span>
+                             </div>
+                          ))}
+                          {returnSearchTerm && filteredReturnSales.length === 0 && <p className="text-center py-10 text-[10px] font-black text-slate-400 uppercase">Nenhuma venda localizada</p>}
+                       </div>
+                    </div>
+                 ) : (
+                    <div className="space-y-6 animate-in slide-in-from-right-4">
+                       <div className="p-4 bg-slate-900 text-white rounded-2xl flex justify-between items-center">
+                          <div><p className="text-[10px] uppercase opacity-50">Venda Selecionada</p><p className="font-black uppercase">{selectedReturnSale.id}</p></div>
+                          <button onClick={() => setSelectedReturnSale(null)} className="text-[10px] font-black uppercase underline">Alterar</button>
+                       </div>
+                       <div className="space-y-3">
+                          <p className="text-[10px] font-black text-slate-400 uppercase border-b pb-1">Itens do Ticket</p>
+                          {(selectedReturnSale.items || []).map(item => (
+                             <div key={item.id} className="flex justify-between items-center text-xs font-bold uppercase text-slate-600 dark:text-slate-300">
+                                <span>{item.quantity}x {item.name}</span>
+                                <span>R$ {(item.quantity * item.salePrice).toLocaleString('pt-BR')}</span>
+                             </div>
+                          ))}
+                       </div>
+                       <div className="p-6 bg-amber-500/10 rounded-2xl border-2 border-dashed border-amber-500/20 text-center">
+                          <p className="text-[10px] font-black text-amber-600 uppercase mb-1">Valor do Crédito/Estorno</p>
+                          <p className="text-3xl font-black text-amber-600 tabular-nums">R$ {selectedReturnSale.value.toLocaleString('pt-BR')}</p>
+                       </div>
+                       <button onClick={handleProcessReturn} className="w-full h-16 bg-amber-500 text-white rounded-2xl font-black text-xs uppercase shadow-xl hover:bg-amber-600 transition-all flex items-center justify-center gap-3">
+                          <span className="material-symbols-outlined">assignment_return</span> CONFIRMAR TROCA / DEVOLUÇÃO
+                       </button>
+                    </div>
+                 )}
+              </div>
+           </div>
+        </div>
+      )}
+
       {/* MODAL CANCELAMENTO */}
       {showCancelModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-in fade-in">
@@ -432,10 +537,14 @@ const PDV: React.FC = () => {
                  </div>
                  <div>
                     <h2 className="text-3xl font-black uppercase tracking-tighter">Operação Concluída!</h2>
-                    <p className="text-slate-500 font-bold text-sm uppercase mt-2">{successType === 'SALE' ? 'Venda realizada com sucesso' : 'Ordem de serviço gerada'}</p>
+                    <p className="text-slate-500 font-bold text-sm uppercase mt-2">
+                       {successType === 'SALE' ? 'Venda realizada com sucesso' : 
+                        successType === 'RETURN' ? 'Troca processada com crédito gerado' :
+                        successType === 'OS' ? 'Ordem de serviço gerada' : 'Cancelamento efetuado'}
+                    </p>
                  </div>
                  
-                 {lastSaleData && (
+                 {lastSaleData && successType === 'SALE' && (
                     <div className="bg-slate-50 dark:bg-slate-800 p-6 rounded-3xl text-left space-y-3 border border-slate-100 dark:border-slate-700">
                        <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase"><span>Comprovante</span><span>#{lastSaleData.id.slice(-6)}</span></div>
                        <div className="flex justify-between text-sm font-black"><span>Total Pago</span><span className="text-primary text-xl">R$ {lastSaleData.total.toLocaleString('pt-BR')}</span></div>
@@ -445,7 +554,7 @@ const PDV: React.FC = () => {
 
                  <div className="grid grid-cols-2 gap-3">
                     <button onClick={() => { window.print(); setShowSuccessModal(false); }} className="py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg flex items-center justify-center gap-2"><span className="material-symbols-outlined text-lg">print</span> Imprimir</button>
-                    <button onClick={() => setShowSuccessModal(false)} className="py-4 bg-primary text-white rounded-2xl font-black text-[10px] uppercase shadow-lg">Próxima Venda</button>
+                    <button onClick={() => setShowSuccessModal(false)} className="py-4 bg-primary text-white rounded-2xl font-black text-[10px] uppercase shadow-lg">Próxima Operação</button>
                  </div>
               </div>
            </div>
