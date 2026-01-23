@@ -30,7 +30,7 @@ const Reports: React.FC = () => {
   const currentStore = establishments.find(e => e.id === currentUser?.storeId);
   const currentStoreName = currentStore?.name || 'ADMINISTRATIVO GLOBAL';
 
-  // 1. Filtragem Base
+  // 1. Filtragem Base (Respeita Datas, Unidade e Filtros de Busca)
   const baseFilteredData = useMemo(() => {
     return (transactions || []).filter(t => {
       if (t.type !== 'INCOME') return false;
@@ -45,15 +45,21 @@ const Reports: React.FC = () => {
     });
   }, [transactions, startDate, endDate, isAdmin, currentStoreName, filterStore, filterCustomer, filterPayment]);
 
-  // 2. Processamento Dinâmico por Tipo de Relatório
+  // 2. Processamento Dinâmico Completo por Tipo de Relatório
   const displayData = useMemo(() => {
-    // Relatórios de Vendas Analítico
-    if (reportType === 'evolucao' || reportType === 'por_vendas') {
-      return baseFilteredData.map(t => {
+    const groups: Record<string, any> = {};
+
+    // --- GRUPO A: ANALÍTICO DE VENDAS (Venda por Venda) ---
+    if (reportType === 'evolucao' || reportType === 'por_vendas' || reportType === 'entrega_futura') {
+      const data = reportType === 'entrega_futura' 
+        ? baseFilteredData.filter(t => t.description.toUpperCase().includes('FUTURA') || t.category.toUpperCase().includes('FUTURA'))
+        : baseFilteredData;
+
+      return data.map(t => {
         const qtyItems = t.items?.reduce((acc, item) => acc + item.quantity, 0) || 0;
         return {
           id: t.id,
-          col1: t.date,
+          col1: t.date.split('-').reverse().join('/'),
           col2: t.store,
           col3: t.client || 'Consumidor Final',
           col4: `${qtyItems} itens`,
@@ -64,12 +70,12 @@ const Reports: React.FC = () => {
       });
     }
 
-    const groups: Record<string, any> = {};
-
-    // Relatório de Produtos com Rentabilidade
-    if (reportType === 'por_produto' || reportType === 'margem_bruta') {
+    // --- GRUPO B: PRODUTOS E SERVIÇOS ---
+    if (reportType === 'por_produto' || reportType === 'margem_bruta' || reportType === 'por_servico') {
       baseFilteredData.forEach(t => {
         (t.items || []).forEach(item => {
+          if (reportType === 'por_servico' && !item.isService) return;
+          
           const key = item.id;
           if (!groups[key]) {
             groups[key] = { col1: item.sku, col2: item.category, col3: item.name, qty: 0, revenue: 0, cost: 0, profit: 0 };
@@ -86,12 +92,13 @@ const Reports: React.FC = () => {
         ...g,
         col4: `${g.qty.toLocaleString('pt-BR')} UN`,
         value: g.revenue,
+        profit: g.profit,
         margin: g.revenue > 0 ? (g.profit / g.revenue) * 100 : 0
       })).sort((a, b) => b.value - a.value);
     }
 
-    // Relatório de Vendedores com Comissões
-    if (reportType === 'por_vendedor') {
+    // --- GRUPO C: VENDEDORES E TICKET MÉDIO ---
+    if (reportType === 'por_vendedor' || reportType === 'ticket_vendedor') {
       baseFilteredData.forEach(t => {
         const vendor = users.find(u => u.id === t.vendorId);
         const key = t.vendorId || 'BALCAO';
@@ -108,18 +115,46 @@ const Reports: React.FC = () => {
       return Object.values(groups).map(g => ({
         ...g,
         col4: `${g.count} Venda(s)`,
-        extra: `R$ ${g.commission.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`
+        value: g.value,
+        extra: reportType === 'ticket_vendedor' 
+          ? `R$ ${(g.value / g.count).toLocaleString('pt-BR', {minimumFractionDigits: 2})}` 
+          : `R$ ${g.commission.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`
       })).sort((a, b) => b.value - a.value);
     }
 
-    // Outros Agrupamentos (Unidade, Cliente)
+    // --- GRUPO D: TEMPORAL (Ano, Mês/Ano) ---
+    if (reportType === 'por_ano' || reportType === 'ticket_mes_ano') {
+      baseFilteredData.forEach(t => {
+        const dateObj = new Date(t.date);
+        const year = dateObj.getFullYear();
+        const month = dateObj.getMonth() + 1;
+        const key = reportType === 'por_ano' ? `${year}` : `${month.toString().padStart(2, '0')}/${year}`;
+        const label = reportType === 'por_ano' ? `ANO ${year}` : `PERÍODO ${key}`;
+
+        if (!groups[key]) {
+          groups[key] = { col1: '---', col2: 'FECHAMENTO', col3: label, count: 0, value: 0 };
+        }
+        groups[key].count += 1;
+        groups[key].value += t.value;
+      });
+      return Object.values(groups).map(g => ({
+        ...g,
+        col4: `${g.count} Transações`,
+        value: g.value,
+        extra: reportType === 'ticket_mes_ano' 
+          ? `Ticket: R$ ${(g.value / g.count).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`
+          : '---'
+      })).sort((a, b) => b.col3.localeCompare(a.col3));
+    }
+
+    // --- GRUPO E: AGRUPAMENTOS PADRÃO (Unidade, Cliente) ---
     baseFilteredData.forEach(t => {
       let key = '';
       let label = '';
       let subLabel = '';
       switch (reportType) {
         case 'por_unidade': key = t.store; label = t.store; subLabel = 'UNIDADE'; break;
-        case 'por_cliente': key = t.client || 'FINAL'; label = t.client || 'Consumidor Final'; subLabel = 'CLIENTE'; break;
+        case 'por_cliente': key = t.clientId || t.client || 'FINAL'; label = t.client || 'Consumidor Final'; subLabel = 'CLIENTE'; break;
         default: key = t.id; label = t.description; subLabel = t.category;
       }
       if (!groups[key]) {
@@ -136,7 +171,7 @@ const Reports: React.FC = () => {
 
   }, [baseFilteredData, reportType, users]);
 
-  // Métricas Consolidadas
+  // Métricas Consolidadas do Topo
   const metrics = useMemo(() => {
     const faturamento = baseFilteredData.reduce((acc, t) => acc + t.value, 0);
     const operacoes = baseFilteredData.length;
@@ -153,13 +188,19 @@ const Reports: React.FC = () => {
     return { faturamento, operacoes, ticketMedio, lucroBruto, markup };
   }, [baseFilteredData]);
 
+  // Definição Dinâmica de Cabeçalhos
   const getTableHeaders = () => {
     switch (reportType) {
       case 'por_produto': 
-      case 'margem_bruta': return ['SKU', 'Categoria', 'Produto', 'Quantidade', 'Lucro (R$)', 'Total Bruto'];
-      case 'por_vendedor': return ['Cargo', 'Loja', 'Consultor', 'Qtd. Vendas', 'Comissão Est.', 'Total'];
-      case 'por_cliente': return ['---', 'Perfil', 'Nome do Cliente', 'Frequência', 'Total Gasto'];
-      case 'por_unidade': return ['---', 'Tipo', 'Unidade/Loja', 'Movimento', 'Total Loja'];
+      case 'margem_bruta': return ['SKU', 'Categoria', 'Produto', 'Quantidade', 'Lucro (R$)', 'Faturamento'];
+      case 'por_servico': return ['Ref', 'Tipo Serviço', 'Descrição do Serviço', 'Qtd Realizada', 'Lucro (R$)', 'Total Bruto'];
+      case 'por_vendedor': return ['Cargo', 'Loja', 'Consultor', 'Qtd. Vendas', 'Comissão Est.', 'Total Vendas'];
+      case 'ticket_vendedor': return ['Cargo', 'Loja', 'Consultor', 'Qtd. Vendas', 'Ticket Médio', 'Total Vendas'];
+      case 'por_cliente': return ['---', 'Perfil', 'Nome do Cliente', 'Frequência', '---', 'Total Gasto'];
+      case 'por_unidade': return ['---', 'Tipo', 'Unidade/Loja', 'Vendas Realizadas', '---', 'Total Loja'];
+      case 'por_ano': return ['---', 'Exercício', 'Ano Fiscal', 'Transações', '---', 'Total Ano'];
+      case 'ticket_mes_ano': return ['---', 'Fechamento', 'Período', 'Volume', 'Ticket Médio', 'Faturamento'];
+      case 'entrega_futura': return ['Data Venda', 'Unidade', 'Cliente', 'Qtd Itens', 'Aguardando', 'Total'];
       default: return ['Data', 'Unidade', 'Cliente', 'Qtd Itens', 'Pagamento', 'Total'];
     }
   };
@@ -167,14 +208,14 @@ const Reports: React.FC = () => {
   return (
     <div className="p-8 space-y-8 animate-in fade-in duration-500 bg-[#0f172a] min-h-screen text-slate-100 print:bg-white print:text-black print:p-0">
       
-      {/* HEADER */}
+      {/* HEADER PRINCIPAL */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 print:mb-8">
         <div className="space-y-1">
           <h2 className="text-4xl font-black uppercase tracking-tighter text-white print:text-black">
-            Relatório {reportType.replace('_', ' ')}
+            Relatório {reportType.replace(/_/g, ' ')}
           </h2>
           <div className="flex items-center gap-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-             <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">calendar_today</span> {startDate} a {endDate}</span>
+             <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">calendar_today</span> {startDate.split('-').reverse().join('/')} a {endDate.split('-').reverse().join('/')}</span>
              <span className="size-1 bg-slate-600 rounded-full"></span>
              <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">store</span> {isAdmin ? filterStore : currentStoreName}</span>
           </div>
@@ -182,10 +223,10 @@ const Reports: React.FC = () => {
         
         <div className="flex items-center gap-3 bg-slate-900/50 p-3 rounded-[2rem] border border-slate-800 print:hidden">
            <div className="flex items-center gap-2 px-4 border-r border-slate-800">
-              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-transparent border-none text-[11px] font-black text-white focus:ring-0 uppercase" />
+              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-transparent border-none text-[11px] font-black text-white focus:ring-0 uppercase cursor-pointer" />
            </div>
            <div className="flex items-center gap-2 px-4 border-r border-slate-800">
-              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-transparent border-none text-[11px] font-black text-white focus:ring-0 uppercase" />
+              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-transparent border-none text-[11px] font-black text-white focus:ring-0 uppercase cursor-pointer" />
            </div>
            <button onClick={() => window.print()} className="flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-2xl text-[10px] font-black uppercase shadow-lg shadow-primary/20 hover:scale-105 transition-all">
               <span className="material-symbols-outlined text-lg">print</span> Gerar PDF
@@ -193,40 +234,40 @@ const Reports: React.FC = () => {
         </div>
       </div>
 
-      {/* METRICAS ANALÍTICAS */}
+      {/* CARDS DE MÉTRICAS ANALÍTICAS */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 print:grid-cols-5">
-         <MetricCard title="Faturamento" value={`R$ ${metrics.faturamento.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`} icon="trending_up" color="text-emerald-500" />
-         <MetricCard title="Lucro Bruto (PDV)" value={`R$ ${metrics.lucroBruto.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`} icon="account_balance_wallet" color="text-primary" />
+         <MetricCard title="Faturamento Bruto" value={`R$ ${metrics.faturamento.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`} icon="trending_up" color="text-emerald-500" />
+         <MetricCard title="Lucro Líquido PDV" value={`R$ ${metrics.lucroBruto.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`} icon="account_balance_wallet" color="text-primary" />
          <MetricCard title="Markup Médio" value={`${metrics.markup.toFixed(1)}%`} icon="percent" color="text-amber-500" />
          <MetricCard title="Ticket Médio" value={`R$ ${metrics.ticketMedio.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`} icon="receipt_long" color="text-indigo-400" />
-         <MetricCard title="Operações" value={metrics.operacoes.toString()} icon="shopping_bag" color="text-rose-400" />
+         <MetricCard title="Total de Vendas" value={metrics.operacoes.toString()} icon="shopping_bag" color="text-rose-400" />
       </div>
 
-      {/* FILTROS ADICIONAIS */}
+      {/* FILTROS DE PESQUISA REFINADA */}
       <div className="bg-[#1e293b]/50 p-5 rounded-[2.5rem] border border-slate-800 flex flex-wrap items-center gap-4 print:hidden">
          {isAdmin && (
            <div className="flex flex-col gap-1.5">
-             <label className="text-[9px] font-black text-slate-500 uppercase px-2">Unidade</label>
-             <select value={filterStore} onChange={e => setFilterStore(e.target.value)} className="h-11 bg-slate-900/80 border-none rounded-xl px-4 text-[10px] font-black uppercase text-slate-300 min-w-[180px]">
+             <label className="text-[9px] font-black text-slate-500 uppercase px-2">Filtrar por Unidade</label>
+             <select value={filterStore} onChange={e => setFilterStore(e.target.value)} className="h-11 bg-slate-900/80 border-none rounded-xl px-4 text-[10px] font-black uppercase text-slate-300 min-w-[180px] outline-none focus:ring-2 focus:ring-primary/20">
                 <option>TODAS LOJAS</option>
                 {establishments.map(e => <option key={e.id} value={e.name}>{e.name}</option>)}
              </select>
            </div>
          )}
          <div className="flex flex-col gap-1.5 flex-1">
-           <label className="text-[9px] font-black text-slate-500 uppercase px-2">Buscar Cliente</label>
-           <input value={filterCustomer} onChange={e => setFilterCustomer(e.target.value)} placeholder="NOME OU DOCUMENTO..." className="w-full h-11 bg-slate-900/80 border-none rounded-xl px-4 text-[10px] font-black uppercase text-white outline-none focus:ring-2 focus:ring-primary" />
+           <label className="text-[9px] font-black text-slate-500 uppercase px-2">Pesquisa de Texto (Cliente / Doc)</label>
+           <input value={filterCustomer} onChange={e => setFilterCustomer(e.target.value)} placeholder="NOME, CPF OU ID..." className="w-full h-11 bg-slate-900/80 border-none rounded-xl px-4 text-[10px] font-black uppercase text-white outline-none focus:ring-2 focus:ring-primary/40 transition-all" />
          </div>
          <div className="flex flex-col gap-1.5">
            <label className="text-[9px] font-black text-slate-500 uppercase px-2">Forma Pagt.</label>
-           <select value={filterPayment} onChange={e => setFilterPayment(e.target.value)} className="h-11 bg-slate-900/80 border-none rounded-xl px-4 text-[10px] font-black uppercase text-slate-300 min-w-[180px]">
+           <select value={filterPayment} onChange={e => setFilterPayment(e.target.value)} className="h-11 bg-slate-900/80 border-none rounded-xl px-4 text-[10px] font-black uppercase text-slate-300 min-w-[180px] outline-none focus:ring-2 focus:ring-primary/20">
               <option>TODOS PAGTOS</option>
               {['Dinheiro', 'Pix', 'Debito', 'Credito'].map(m => <option key={m}>{m}</option>)}
            </select>
          </div>
       </div>
 
-      {/* TABELA ANALÍTICA */}
+      {/* TABELA DE DADOS RESULTANTES */}
       <div className="bg-[#1e293b] rounded-[3rem] border border-slate-800 overflow-hidden shadow-2xl print:border-none">
          <table className="w-full text-left">
             <thead>
@@ -244,15 +285,15 @@ const Reports: React.FC = () => {
                     <td className="px-8 py-5 text-xs text-slate-200 font-bold uppercase truncate max-w-[250px]">{row.col3}</td>
                     <td className="px-8 py-5 text-[10px] text-slate-400 font-black uppercase">{row.col4}</td>
                     <td className="px-8 py-5 text-right font-black">
-                       {reportType === 'por_vendedor' ? (
-                          <span className="text-emerald-500 text-[11px] tabular-nums">{row.extra}</span>
-                       ) : reportType === 'por_produto' || reportType === 'margem_bruta' ? (
+                       {reportType.includes('vendedor') || reportType.includes('mes_ano') ? (
+                          <span className="text-emerald-500 text-[11px] tabular-nums font-black">{row.extra}</span>
+                       ) : reportType.includes('produto') || reportType === 'margem_bruta' || reportType === 'por_servico' ? (
                           <div className="flex flex-col">
                              <span className={`text-[11px] tabular-nums ${row.profit > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>R$ {row.profit?.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                              <span className="text-[9px] text-slate-500 font-bold">{row.margin?.toFixed(1)}% margem</span>
                           </div>
                        ) : (
-                          <span className="text-slate-400 text-[10px] tabular-nums">{row.extra || row.col5 || '---'}</span>
+                          <span className="text-slate-400 text-[10px] tabular-nums uppercase">{row.extra || row.col5 || '---'}</span>
                        )}
                     </td>
                     <td className="px-8 py-5 text-right text-sm font-black text-white tabular-nums">
@@ -261,13 +302,13 @@ const Reports: React.FC = () => {
                  </tr>
                ))}
                {displayData.length === 0 && (
-                 <tr><td colSpan={6} className="px-8 py-32 text-center text-[11px] font-black uppercase text-slate-600 tracking-[0.3em]">Nenhum dado analítico no período</td></tr>
+                 <tr><td colSpan={6} className="px-8 py-32 text-center text-[11px] font-black uppercase text-slate-600 tracking-[0.3em]">Nenhum registro analítico encontrado no período</td></tr>
                )}
             </tbody>
             {displayData.length > 0 && (
               <tfoot className="bg-slate-800/30 border-t border-slate-700">
                  <tr>
-                    <td colSpan={5} className="px-8 py-8 text-[11px] font-black uppercase text-slate-400 text-right tracking-widest">Somatória Geral do Período:</td>
+                    <td colSpan={5} className="px-8 py-8 text-[11px] font-black uppercase text-slate-400 text-right tracking-widest">Total Consolidado do Período:</td>
                     <td className="px-8 py-8 text-right text-2xl font-black text-primary tabular-nums">R$ {metrics.faturamento.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                  </tr>
               </tfoot>
