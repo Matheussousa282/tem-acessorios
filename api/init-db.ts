@@ -11,59 +11,58 @@ export default async function handler(req: any, res: any) {
     await sql`CREATE TABLE IF NOT EXISTS role_permissions (role TEXT PRIMARY KEY, permissions JSONB NOT NULL)`;
     await sql`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT UNIQUE, password TEXT DEFAULT '123456', role TEXT NOT NULL, store_id TEXT, active BOOLEAN DEFAULT TRUE, avatar TEXT, commission_active BOOLEAN DEFAULT FALSE, commission_rate NUMERIC DEFAULT 0)`;
     await sql`CREATE TABLE IF NOT EXISTS establishments (id TEXT PRIMARY KEY, name TEXT NOT NULL, cnpj TEXT, location TEXT, has_stock_access BOOLEAN DEFAULT TRUE, active BOOLEAN DEFAULT TRUE, logo_url TEXT)`;
-    await sql`CREATE TABLE IF NOT EXISTS products (id TEXT PRIMARY KEY, name TEXT NOT NULL, sku TEXT UNIQUE, barcode TEXT, category TEXT, cost_price NUMERIC, sale_price NUMERIC, stock INTEGER DEFAULT 0, image TEXT, brand TEXT, unit TEXT, location TEXT, is_service BOOLEAN DEFAULT FALSE)`;
+    
+    // Tabela Products com todas as colunas necessárias
+    await sql`CREATE TABLE IF NOT EXISTS products (
+      id TEXT PRIMARY KEY, 
+      name TEXT NOT NULL, 
+      sku TEXT UNIQUE, 
+      barcode TEXT, 
+      category TEXT, 
+      cost_price NUMERIC, 
+      sale_price NUMERIC, 
+      stock INTEGER DEFAULT 0, 
+      image TEXT, 
+      brand TEXT, 
+      unit TEXT, 
+      location TEXT, 
+      is_service BOOLEAN DEFAULT FALSE,
+      min_stock INTEGER DEFAULT 0,
+      other_costs_percent NUMERIC DEFAULT 0,
+      margin_percent NUMERIC DEFAULT 0,
+      max_discount_percent NUMERIC DEFAULT 0,
+      commission_percent NUMERIC DEFAULT 0,
+      conversion_factor NUMERIC DEFAULT 1,
+      weight TEXT DEFAULT '0'
+    )`;
+
+    // Migração: Adicionar colunas caso a tabela já exista mas esteja incompleta
+    const columns = [
+      { name: 'min_stock', type: 'INTEGER DEFAULT 0' },
+      { name: 'other_costs_percent', type: 'NUMERIC DEFAULT 0' },
+      { name: 'margin_percent', type: 'NUMERIC DEFAULT 0' },
+      { name: 'max_discount_percent', type: 'NUMERIC DEFAULT 0' },
+      { name: 'commission_percent', type: 'NUMERIC DEFAULT 0' },
+      { name: 'conversion_factor', type: 'NUMERIC DEFAULT 1' },
+      { name: 'weight', type: 'TEXT DEFAULT \'0\'' }
+    ];
+
+    for (const col of columns) {
+      try {
+        await sql.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS ${col.name} ${col.type}`);
+      } catch (e) {
+        console.log(`Coluna ${col.name} já existe ou erro ignorado.`);
+      }
+    }
+
     await sql`CREATE TABLE IF NOT EXISTS transactions (id TEXT PRIMARY KEY, date TEXT, due_date TEXT, description TEXT, store TEXT, category TEXT, status TEXT, value NUMERIC, shipping_value NUMERIC DEFAULT 0, type TEXT, method TEXT, client TEXT, client_id TEXT, vendor_id TEXT, items JSONB, installments INTEGER, auth_number TEXT, transaction_sku TEXT, card_operator_id TEXT, card_brand_id TEXT)`;
     await sql`CREATE TABLE IF NOT EXISTS customers (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT, phone TEXT, birth_date TEXT, cpf_cnpj TEXT, zip_code TEXT, address TEXT, number TEXT, complement TEXT, neighborhood TEXT, city TEXT, state TEXT, notes TEXT)`;
     await sql`CREATE TABLE IF NOT EXISTS service_orders (id TEXT PRIMARY KEY, date TEXT NOT NULL, customer_id TEXT NOT NULL, customer_name TEXT NOT NULL, description TEXT NOT NULL, status TEXT NOT NULL, items JSONB NOT NULL, total_value NUMERIC NOT NULL, technician_name TEXT, expected_date TEXT, store TEXT NOT NULL)`;
     
-    // Tabela de Sessões de Caixa
-    await sql`CREATE TABLE IF NOT EXISTS cash_sessions (
-      id TEXT PRIMARY KEY, 
-      store_id TEXT NOT NULL, 
-      store_name TEXT, 
-      register_name TEXT NOT NULL, 
-      opening_time TEXT, 
-      opening_operator_id TEXT, 
-      opening_operator_name TEXT, 
-      opening_value NUMERIC, 
-      closing_time TEXT, 
-      closing_operator_id TEXT, 
-      closing_operator_name TEXT, 
-      closing_value NUMERIC, 
-      status TEXT NOT NULL, 
-      price_table TEXT
-    )`;
-
-    // Tabela de Lançamentos de Caixa
-    await sql`CREATE TABLE IF NOT EXISTS cash_entries (
-      id TEXT PRIMARY KEY,
-      session_id TEXT NOT NULL,
-      type TEXT NOT NULL,
-      category TEXT,
-      description TEXT,
-      value NUMERIC NOT NULL,
-      timestamp TEXT NOT NULL,
-      method TEXT
-    )`;
-
-    // Tabela de Operadoras de Cartão
-    await sql`CREATE TABLE IF NOT EXISTS card_operators (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      active BOOLEAN DEFAULT TRUE
-    )`;
-
-    // Tabela de Bandeiras de Cartão
-    await sql`CREATE TABLE IF NOT EXISTS card_brands (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      operator_id TEXT NOT NULL,
-      active BOOLEAN DEFAULT TRUE
-    )`;
-
-    // Migração de colunas de cartão em transações caso não existam
-    try { await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS card_operator_id TEXT`; } catch(e) {}
-    try { await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS card_brand_id TEXT`; } catch(e) {}
+    await sql`CREATE TABLE IF NOT EXISTS cash_sessions (id TEXT PRIMARY KEY, store_id TEXT NOT NULL, store_name TEXT, register_name TEXT NOT NULL, opening_time TEXT, opening_operator_id TEXT, opening_operator_name TEXT, opening_value NUMERIC, closing_time TEXT, closing_operator_id TEXT, closing_operator_name TEXT, closing_value NUMERIC, status TEXT NOT NULL, price_table TEXT)`;
+    await sql`CREATE TABLE IF NOT EXISTS cash_entries (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, type TEXT NOT NULL, category TEXT, description TEXT, value NUMERIC NOT NULL, timestamp TEXT NOT NULL, method TEXT)`;
+    await sql`CREATE TABLE IF NOT EXISTS card_operators (id TEXT PRIMARY KEY, name TEXT NOT NULL, active BOOLEAN DEFAULT TRUE)`;
+    await sql`CREATE TABLE IF NOT EXISTS card_brands (id TEXT PRIMARY KEY, name TEXT NOT NULL, operator_id TEXT NOT NULL, active BOOLEAN DEFAULT TRUE)`;
 
     return res.status(200).json({ message: 'Banco de Dados Neon Sincronizado com Sucesso!' });
   } catch (error: any) {
