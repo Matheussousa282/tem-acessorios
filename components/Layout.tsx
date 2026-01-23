@@ -16,11 +16,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [isVendasOpen, setIsVendasOpen] = useState(false);
   const [isFinancialOpen, setIsFinancialOpen] = useState(false);
   const [isOSOpen, setIsOSOpen] = useState(false);
-  const [isReportsMenuOpen, setIsReportsMenuOpen] = useState(false);
 
   useEffect(() => {
     if (location.pathname.includes('estoque')) setIsStockOpen(true);
-    if (location.pathname.includes('pdv') || location.pathname.includes('clientes')) setIsVendasOpen(true);
+    if (location.pathname.includes('pdv') || location.pathname.includes('clientes') || location.pathname.includes('relatorios')) setIsVendasOpen(true);
     if (location.pathname.includes('entradas') || location.pathname.includes('dre') || location.pathname.includes('cartoes')) setIsFinancialOpen(true);
     if (location.pathname.includes('servicos')) setIsOSOpen(true);
   }, []);
@@ -69,21 +68,29 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             {perms.pdv && (
                <div className="flex flex-col">
                 <button onClick={() => setIsVendasOpen(!isVendasOpen)} className="flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-slate-600 hover:bg-slate-100">
-                  <div className="flex items-center gap-3"><span className="material-symbols-outlined text-xl">shopping_cart</span><span className="text-xs font-black uppercase tracking-widest">Vendas</span></div>
+                  <div className="flex items-center gap-3"><span className="material-symbols-outlined text-xl">shopping_cart</span><span className="text-xs font-black uppercase tracking-widest">Vendas / PDV</span></div>
                   <span className={`material-symbols-outlined text-sm transition-transform ${isVendasOpen ? 'rotate-180' : ''}`}>expand_more</span>
                 </button>
                 {isVendasOpen && (
                   <div className="flex flex-col ml-9 mt-1 border-l gap-1">
-                    <SidebarSubItem to="/caixa" label="Caixa" />
-                    <SidebarSubItem to="/pdv" label="Frente PDV" />
+                    <SidebarSubItem to="/caixa" label="Controle de Caixa" />
+                    <SidebarSubItem to="/pdv" label="Frente de Caixa" />
                     <SidebarSubItem to="/clientes" label="Clientes" />
                     {perms.reports && (
-                      <div className="flex flex-col ml-4">
-                         <SidebarSubItem to="/relatorios?type=evolucao" label="Evolução" small />
-                         <SidebarSubItem to="/relatorios?type=por_vendedor" label="Vendedores" small />
-                         <SidebarSubItem to="/relatorios?type=por_produto" label="Produtos ABC" small />
-                         <SidebarSubItem to="/relatorios?type=por_servico" label="Analítico Serviços" small />
-                         <SidebarSubItem to="/relatorios?type=margem_bruta" label="Rentabilidade" small />
+                      <div className="flex flex-col mt-2">
+                         <p className="px-4 py-1 text-[9px] font-black text-slate-400 uppercase tracking-widest">Relatórios</p>
+                         <SidebarSubItem to="/relatorios?type=evolucao" label="Evolução de Vendas" small />
+                         <SidebarSubItem to="/relatorios?type=por_unidade" label="Vendas por Unidade" small />
+                         <SidebarSubItem to="/relatorios?type=entrega_futura" label="Entrega Futura" small />
+                         <SidebarSubItem to="/relatorios?type=por_ano" label="Por Ano" small />
+                         <SidebarSubItem to="/relatorios?type=por_cliente" label="Por Cliente" small />
+                         <SidebarSubItem to="/relatorios?type=por_vendas" label="Por Vendas" small />
+                         <SidebarSubItem to="/relatorios?type=por_vendedor" label="Por Vendedor" small />
+                         <SidebarSubItem to="/relatorios?type=ticket_vendedor" label="Ticket Médio por Vendedor" small />
+                         <SidebarSubItem to="/relatorios?type=ticket_mes_ano" label="Ticket Médio por Mês/Ano" small />
+                         <SidebarSubItem to="/relatorios?type=por_produto" label="Por Produto" small />
+                         <SidebarSubItem to="/relatorios?type=margem_bruta" label="Por Produto com Margem Bruta" small />
+                         <SidebarSubItem to="/relatorios?type=por_servico" label="Por Serviço" small />
                       </div>
                     )}
                   </div>
@@ -135,7 +142,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <header className="h-16 flex-shrink-0 border-b bg-white/80 dark:bg-background-dark/80 backdrop-blur-md flex items-center justify-end px-8">
            <div className="flex items-center gap-4"><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Unidade:</span><span className="text-xs font-black text-primary uppercase">{currentStoreName}</span></div>
         </header>
-        <div className="flex-1 overflow-y-auto">{children}</div>
+        <div className="flex-1 overflow-y-auto no-scrollbar">{children}</div>
       </main>
     </div>
   );
