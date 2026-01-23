@@ -19,7 +19,6 @@ const Settings: React.FC = () => {
   const [showUserModal, setShowUserModal] = useState(false);
   const [showStoreModal, setShowStoreModal] = useState(false);
   
-  // Estados para Aba de Permissões
   const [selectedRolePerm, setSelectedRolePerm] = useState<UserRole>(UserRole.MANAGER);
   const [localPerms, setLocalPerms] = useState<RolePermissions | null>(null);
 
@@ -37,7 +36,6 @@ const Settings: React.FC = () => {
     setLocalConfig(systemConfig);
   }, [systemConfig]);
 
-  // Carrega permissões locais ao mudar o cargo selecionado
   useEffect(() => {
     if (rolePermissions[selectedRolePerm]) {
       setLocalPerms({ ...rolePermissions[selectedRolePerm] });
@@ -358,7 +356,8 @@ const getLabelForModule = (key: string) => {
     expenses: 'Controle de Despesas',
     financial: 'DRE / Resultado',
     settings: 'Configurações Sistema',
-    serviceOrders: 'Ordens de Serviço'
+    serviceOrders: 'Ordens de Serviço',
+    cardManagement: 'Gestão de Cartões'
   };
   return labels[key] || key;
 };
@@ -375,7 +374,8 @@ const getIconForModule = (key: string) => {
     expenses: 'money_off',
     financial: 'account_balance',
     settings: 'settings',
-    serviceOrders: 'build'
+    serviceOrders: 'build',
+    cardManagement: 'credit_card'
   };
   return icons[key] || 'label';
 };
