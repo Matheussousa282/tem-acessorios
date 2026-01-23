@@ -52,8 +52,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       <aside className="w-64 flex-shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-background-dark flex flex-col justify-between p-4 z-50 overflow-y-auto no-scrollbar">
         <div className="flex flex-col gap-8">
           <div className="flex items-center gap-3 px-2">
-            <div className="bg-primary rounded-lg size-10 flex items-center justify-center text-white shadow-lg">
-              <span className="material-symbols-outlined">storefront</span>
+            {/* LOGOTIPO DINÂMICO */}
+            <div className="bg-primary rounded-lg size-10 flex items-center justify-center text-white shadow-lg overflow-hidden">
+              {systemConfig.logoUrl ? (
+                <img src={systemConfig.logoUrl} className="size-full object-cover" alt="Logo" />
+              ) : (
+                <span className="material-symbols-outlined">storefront</span>
+              )}
             </div>
             <div className="flex flex-col min-w-0">
               <h1 className="text-slate-900 dark:text-white text-sm font-black leading-tight truncate uppercase">{systemConfig.companyName}</h1>
