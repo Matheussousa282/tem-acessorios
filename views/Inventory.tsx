@@ -12,12 +12,16 @@ const Inventory: React.FC = () => {
   const [showProductModal, setShowProductModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  const [form, setForm] = useState<Partial<Product>>({
+  const initialForm: Partial<Product> = {
     name: '', sku: '', barcode: '', category: '', brand: '', costPrice: 0, salePrice: 0, stock: 0, unit: 'UN', location: '', image: '', isService: false,
     minStock: 0, otherCostsPercent: 0, marginPercent: 0, maxDiscountPercent: 0, commissionPercent: 0, conversionFactor: 1, weight: '0'
-  });
+  };
 
+  const [form, setForm] = useState<Partial<Product>>(initialForm);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Added currentStore definition to fix missing name error
+  const currentStore = useMemo(() => establishments.find(e => e.id === currentUser?.storeId), [establishments, currentUser]);
 
   const categories = useMemo(() => ['Todas', ...Array.from(new Set(products.map(p => p.category)))], [products]);
 
@@ -53,16 +57,35 @@ const Inventory: React.FC = () => {
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     const finalImage = form.image || `https://picsum.photos/seed/${form.sku || Date.now()}/400/400`;
-    const productData = { 
-      ...form as Product, 
-      id: editingId || `prod-${Date.now()}`, 
+    
+    // Garantir que todos os campos sejam enviados com tipos corretos
+    const productData: Product = {
+      id: editingId || `prod-${Date.now()}`,
+      name: form.name || '',
+      sku: form.sku || `SKU-${Date.now()}`,
+      barcode: form.barcode || '',
+      category: form.category || 'Geral',
+      costPrice: Number(form.costPrice) || 0,
+      salePrice: Number(form.salePrice) || 0,
+      stock: Number(form.stock) || 0,
       image: finalImage,
-      isService: false
+      brand: form.brand || '',
+      unit: form.unit || 'UN',
+      location: form.location || '',
+      isService: !!form.isService,
+      minStock: Number(form.minStock) || 0,
+      otherCostsPercent: Number(form.otherCostsPercent) || 0,
+      marginPercent: Number(form.marginPercent) || 0,
+      maxDiscountPercent: Number(form.maxDiscountPercent) || 0,
+      commissionPercent: Number(form.commissionPercent) || 0,
+      conversionFactor: Number(form.conversionFactor) || 1,
+      weight: String(form.weight || '0')
     };
     
     await addProduct(productData);
     setShowProductModal(false);
     setEditingId(null);
+    setForm(initialForm);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -76,16 +99,12 @@ const Inventory: React.FC = () => {
 
   const openNewProduct = () => {
     setEditingId(null);
-    setForm({ 
-      name: '', sku: `SKU-${Date.now()}`, barcode: '', category: '', brand: '', 
-      costPrice: 0, salePrice: 0, stock: 0, unit: 'UN', location: '', image: '', isService: false,
-      minStock: 0, otherCostsPercent: 0, marginPercent: 0, maxDiscountPercent: 0, commissionPercent: 0, conversionFactor: 1, weight: '0'
-    });
+    setForm(initialForm);
     setShowProductModal(true);
   };
 
   return (
-    <div className="p-8 space-y-6 animate-in fade-in duration-500 pb-24">
+    <div className="p-8 space-y-6 animate-in fade-in duration-700 pb-24">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white uppercase">Inventário & Catálogo</h2>
@@ -208,8 +227,11 @@ const Inventory: React.FC = () => {
                        <input type="text" value={form.unit} onChange={e => setForm({...form, unit: e.target.value})} className="w-full h-12 bg-white dark:bg-slate-900 border-none rounded-xl px-4 text-sm font-black uppercase" />
                     </div>
                     <div className="space-y-1">
-                       <label className="text-[10px] font-black text-slate-400 uppercase px-2">Tipo</label>
-                       <input readOnly value="Normal" className="w-full h-12 bg-slate-100 dark:bg-slate-800 border-none rounded-xl px-4 text-sm font-black text-slate-400 uppercase" />
+                       <label className="text-[10px] font-black text-slate-400 uppercase px-2">Tipo de Cadastro</label>
+                       <select value={form.isService ? 'true' : 'false'} onChange={e => setForm({...form, isService: e.target.value === 'true'})} className="w-full h-12 bg-white dark:bg-slate-900 border-none rounded-xl px-4 text-sm font-bold uppercase">
+                          <option value="false">Produto Físico</option>
+                          <option value="true">Serviço / Mão de Obra</option>
+                       </select>
                     </div>
                  </div>
               </div>
@@ -217,12 +239,12 @@ const Inventory: React.FC = () => {
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                  <div className="lg:col-span-5 space-y-6">
                     <div className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-                       <h4 className="text-[10px] font-black text-primary uppercase tracking-widest border-b border-slate-100 dark:border-slate-800 pb-3">Estoque</h4>
+                       <h4 className="text-[10px] font-black text-primary uppercase tracking-widest border-b border-slate-100 dark:border-slate-800 pb-3">Estoque & Localização</h4>
                        <div className="overflow-hidden rounded-xl border border-slate-100 dark:border-slate-800">
                           <table className="w-full text-left text-[10px]">
                              <thead className="bg-slate-50 dark:bg-slate-800">
                                 <tr>
-                                   <th className="px-4 py-3 font-black uppercase text-slate-400">Setor - Localização principal</th>
+                                   <th className="px-4 py-3 font-black uppercase text-slate-400">Setor - Localização</th>
                                    <th className="px-4 py-3 font-black uppercase text-slate-400 text-right">Estoque</th>
                                 </tr>
                              </thead>
@@ -244,8 +266,8 @@ const Inventory: React.FC = () => {
                              <input type="number" value={form.minStock} onChange={e => setForm({...form, minStock: parseInt(e.target.value) || 0})} className="w-full h-10 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-xs font-black" />
                           </div>
                           <div className="space-y-1">
-                             <label className="text-[9px] font-black text-slate-400 uppercase px-2">Estoque Total</label>
-                             <div className="w-full h-10 bg-slate-100 dark:bg-slate-800 rounded-xl px-4 text-xs font-black flex items-center justify-end text-slate-500">{form.stock}</div>
+                             <label className="text-[9px] font-black text-slate-400 uppercase px-2">Unidade Logada</label>
+                             <div className="w-full h-10 bg-slate-100 dark:bg-slate-800 rounded-xl px-4 text-xs font-black flex items-center justify-end text-slate-500">{currentStore?.name || 'Local'}</div>
                           </div>
                        </div>
                     </div>
@@ -253,14 +275,14 @@ const Inventory: React.FC = () => {
 
                  <div className="lg:col-span-4 space-y-6">
                     <div className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border-2 border-primary/20 shadow-lg space-y-6">
-                       <h4 className="text-[10px] font-black text-primary uppercase tracking-widest border-b border-slate-100 dark:border-slate-800 pb-3">Cálculo do Preço de Venda</h4>
+                       <h4 className="text-[10px] font-black text-primary uppercase tracking-widest border-b border-slate-100 dark:border-slate-800 pb-3">Financeiro e Precificação</h4>
                        <div className="space-y-4">
                           <div className="flex items-center justify-between">
                              <label className="text-[10px] font-black text-slate-500 uppercase">Preço Custo R$</label>
                              <input type="number" step="0.01" value={form.costPrice} onChange={e => handlePriceChange('costPrice', parseFloat(e.target.value) || 0)} className="w-32 h-10 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-right font-black tabular-nums text-rose-500" />
                           </div>
                           <div className="flex items-center justify-between">
-                             <label className="text-[10px] font-black text-slate-500 uppercase">Margem %</label>
+                             <label className="text-[10px] font-black text-slate-500 uppercase">Margem Lucro %</label>
                              <input type="number" step="0.01" value={form.marginPercent} onChange={e => handlePriceChange('marginPercent', parseFloat(e.target.value) || 0)} className="w-32 h-10 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-right font-black tabular-nums text-amber-500" />
                           </div>
                           <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
@@ -274,8 +296,12 @@ const Inventory: React.FC = () => {
                  <div className="lg:col-span-3 space-y-6">
                     <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 space-y-4">
                        <div className="space-y-1">
-                          <label className="text-[10px] font-black text-slate-400 uppercase px-2">Código de Barras</label>
+                          <label className="text-[10px] font-black text-slate-400 uppercase px-2">Cód. Barras (GTIN)</label>
                           <input type="text" value={form.barcode} onChange={e => setForm({...form, barcode: e.target.value})} className="w-full h-12 bg-white dark:bg-slate-900 border-none rounded-xl px-4 text-sm font-mono font-black" />
+                       </div>
+                       <div className="space-y-1">
+                          <label className="text-[10px] font-black text-slate-400 uppercase px-2">Referência SKU</label>
+                          <input type="text" value={form.sku} onChange={e => setForm({...form, sku: e.target.value})} className="w-full h-12 bg-white dark:bg-slate-900 border-none rounded-xl px-4 text-sm font-mono font-black uppercase" />
                        </div>
                     </div>
                  </div>
@@ -291,7 +317,6 @@ const Inventory: React.FC = () => {
           </div>
         </div>
       )}
-      <style>{`.custom-scrollbar::-webkit-scrollbar { width: 4px; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 20px; }`}</style>
     </div>
   );
 };
