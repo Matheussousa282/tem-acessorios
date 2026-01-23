@@ -131,12 +131,21 @@ const PDV: React.FC = () => {
         cardBrandId: selectedBrandId
       } : {};
 
-      setLastSaleData({
-        id: saleId, items: [...cart], subtotal, shipping: shippingValue, total: totalGeral,
-        payment: paymentMethod, date: new Date().toLocaleString('pt-BR'),
-        vendor: vendor?.name || 'Não inf.', customer: customer?.name || 'Consumidor Final',
+      const currentSaleData = {
+        id: saleId, 
+        items: [...cart], 
+        subtotal, 
+        shipping: shippingValue, 
+        total: totalGeral,
+        payment: paymentMethod, 
+        date: new Date().toLocaleString('pt-BR'),
+        vendor: vendor?.name || 'Não inf.', 
+        customer: customer?.name || 'Consumidor Final',
+        store: currentStore,
         ...cardDetails
-      });
+      };
+      
+      setLastSaleData(currentSaleData);
 
       await processSale(cart, totalGeral, paymentMethod, selectedCustomerId, selectedVendorId, shippingValue, cardDetails);
       
@@ -244,8 +253,61 @@ const PDV: React.FC = () => {
   return (
     <div className="h-screen flex flex-col bg-slate-50 dark:bg-background-dark overflow-hidden font-display relative">
       
+      {/* TEMPLATE DE IMPRESSÃO DO RECIBO PDV */}
+      <div id="receipt-print-template" className="hidden print:block p-4 bg-white text-black font-mono text-[10px] leading-tight">
+        <div className="text-center space-y-1 mb-4">
+           {lastSaleData?.store?.logoUrl && <img src={lastSaleData.store.logoUrl} className="h-12 mx-auto mb-2 grayscale" alt="Logo" />}
+           <h2 className="text-xs font-black uppercase">{lastSaleData?.store?.name}</h2>
+           <p className="text-[8px] uppercase">{lastSaleData?.store?.location}</p>
+           <p className="text-[8px]">CNPJ: {lastSaleData?.store?.cnpj}</p>
+           <div className="border-t border-b border-black py-1 my-2 font-black">CUPOM NÃO FISCAL</div>
+        </div>
+
+        <div className="flex justify-between mb-2">
+           <span>DOC: {lastSaleData?.id}</span>
+           <span>{lastSaleData?.date}</span>
+        </div>
+        
+        <div className="mb-4">
+           <p>CLIENTE: {lastSaleData?.customer}</p>
+           <p>VENDEDOR: {lastSaleData?.vendor}</p>
+        </div>
+
+        <div className="border-b border-black pb-1 mb-1 flex text-[9px] font-black">
+           <span className="w-10">QTD</span>
+           <span className="flex-1">DESCRIÇÃO</span>
+           <span className="w-16 text-right">TOTAL</span>
+        </div>
+
+        <div className="space-y-1 mb-4 border-b border-black pb-2">
+           {lastSaleData?.items.map((item: any, idx: number) => (
+             <div key={idx} className="flex">
+                <span className="w-10">{item.quantity}</span>
+                <span className="flex-1 uppercase">{item.name}</span>
+                <span className="w-16 text-right">{(item.quantity * item.salePrice).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+             </div>
+           ))}
+        </div>
+
+        <div className="space-y-1 text-right font-black">
+           <div className="flex justify-between"><span>SUBTOTAL:</span><span>R$ {lastSaleData?.subtotal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
+           {lastSaleData?.shipping > 0 && <div className="flex justify-between"><span>FRETE (+):</span><span>R$ {lastSaleData?.shipping.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>}
+           <div className="flex justify-between text-xs border-t border-black pt-1"><span>TOTAL GERAL:</span><span>R$ {lastSaleData?.total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
+        </div>
+
+        <div className="mt-4 pt-2 border-t border-dashed border-black">
+           <p className="font-black">FORMA DE PAGAMENTO:</p>
+           <p className="uppercase">{lastSaleData?.payment} {lastSaleData?.installments > 1 ? `(${lastSaleData?.installments}X)` : ''}</p>
+        </div>
+
+        <div className="mt-8 text-center space-y-2">
+           <p className="text-[8px] font-bold">OBRIGADO PELA PREFERÊNCIA!</p>
+           <p className="text-[7px] opacity-50">SISTEMA ERP RETAIL - v4.5</p>
+        </div>
+      </div>
+
       {/* HEADER PDV */}
-      <header className="flex items-center justify-between px-8 py-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 z-30 shadow-sm shrink-0">
+      <header className="flex items-center justify-between px-8 py-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 z-30 shadow-sm shrink-0 print:hidden">
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-3 relative">
              <div onClick={() => setShowTerminalMenu(!showTerminalMenu)} className="size-12 rounded-xl bg-primary flex items-center justify-center text-white shadow-lg overflow-hidden cursor-pointer hover:scale-105 transition-all">
@@ -272,7 +334,7 @@ const PDV: React.FC = () => {
         </div>
       </header>
 
-      <main className="flex flex-1 overflow-hidden">
+      <main className="flex flex-1 overflow-hidden print:hidden">
         {/* LADO ESQUERDO: LISTA DE PRODUTOS */}
         <section className="flex-1 flex flex-col">
           <div className="p-6 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shrink-0">
@@ -362,7 +424,7 @@ const PDV: React.FC = () => {
 
       {/* MODAL CHECKOUT */}
       {showCheckout && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 print:hidden">
            <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
               <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
                  <div><h3 className="text-2xl font-black uppercase tracking-tight">Pagamento</h3><p className="text-[10px] font-black text-slate-400 uppercase mt-1">Selecione o método e finalize</p></div>
@@ -426,7 +488,7 @@ const PDV: React.FC = () => {
 
       {/* MODAL CONSULTA PREÇO */}
       {showPriceInquiry && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-in fade-in">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-in fade-in print:hidden">
            <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
               <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-900 text-white">
                  <h3 className="text-xl font-black uppercase">Consulta de Preço Rápida</h3>
@@ -450,7 +512,7 @@ const PDV: React.FC = () => {
 
       {/* MODAL TROCAS (RETURNS) */}
       {showReturnsModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-in fade-in">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-in fade-in print:hidden">
            <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 h-[600px] flex flex-col">
               <div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-amber-500 text-white flex justify-between items-center">
                  <h3 className="text-xl font-black uppercase">Trocas e Devoluções</h3>
@@ -512,7 +574,7 @@ const PDV: React.FC = () => {
 
       {/* MODAL CANCELAMENTO */}
       {showCancelModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-in fade-in">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-in fade-in print:hidden">
            <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
               <div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-rose-500 text-white flex justify-between items-center">
                  <h3 className="text-xl font-black uppercase">Cancelamento de Venda</h3>
@@ -529,7 +591,7 @@ const PDV: React.FC = () => {
 
       {/* MODAL SUCESSO */}
       {showSuccessModal && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/90 backdrop-blur-2xl p-4 animate-in fade-in">
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/90 backdrop-blur-2xl p-4 animate-in fade-in print:hidden">
            <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[4rem] shadow-2xl overflow-hidden text-center animate-in zoom-in-95">
               <div className="p-12 space-y-8">
                  <div className="size-24 bg-emerald-500 text-white rounded-[2rem] flex items-center justify-center mx-auto shadow-2xl shadow-emerald-500/30 animate-bounce">
@@ -553,7 +615,7 @@ const PDV: React.FC = () => {
                  )}
 
                  <div className="grid grid-cols-2 gap-3">
-                    <button onClick={() => { window.print(); setShowSuccessModal(false); }} className="py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg flex items-center justify-center gap-2"><span className="material-symbols-outlined text-lg">print</span> Imprimir</button>
+                    <button onClick={() => { window.print(); setShowSuccessModal(false); }} className="py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg flex items-center justify-center gap-2"><span className="material-symbols-outlined text-lg">print</span> Imprimir Recibo</button>
                     <button onClick={() => setShowSuccessModal(false)} className="py-4 bg-primary text-white rounded-2xl font-black text-[10px] uppercase shadow-lg">Próxima Operação</button>
                  </div>
               </div>
@@ -563,7 +625,7 @@ const PDV: React.FC = () => {
 
       {/* MODAL NOVO CLIENTE (SIMPLIFICADO PARA PDV) */}
       {showCustomerModal && (
-        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-in fade-in">
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-in fade-in print:hidden">
            <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
               <div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-primary text-white flex justify-between items-center">
                  <h3 className="text-xl font-black uppercase">Cadastro de Cliente</h3>
@@ -581,7 +643,7 @@ const PDV: React.FC = () => {
 
       {/* MODAL ORDEM DE SERVIÇO */}
       {showOSModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-in fade-in">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-in fade-in print:hidden">
            <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
               <div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-amber-500 text-white flex justify-between items-center">
                  <h3 className="text-xl font-black uppercase">Gerar Ordem de Serviço</h3>
@@ -607,6 +669,35 @@ const PDV: React.FC = () => {
         .custom-scrollbar::-webkit-scrollbar { width: 5px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 20px; }
         .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; }
+
+        @media print {
+          /* Esconder toda a interface do sistema */
+          aside, header, main, div[class*="fixed"], div[id="root"] > div:not(#receipt-print-template) {
+            display: none !important;
+          }
+          
+          body {
+            background-color: white !important;
+            color: black !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+          }
+
+          #receipt-print-template {
+            display: block !important;
+            width: 100% !important;
+            max-width: 80mm; /* Tamanho padrão de impressora térmica */
+            margin: 0 auto;
+            visibility: visible;
+          }
+
+          /* Para impressoras A4, vamos centralizar e dar uma margem */
+          @page {
+            size: auto;
+            margin: 0mm;
+          }
+        }
       `}</style>
     </div>
   );
