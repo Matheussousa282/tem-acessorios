@@ -18,6 +18,23 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [isFinancialOpen, setIsFinancialOpen] = useState(false);
   const [isOSOpen, setIsOSOpen] = useState(false);
 
+  // ESTADO DO MODO CLARO (Ativo = Light Mode / Inativo = Dark Mode)
+  const [isLightMode, setIsLightMode] = useState(() => {
+    return localStorage.getItem('theme') === 'light';
+  });
+
+  // Efeito para aplicar a classe no HTML
+  useEffect(() => {
+    const html = document.documentElement;
+    if (isLightMode) {
+      html.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    } else {
+      html.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    }
+  }, [isLightMode]);
+
   const perms = useMemo(() => {
     if (!currentUser) return INITIAL_PERMS[UserRole.VENDOR];
     return rolePermissions[currentUser.role] || INITIAL_PERMS[currentUser.role] || INITIAL_PERMS[UserRole.VENDOR];
@@ -48,11 +65,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const hasFinancialGroupAccess = perms.incomes || perms.expenses || perms.cardManagement || perms.financial;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background-light dark:bg-background-dark font-display">
+    <div className="flex h-screen overflow-hidden bg-background-light dark:bg-background-dark font-display transition-colors duration-300">
       <aside className="w-64 flex-shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-background-dark flex flex-col justify-between p-4 z-50 overflow-y-auto no-scrollbar">
         <div className="flex flex-col gap-8">
           <div className="flex items-center gap-3 px-2">
-            {/* LOGOTIPO DINÂMICO */}
             <div className="bg-primary rounded-lg size-10 flex items-center justify-center text-white shadow-lg overflow-hidden">
               {systemConfig.logoUrl ? (
                 <img src={systemConfig.logoUrl} className="size-full object-cover" alt="Logo" />
@@ -71,22 +87,22 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             
             {perms.serviceOrders && (
               <div className="flex flex-col">
-                <button onClick={() => setIsOSOpen(!isOSOpen)} className="flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-slate-600 hover:bg-slate-100">
+                <button onClick={() => setIsOSOpen(!isOSOpen)} className="flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
                   <div className="flex items-center gap-3"><span className="material-symbols-outlined text-xl">build</span><span className="text-xs font-black uppercase tracking-widest">Serviços</span></div>
                   <span className={`material-symbols-outlined text-sm transition-transform ${isOSOpen ? 'rotate-180' : ''}`}>expand_more</span>
                 </button>
-                {isOSOpen && <div className="flex flex-col ml-9 mt-1 border-l gap-1"><SidebarSubItem to="/servicos?tab=list" label="Gerenciar OS" /><SidebarSubItem to="/servicos?tab=catalog" label="Catálogo" /></div>}
+                {isOSOpen && <div className="flex flex-col ml-9 mt-1 border-l dark:border-slate-800 gap-1"><SidebarSubItem to="/servicos?tab=list" label="Gerenciar OS" /><SidebarSubItem to="/servicos?tab=catalog" label="Catálogo" /></div>}
               </div>
             )}
 
             {hasVendasAccess && (
                <div className="flex flex-col">
-                <button onClick={() => setIsVendasOpen(!isVendasOpen)} className="flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-slate-600 hover:bg-slate-100">
+                <button onClick={() => setIsVendasOpen(!isVendasOpen)} className="flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
                   <div className="flex items-center gap-3"><span className="material-symbols-outlined text-xl">shopping_cart</span><span className="text-xs font-black uppercase tracking-widest">Vendas / PDV</span></div>
                   <span className={`material-symbols-outlined text-sm transition-transform ${isVendasOpen ? 'rotate-180' : ''}`}>expand_more</span>
                 </button>
                 {isVendasOpen && (
-                  <div className="flex flex-col ml-9 mt-1 border-l gap-1">
+                  <div className="flex flex-col ml-9 mt-1 border-l dark:border-slate-800 gap-1">
                     {perms.cashControl && <SidebarSubItem to="/caixa" label="Controle de Caixa" />}
                     {perms.pdv && <SidebarSubItem to="/pdv" label="Frente de Caixa" />}
                     {perms.customers && <SidebarSubItem to="/clientes" label="Clientes" />}
@@ -126,12 +142,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
             {hasEstoqueAccess && (
               <div className="flex flex-col">
-                <button onClick={() => setIsStockOpen(!isStockOpen)} className="flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-slate-600 hover:bg-slate-100">
+                <button onClick={() => setIsStockOpen(!isStockOpen)} className="flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
                   <div className="flex items-center gap-3"><span className="material-symbols-outlined text-xl">inventory_2</span><span className="text-xs font-black uppercase tracking-widest">Estoque</span></div>
                   <span className={`material-symbols-outlined text-sm transition-transform ${isStockOpen ? 'rotate-180' : ''}`}>expand_more</span>
                 </button>
                 {isStockOpen && (
-                  <div className="flex flex-col ml-9 mt-1 border-l gap-1">
+                  <div className="flex flex-col ml-9 mt-1 border-l dark:border-slate-800 gap-1">
                     {perms.inventory && <SidebarSubItem to="/estoque" label="Produtos" />}
                     {perms.balance && <SidebarSubItem to="/balanco" label="Balanço" />}
                   </div>
@@ -141,12 +157,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
             {hasFinancialGroupAccess && (
               <div className="flex flex-col">
-                <button onClick={() => setIsFinancialOpen(!isFinancialOpen)} className="flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-slate-600 hover:bg-slate-100">
+                <button onClick={() => setIsFinancialOpen(!isFinancialOpen)} className="flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
                   <div className="flex items-center gap-3"><span className="material-symbols-outlined text-xl">account_balance</span><span className="text-xs font-black uppercase tracking-widest">Financeiro</span></div>
                   <span className={`material-symbols-outlined text-sm transition-transform ${isFinancialOpen ? 'rotate-180' : ''}`}>expand_more</span>
                 </button>
                 {isFinancialOpen && (
-                  <div className="flex flex-col ml-9 mt-1 border-l gap-1">
+                  <div className="flex flex-col ml-9 mt-1 border-l dark:border-slate-800 gap-1">
                     {perms.incomes && <SidebarSubItem to="/entradas" label="Receitas" />}
                     {perms.expenses && <SidebarSubItem to="/saidas" label="Despesas" />}
                     {perms.cardManagement && <SidebarSubItem to="/cartoes" label="Cartões" />}
@@ -160,18 +176,44 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </nav>
         </div>
 
-        <div className="pt-4 border-t space-y-4">
-           <div className="flex items-center gap-3 px-2 py-3 bg-slate-50 dark:bg-slate-800 rounded-2xl">
+        <div className="pt-4 border-t dark:border-slate-800 space-y-4">
+           <div className="flex items-center gap-3 px-2 py-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl">
               <div className="size-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-black">{currentUser.name.charAt(0)}</div>
-              <div className="flex-1 min-w-0"><p className="text-[11px] font-black uppercase truncate">{currentUser.name}</p><p className="text-[9px] font-bold text-slate-400 uppercase">{currentUser.role}</p></div>
-              <button onClick={() => { logout(); navigate('/login'); }} className="text-rose-500"><span className="material-symbols-outlined text-lg">logout</span></button>
+              <div className="flex-1 min-w-0"><p className="text-[11px] font-black dark:text-white uppercase truncate">{currentUser.name}</p><p className="text-[9px] font-bold text-slate-400 uppercase">{currentUser.role}</p></div>
+              <button onClick={() => { logout(); navigate('/login'); }} className="text-rose-500 hover:scale-110 transition-transform"><span className="material-symbols-outlined text-lg">logout</span></button>
            </div>
         </div>
       </aside>
 
       <main className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-16 flex-shrink-0 border-b bg-white/80 dark:bg-background-dark/80 backdrop-blur-md flex items-center justify-end px-8">
-           <div className="flex items-center gap-4"><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Unidade:</span><span className="text-xs font-black text-primary uppercase">{currentStoreName}</span></div>
+        <header className="h-16 flex-shrink-0 border-b dark:border-slate-800 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md flex items-center justify-between px-8">
+           {/* Lado Esquerdo Header (Pode ser usado para Breadcrumbs no futuro) */}
+           <div></div>
+
+           {/* Lado Direito Header: Unidade e Toggle Theme */}
+           <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2">
+                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Modo Claro:</span>
+                 {/* INTERRUPTOR DE TEMA (Ativo = Claro) */}
+                 <button 
+                   onClick={() => setIsLightMode(!isLightMode)}
+                   className={`w-14 h-7 rounded-full relative transition-all duration-500 shadow-inner flex items-center ${isLightMode ? 'bg-amber-400' : 'bg-slate-700'}`}
+                 >
+                    <div className={`absolute top-1 size-5 rounded-full bg-white shadow-md flex items-center justify-center transition-all duration-500 transform ${isLightMode ? 'left-8 rotate-0' : 'left-1 rotate-180'}`}>
+                       <span className={`material-symbols-outlined text-[14px] ${isLightMode ? 'text-amber-500' : 'text-slate-400'}`}>
+                          {isLightMode ? 'light_mode' : 'dark_mode'}
+                       </span>
+                    </div>
+                 </button>
+              </div>
+
+              <div className="h-6 w-px bg-slate-200 dark:bg-slate-800"></div>
+
+              <div className="flex items-center gap-4">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Unidade:</span>
+                <span className="text-xs font-black text-primary uppercase">{currentStoreName}</span>
+              </div>
+           </div>
         </header>
         <div className="flex-1 overflow-y-auto no-scrollbar">{children}</div>
       </main>
@@ -180,11 +222,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 };
 
 const SidebarItem = ({ to, icon, label }: any) => (
-  <NavLink to={to} className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${isActive ? 'bg-primary text-white shadow-lg font-black' : 'text-slate-600 hover:bg-slate-100'}`}><span className="material-symbols-outlined text-xl">{icon}</span><span className="text-xs font-black uppercase tracking-widest">{label}</span></NavLink>
+  <NavLink to={to} className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${isActive ? 'bg-primary text-white shadow-lg font-black' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}><span className="material-symbols-outlined text-xl">{icon}</span><span className="text-xs font-black uppercase tracking-widest">{label}</span></NavLink>
 );
 
 const SidebarSubItem = ({ to, label, small }: any) => (
-  <NavLink to={to} className={({ isActive }) => `${small ? 'px-4 py-1 text-[9px]' : 'px-4 py-2 text-[10px]'} font-bold uppercase transition-all ${isActive ? 'text-primary bg-primary/5 border-l-2 border-primary font-black' : 'text-slate-400 hover:text-slate-600'}`}>{label}</NavLink>
+  <NavLink to={to} className={({ isActive }) => `${small ? 'px-4 py-1 text-[9px]' : 'px-4 py-2 text-[10px]'} font-bold uppercase transition-all ${isActive ? 'text-primary bg-primary/5 border-l-2 border-primary font-black' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}>{label}</NavLink>
 );
 
 export default Layout;
