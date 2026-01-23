@@ -66,16 +66,14 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-// Permissões Padrão para garantir que o sistema funcione mesmo sem DB
 export const INITIAL_PERMS: Record<string, RolePermissions> = {
-  [UserRole.ADMIN]: { dashboard: true, pdv: true, customers: true, reports: true, inventory: true, balance: true, incomes: true, expenses: true, financial: true, settings: true, serviceOrders: true },
-  [UserRole.MANAGER]: { dashboard: true, pdv: true, customers: true, reports: true, inventory: true, balance: true, incomes: true, expenses: true, financial: true, settings: false, serviceOrders: true },
-  [UserRole.CASHIER]: { dashboard: true, pdv: true, customers: true, reports: false, inventory: false, balance: false, incomes: true, expenses: false, financial: false, settings: false, serviceOrders: true },
-  [UserRole.VENDOR]: { dashboard: true, pdv: true, customers: true, reports: false, inventory: false, balance: false, incomes: false, expenses: false, financial: false, settings: false, serviceOrders: true },
+  [UserRole.ADMIN]: { dashboard: true, pdv: true, customers: true, reports: true, inventory: true, balance: true, incomes: true, expenses: true, financial: true, settings: true, serviceOrders: true, cardManagement: true },
+  [UserRole.MANAGER]: { dashboard: true, pdv: true, customers: true, reports: true, inventory: true, balance: true, incomes: true, expenses: true, financial: true, settings: false, serviceOrders: true, cardManagement: true },
+  [UserRole.CASHIER]: { dashboard: true, pdv: true, customers: true, reports: false, inventory: false, balance: false, incomes: true, expenses: false, financial: false, settings: false, serviceOrders: true, cardManagement: false },
+  [UserRole.VENDOR]: { dashboard: true, pdv: true, customers: true, reports: false, inventory: false, balance: false, incomes: false, expenses: false, financial: false, settings: false, serviceOrders: true, cardManagement: false },
 };
 
 const SESSION_KEY = 'tem_acessorios_user_session';
-const LAST_ACTIVITY_KEY = 'tem_acessorios_last_activity';
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -96,61 +94,65 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [establishments, setEstablishments] = useState<Establishment[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const safeFetch = async (url: string) => {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (e) {
+      console.error(`Fetch error at ${url}:`, e);
+      return null;
+    }
+  };
+
   const logout = useCallback(() => {
     setCurrentUser(null);
     localStorage.removeItem(SESSION_KEY);
-    localStorage.removeItem(LAST_ACTIVITY_KEY);
   }, []);
 
   const refreshData = async () => {
     try {
-      const responses = await Promise.all([
-        fetch('/api/products').then(r => r.json()).catch(() => []),
-        fetch('/api/transactions').then(r => r.json()).catch(() => []),
-        fetch('/api/customers').then(r => r.json()).catch(() => []),
-        fetch('/api/users').then(r => r.json()).catch(() => []),
-        fetch('/api/establishments').then(r => r.json()).catch(() => []),
-        fetch('/api/service-orders').then(r => r.json()).catch(() => []),
-        fetch('/api/cash-sessions').then(r => r.json()).catch(() => []),
-        fetch('/api/cash-entries').then(r => r.json()).catch(() => []),
-        fetch('/api/card-operators').then(r => r.json()).catch(() => []),
-        fetch('/api/card-brands').then(r => r.json()).catch(() => []),
-        fetch('/api/config').then(r => r.ok ? r.json() : null).catch(() => null),
-        fetch('/api/permissions').then(r => r.ok ? r.json() : null).catch(() => null)
+      const [p, t, c, u, e, so, cs, ce, co, cb, conf, perms] = await Promise.all([
+        safeFetch('/api/products'),
+        safeFetch('/api/transactions'),
+        safeFetch('/api/customers'),
+        safeFetch('/api/users'),
+        safeFetch('/api/establishments'),
+        safeFetch('/api/service-orders'),
+        safeFetch('/api/cash-sessions'),
+        safeFetch('/api/cash-entries'),
+        safeFetch('/api/card-operators'),
+        safeFetch('/api/card-brands'),
+        safeFetch('/api/config'),
+        safeFetch('/api/permissions')
       ]);
       
-      setProducts(responses[0]);
-      setTransactions(responses[1]);
-      setCustomers(responses[2]);
-      setUsers(responses[3]);
-      setEstablishments(responses[4]);
-      setServiceOrders(responses[5]);
-      setCashSessions(responses[6]);
-      setCashEntries(responses[7]);
-      setCardOperators(responses[8]);
-      setCardBrands(responses[9]);
+      if (p) setProducts(p);
+      if (t) setTransactions(t);
+      if (c) setCustomers(c);
+      if (u) setUsers(u);
+      if (e) setEstablishments(e);
+      if (so) setServiceOrders(so);
+      if (cs) setCashSessions(cs);
+      if (ce) setCashEntries(ce);
+      if (co) setCardOperators(co);
+      if (cb) setCardBrands(cb);
+      if (conf) setSystemConfig(conf);
       
-      if (responses[10]) setSystemConfig(responses[10]);
-      
-      // Merge permissões: Usa o padrão e sobrescreve com o que vier do banco
-      if (responses[11] && Array.isArray(responses[11])) {
+      if (perms && Array.isArray(perms)) {
         const permsMap = { ...INITIAL_PERMS };
-        responses[11].forEach((p: any) => { 
-          if (p.role && p.permissions) {
-            permsMap[p.role] = p.permissions; 
-          }
-        });
+        perms.forEach((p: any) => { if (p.role && p.permissions) permsMap[p.role] = p.permissions; });
         setRolePermissions(permsMap);
       }
 
       const savedUser = localStorage.getItem(SESSION_KEY);
-      if (savedUser) {
-        const parsedUser = JSON.parse(savedUser) as User;
-        const validUser = (responses[3] as User[]).find(u => u.id === parsedUser.id && u.active);
-        if (validUser) setCurrentUser(validUser);
+      if (savedUser && u) {
+        const parsed = JSON.parse(savedUser);
+        const valid = u.find((x: any) => x.id === parsed.id && x.active);
+        if (valid) setCurrentUser(valid);
       }
     } catch (error) {
-      console.error("Erro na sincronização:", error);
+      console.error("Erro geral na sincronização:", error);
     } finally {
       setLoading(false);
     }
@@ -170,17 +172,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return false;
   };
 
-  const addProduct = async (p: Product) => { await fetch('/api/products', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(p)}); await refreshData(); };
+  const addProduct = async (p: Product) => { 
+    await fetch('/api/products', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(p)}); 
+    await refreshData(); 
+  };
   const addTransaction = async (t: Transaction) => { await fetch('/api/transactions', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(t)}); await refreshData(); };
   const addCustomer = async (c: Customer) => { await fetch('/api/customers', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(c)}); await refreshData(); };
   const addUser = async (u: User) => { await fetch('/api/users', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(u)}); await refreshData(); };
   const addEstablishment = async (e: Establishment) => { await fetch('/api/establishments', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(e)}); await refreshData(); };
   const addServiceOrder = async (os: ServiceOrder) => { await fetch('/api/service-orders', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(os)}); await refreshData(); };
-  const updateServiceOrder = async (os: ServiceOrder) => { await addServiceOrder(os); };
-  
   const saveCashSession = async (s: CashSession) => { await fetch('/api/cash-sessions', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(s)}); await refreshData(); };
   const addCashEntry = async (e: CashEntry) => { await fetch('/api/cash-entries', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(e)}); await refreshData(); };
-
   const saveCardOperator = async (o: CardOperator) => { await fetch('/api/card-operators', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(o)}); await refreshData(); };
   const deleteCardOperator = async (id: string) => { await fetch(`/api/card-operators?id=${id}`, { method: 'DELETE' }); await refreshData(); };
   const saveCardBrand = async (b: CardBrand) => { await fetch('/api/card-brands', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(b)}); await refreshData(); };
@@ -253,8 +255,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   return (
     <AppContext.Provider value={{ 
       currentUser, systemConfig, rolePermissions, products, transactions, customers, users, serviceOrders, establishments, cashSessions, cashEntries, cardOperators, cardBrands, loading, login, logout, 
-      addProduct, updateProduct: addProduct, deleteProduct: async (id) => {}, addTransaction, addCustomer, addUser, updateSelf: addUser, addServiceOrder, updateServiceOrder,
-      deleteUser: async (id) => {}, addEstablishment, deleteEstablishment: async (id) => {}, processSale, updateStock: async (id, q) => {}, bulkUpdateStock, refreshData, saveCashSession, addCashEntry,
+      addProduct, updateProduct: addProduct, deleteProduct: async () => {}, addTransaction, addCustomer, addUser, updateSelf: addUser, addServiceOrder, updateServiceOrder: addServiceOrder,
+      deleteUser: async () => {}, addEstablishment, deleteEstablishment: async () => {}, processSale, updateStock: async () => {}, bulkUpdateStock, refreshData, saveCashSession, addCashEntry,
       saveCardOperator, deleteCardOperator, saveCardBrand, deleteCardBrand,
       updateConfig: async (conf) => { await fetch('/api/config', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(conf)}); refreshData(); }, 
       updateRolePermissions: async (role, perms) => { await fetch('/api/permissions', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({role, permissions: perms})}); refreshData(); }
