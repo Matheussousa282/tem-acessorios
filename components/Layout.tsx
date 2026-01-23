@@ -14,15 +14,19 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   
   const [isStockOpen, setIsStockOpen] = useState(false);
   const [isVendasOpen, setIsVendasOpen] = useState(false);
+  const [isReportsOpen, setIsReportsOpen] = useState(false);
   const [isFinancialOpen, setIsFinancialOpen] = useState(false);
   const [isOSOpen, setIsOSOpen] = useState(false);
 
   useEffect(() => {
     if (location.pathname.includes('estoque')) setIsStockOpen(true);
-    if (location.pathname.includes('pdv') || location.pathname.includes('clientes') || location.pathname.includes('relatorios')) setIsVendasOpen(true);
+    if (location.pathname.includes('pdv') || location.pathname.includes('clientes') || location.pathname.includes('relatorios')) {
+      setIsVendasOpen(true);
+      if (location.pathname.includes('relatorios')) setIsReportsOpen(true);
+    }
     if (location.pathname.includes('entradas') || location.pathname.includes('dre') || location.pathname.includes('cartoes')) setIsFinancialOpen(true);
     if (location.pathname.includes('servicos')) setIsOSOpen(true);
-  }, []);
+  }, [location.pathname]);
 
   const currentStoreName = useMemo(() => {
     if (!currentUser || !establishments) return '---';
@@ -76,21 +80,33 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     <SidebarSubItem to="/caixa" label="Controle de Caixa" />
                     <SidebarSubItem to="/pdv" label="Frente de Caixa" />
                     <SidebarSubItem to="/clientes" label="Clientes" />
+                    
                     {perms.reports && (
-                      <div className="flex flex-col mt-2">
-                         <p className="px-4 py-1 text-[9px] font-black text-slate-400 uppercase tracking-widest">Relatórios</p>
-                         <SidebarSubItem to="/relatorios?type=evolucao" label="Evolução de Vendas" small />
-                         <SidebarSubItem to="/relatorios?type=por_unidade" label="Vendas por Unidade" small />
-                         <SidebarSubItem to="/relatorios?type=entrega_futura" label="Entrega Futura" small />
-                         <SidebarSubItem to="/relatorios?type=por_ano" label="Por Ano" small />
-                         <SidebarSubItem to="/relatorios?type=por_cliente" label="Por Cliente" small />
-                         <SidebarSubItem to="/relatorios?type=por_vendas" label="Por Vendas" small />
-                         <SidebarSubItem to="/relatorios?type=por_vendedor" label="Por Vendedor" small />
-                         <SidebarSubItem to="/relatorios?type=ticket_vendedor" label="Ticket Médio por Vendedor" small />
-                         <SidebarSubItem to="/relatorios?type=ticket_mes_ano" label="Ticket Médio por Mês/Ano" small />
-                         <SidebarSubItem to="/relatorios?type=por_produto" label="Por Produto" small />
-                         <SidebarSubItem to="/relatorios?type=margem_bruta" label="Por Produto com Margem Bruta" small />
-                         <SidebarSubItem to="/relatorios?type=por_servico" label="Por Serviço" small />
+                      <div className="flex flex-col mt-1">
+                         <button 
+                          onClick={() => setIsReportsOpen(!isReportsOpen)}
+                          className="flex items-center justify-between px-4 py-2 rounded-lg text-slate-400 hover:text-primary transition-all group"
+                         >
+                           <span className="text-[10px] font-black uppercase tracking-widest">Relatórios</span>
+                           <span className={`material-symbols-outlined text-sm transition-transform ${isReportsOpen ? 'rotate-180' : ''}`}>expand_more</span>
+                         </button>
+                         
+                         {isReportsOpen && (
+                           <div className="flex flex-col ml-3 border-l border-slate-100 dark:border-slate-800 mt-1 gap-0.5 animate-in slide-in-from-top-1">
+                              <SidebarSubItem to="/relatorios?type=evolucao" label="Evolução de Vendas" small />
+                              <SidebarSubItem to="/relatorios?type=por_unidade" label="Vendas por Unidade" small />
+                              <SidebarSubItem to="/relatorios?type=entrega_futura" label="Entrega Futura" small />
+                              <SidebarSubItem to="/relatorios?type=por_ano" label="Por Ano" small />
+                              <SidebarSubItem to="/relatorios?type=por_cliente" label="Por Cliente" small />
+                              <SidebarSubItem to="/relatorios?type=por_vendas" label="Por Vendas" small />
+                              <SidebarSubItem to="/relatorios?type=por_vendedor" label="Por Vendedor" small />
+                              <SidebarSubItem to="/relatorios?type=ticket_vendedor" label="Ticket Médio por Vendedor" small />
+                              <SidebarSubItem to="/relatorios?type=ticket_mes_ano" label="Ticket Médio por Mês/Ano" small />
+                              <SidebarSubItem to="/relatorios?type=por_produto" label="Por Produto" small />
+                              <SidebarSubItem to="/relatorios?type=margem_bruta" label="Por Produto com Margem Bruta" small />
+                              <SidebarSubItem to="/relatorios?type=por_servico" label="Por Serviço" small />
+                           </div>
+                         )}
                       </div>
                     )}
                   </div>
