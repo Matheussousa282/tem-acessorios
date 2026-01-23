@@ -137,6 +137,7 @@ export enum UserRole {
 export interface RolePermissions {
   dashboard: boolean;
   pdv: boolean;
+  cashControl: boolean;
   customers: boolean;
   reports: boolean;
   inventory: boolean;

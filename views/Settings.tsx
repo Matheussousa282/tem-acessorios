@@ -348,6 +348,7 @@ const getLabelForModule = (key: string) => {
   const labels: Record<string, string> = {
     dashboard: 'Dashboard / Resumo',
     pdv: 'Frente de Caixa (PDV)',
+    cashControl: 'Controle de Caixa',
     customers: 'Gestão de Clientes',
     reports: 'Relatórios de Venda',
     inventory: 'Catálogo de Produtos',
@@ -366,6 +367,7 @@ const getIconForModule = (key: string) => {
   const icons: Record<string, string> = {
     dashboard: 'dashboard',
     pdv: 'point_of_sale',
+    cashControl: 'account_balance_wallet',
     customers: 'groups',
     reports: 'monitoring',
     inventory: 'inventory_2',

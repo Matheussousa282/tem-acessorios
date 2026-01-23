@@ -18,9 +18,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [isFinancialOpen, setIsFinancialOpen] = useState(false);
   const [isOSOpen, setIsOSOpen] = useState(false);
 
+  const perms = useMemo(() => {
+    if (!currentUser) return INITIAL_PERMS[UserRole.VENDOR];
+    return rolePermissions[currentUser.role] || INITIAL_PERMS[currentUser.role] || INITIAL_PERMS[UserRole.VENDOR];
+  }, [rolePermissions, currentUser?.role]);
+
   useEffect(() => {
     if (location.pathname.includes('estoque')) setIsStockOpen(true);
-    if (location.pathname.includes('pdv') || location.pathname.includes('clientes') || location.pathname.includes('relatorios')) {
+    if (location.pathname.includes('pdv') || location.pathname.includes('clientes') || location.pathname.includes('relatorios') || location.pathname.includes('caixa')) {
       setIsVendasOpen(true);
       if (location.pathname.includes('relatorios')) setIsReportsOpen(true);
     }
@@ -36,11 +41,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   if (!currentUser) return null;
 
-  const perms = useMemo(() => {
-    return rolePermissions[currentUser.role] || INITIAL_PERMS[currentUser.role] || INITIAL_PERMS[UserRole.VENDOR];
-  }, [rolePermissions, currentUser.role]);
-
   if (isPDV) return <div className="h-screen w-full overflow-hidden">{children}</div>;
+
+  const hasVendasAccess = perms.cashControl || perms.pdv || perms.customers || perms.reports;
+  const hasEstoqueAccess = perms.inventory || perms.balance;
+  const hasFinancialGroupAccess = perms.incomes || perms.expenses || perms.cardManagement || perms.financial;
 
   return (
     <div className="flex h-screen overflow-hidden bg-background-light dark:bg-background-dark font-display">
@@ -69,7 +74,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </div>
             )}
 
-            {perms.pdv && (
+            {hasVendasAccess && (
                <div className="flex flex-col">
                 <button onClick={() => setIsVendasOpen(!isVendasOpen)} className="flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-slate-600 hover:bg-slate-100">
                   <div className="flex items-center gap-3"><span className="material-symbols-outlined text-xl">shopping_cart</span><span className="text-xs font-black uppercase tracking-widest">Vendas / PDV</span></div>
@@ -77,9 +82,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 </button>
                 {isVendasOpen && (
                   <div className="flex flex-col ml-9 mt-1 border-l gap-1">
-                    <SidebarSubItem to="/caixa" label="Controle de Caixa" />
-                    <SidebarSubItem to="/pdv" label="Frente de Caixa" />
-                    <SidebarSubItem to="/clientes" label="Clientes" />
+                    {perms.cashControl && <SidebarSubItem to="/caixa" label="Controle de Caixa" />}
+                    {perms.pdv && <SidebarSubItem to="/pdv" label="Frente de Caixa" />}
+                    {perms.customers && <SidebarSubItem to="/clientes" label="Clientes" />}
                     
                     {perms.reports && (
                       <div className="flex flex-col mt-1">
@@ -114,17 +119,22 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </div>
             )}
 
-            {perms.inventory && (
+            {hasEstoqueAccess && (
               <div className="flex flex-col">
                 <button onClick={() => setIsStockOpen(!isStockOpen)} className="flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-slate-600 hover:bg-slate-100">
                   <div className="flex items-center gap-3"><span className="material-symbols-outlined text-xl">inventory_2</span><span className="text-xs font-black uppercase tracking-widest">Estoque</span></div>
                   <span className={`material-symbols-outlined text-sm transition-transform ${isStockOpen ? 'rotate-180' : ''}`}>expand_more</span>
                 </button>
-                {isStockOpen && <div className="flex flex-col ml-9 mt-1 border-l gap-1"><SidebarSubItem to="/estoque" label="Produtos" /><SidebarSubItem to="/balanco" label="Balanço" /></div>}
+                {isStockOpen && (
+                  <div className="flex flex-col ml-9 mt-1 border-l gap-1">
+                    {perms.inventory && <SidebarSubItem to="/estoque" label="Produtos" />}
+                    {perms.balance && <SidebarSubItem to="/balanco" label="Balanço" />}
+                  </div>
+                )}
               </div>
             )}
 
-            {(perms.financial) && (
+            {hasFinancialGroupAccess && (
               <div className="flex flex-col">
                 <button onClick={() => setIsFinancialOpen(!isFinancialOpen)} className="flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-slate-600 hover:bg-slate-100">
                   <div className="flex items-center gap-3"><span className="material-symbols-outlined text-xl">account_balance</span><span className="text-xs font-black uppercase tracking-widest">Financeiro</span></div>
@@ -132,10 +142,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 </button>
                 {isFinancialOpen && (
                   <div className="flex flex-col ml-9 mt-1 border-l gap-1">
-                    <SidebarSubItem to="/entradas" label="Receitas" />
-                    <SidebarSubItem to="/saidas" label="Despesas" />
+                    {perms.incomes && <SidebarSubItem to="/entradas" label="Receitas" />}
+                    {perms.expenses && <SidebarSubItem to="/saidas" label="Despesas" />}
                     {perms.cardManagement && <SidebarSubItem to="/cartoes" label="Cartões" />}
-                    <SidebarSubItem to="/dre" label="DRE" />
+                    {perms.financial && <SidebarSubItem to="/dre" label="DRE" />}
                   </div>
                 )}
               </div>

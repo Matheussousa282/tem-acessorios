@@ -1,7 +1,7 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AppProvider, useApp } from './AppContext';
+import { AppProvider, useApp, INITIAL_PERMS } from './AppContext';
 import Layout from './components/Layout';
 import Dashboard from './views/Dashboard';
 import PDV from './views/PDV';
@@ -16,6 +16,22 @@ import ServiceOrders from './views/ServiceOrders';
 import Login from './views/Login';
 import CashMovement from './views/CashMovement';
 import CardManagement from './views/CardManagement';
+import { UserRole } from './types';
+
+// Fix: Mark children as optional in the prop type definition to satisfy TypeScript's JSX checks when children are passed as nested elements.
+const ProtectedRoute = ({ children, perm }: { children?: React.ReactNode, perm?: string }) => {
+  const { currentUser, rolePermissions } = useApp();
+  
+  const perms = useMemo(() => {
+    if (!currentUser) return INITIAL_PERMS[UserRole.VENDOR];
+    return rolePermissions[currentUser.role] || INITIAL_PERMS[currentUser.role];
+  }, [rolePermissions, currentUser?.role]);
+
+  if (!currentUser) return <Navigate to="/login" />;
+  if (perm && !(perms as any)[perm]) return <Navigate to="/" />;
+
+  return <>{children}</>;
+};
 
 const AppRoutes: React.FC = () => {
   const { currentUser, loading } = useApp();
@@ -43,18 +59,18 @@ const AppRoutes: React.FC = () => {
   return (
     <Routes>
       <Route path="/" element={<Layout><Dashboard /></Layout>} />
-      <Route path="/pdv" element={<PDV />} />
-      <Route path="/caixa" element={<Layout><CashMovement /></Layout>} />
-      <Route path="/clientes" element={<Layout><Customers /></Layout>} />
-      <Route path="/relatorios" element={<Layout><Reports /></Layout>} />
-      <Route path="/estoque" element={<Layout><Inventory /></Layout>} />
-      <Route path="/balanco" element={<Layout><Balance /></Layout>} />
-      <Route path="/servicos" element={<Layout><ServiceOrders /></Layout>} />
-      <Route path="/entradas" element={<Layout><Transactions type="INCOME" /></Layout>} />
-      <Route path="/saidas" element={<Layout><Transactions type="EXPENSE" /></Layout>} />
-      <Route path="/cartoes" element={<Layout><CardManagement /></Layout>} />
-      <Route path="/dre" element={<Layout><DRE /></Layout>} />
-      <Route path="/config" element={<Layout><Settings /></Layout>} />
+      <Route path="/pdv" element={<ProtectedRoute perm="pdv"><PDV /></ProtectedRoute>} />
+      <Route path="/caixa" element={<Layout><ProtectedRoute perm="cashControl"><CashMovement /></ProtectedRoute></Layout>} />
+      <Route path="/clientes" element={<Layout><ProtectedRoute perm="customers"><Customers /></ProtectedRoute></Layout>} />
+      <Route path="/relatorios" element={<Layout><ProtectedRoute perm="reports"><Reports /></ProtectedRoute></Layout>} />
+      <Route path="/estoque" element={<Layout><ProtectedRoute perm="inventory"><Inventory /></ProtectedRoute></Layout>} />
+      <Route path="/balanco" element={<Layout><ProtectedRoute perm="balance"><Balance /></ProtectedRoute></Layout>} />
+      <Route path="/servicos" element={<Layout><ProtectedRoute perm="serviceOrders"><ServiceOrders /></ProtectedRoute></Layout>} />
+      <Route path="/entradas" element={<Layout><ProtectedRoute perm="incomes"><Transactions type="INCOME" /></ProtectedRoute></Layout>} />
+      <Route path="/saidas" element={<Layout><ProtectedRoute perm="expenses"><Transactions type="EXPENSE" /></ProtectedRoute></Layout>} />
+      <Route path="/cartoes" element={<Layout><ProtectedRoute perm="cardManagement"><CardManagement /></ProtectedRoute></Layout>} />
+      <Route path="/dre" element={<Layout><ProtectedRoute perm="financial"><DRE /></ProtectedRoute></Layout>} />
+      <Route path="/config" element={<Layout><ProtectedRoute perm="settings"><Settings /></ProtectedRoute></Layout>} />
       <Route path="/login" element={<Navigate to="/" replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
