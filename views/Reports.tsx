@@ -5,12 +5,12 @@ import { Transaction, UserRole } from '../types';
 import { useLocation } from 'react-router-dom';
 
 const Reports: React.FC = () => {
-  const { transactions, users, currentUser, establishments } = useApp();
+  const { transactions, users, currentUser, establishments, products } = useApp();
   const location = useLocation();
   const query = new URLSearchParams(location.search);
   const reportType = query.get('type') || 'evolucao';
 
-  // Filtros de Data - Agora inicia com os últimos 30 dias para garantir que mostre dados
+  // Filtros de Data
   const today = new Date();
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(today.getDate() - 30);
@@ -30,215 +30,245 @@ const Reports: React.FC = () => {
   const currentStore = establishments.find(e => e.id === currentUser?.storeId);
   const currentStoreName = currentStore?.name || 'ADMINISTRATIVO GLOBAL';
 
-  // 1. Filtragem Base (Data e Permissões)
+  // 1. Filtragem Base
   const baseFilteredData = useMemo(() => {
     return (transactions || []).filter(t => {
       if (t.type !== 'INCOME') return false;
-      
       const matchesDate = t.date >= startDate && t.date <= endDate;
       if (!matchesDate) return false;
-
       const belongsToStore = isAdmin || t.store === currentStoreName;
       if (!belongsToStore) return false;
-      
       if (filterStore !== 'TODAS LOJAS' && t.store !== filterStore) return false;
       if (filterCustomer && !t.client?.toLowerCase().includes(filterCustomer.toLowerCase())) return false;
       if (filterPayment !== 'TODOS PAGTOS' && t.method !== filterPayment) return false;
-
       return true;
     });
   }, [transactions, startDate, endDate, isAdmin, currentStoreName, filterStore, filterCustomer, filterPayment]);
 
   // 2. Processamento Dinâmico por Tipo de Relatório
   const displayData = useMemo(() => {
+    // Relatórios de Vendas Analítico
     if (reportType === 'evolucao' || reportType === 'por_vendas') {
-      return baseFilteredData.map(t => ({
-        col1: t.date,
-        col2: t.store,
-        col3: t.client || 'Consumidor Final',
-        col4: t.method,
-        value: t.value,
-        id: t.id
-      }));
+      return baseFilteredData.map(t => {
+        const qtyItems = t.items?.reduce((acc, item) => acc + item.quantity, 0) || 0;
+        return {
+          id: t.id,
+          col1: t.date,
+          col2: t.store,
+          col3: t.client || 'Consumidor Final',
+          col4: `${qtyItems} itens`,
+          col5: t.method,
+          value: t.value,
+          extra: t.id.split('-')[1] ? new Date(parseInt(t.id.split('-')[1])).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'}) : '--:--'
+        };
+      });
     }
 
-    // Agrupamentos
     const groups: Record<string, any> = {};
 
+    // Relatório de Produtos com Rentabilidade
     if (reportType === 'por_produto' || reportType === 'margem_bruta') {
       baseFilteredData.forEach(t => {
         (t.items || []).forEach(item => {
           const key = item.id;
           if (!groups[key]) {
-            groups[key] = { col1: item.sku, col2: 'MERCADORIA', col3: item.name, col4: 'UN', value: 0, qty: 0 };
+            groups[key] = { col1: item.sku, col2: item.category, col3: item.name, qty: 0, revenue: 0, cost: 0, profit: 0 };
           }
-          groups[key].value += (item.salePrice * item.quantity);
+          const itemRev = (item.salePrice * item.quantity);
+          const itemCost = (item.costPrice * item.quantity);
           groups[key].qty += item.quantity;
-          groups[key].col4 = `${groups[key].qty} UN`;
+          groups[key].revenue += itemRev;
+          groups[key].cost += itemCost;
+          groups[key].profit = groups[key].revenue - groups[key].cost;
         });
       });
-    } else {
-      baseFilteredData.forEach(t => {
-        let key = '';
-        let label = '';
-        let subLabel = '';
-
-        switch (reportType) {
-          case 'por_unidade': key = t.store; label = t.store; subLabel = 'UNIDADE'; break;
-          case 'por_cliente': key = t.client || 'FINAL'; label = t.client || 'Consumidor Final'; subLabel = 'CLIENTE'; break;
-          case 'por_vendedor': 
-            const v = users.find(u => u.id === t.vendorId);
-            key = t.vendorId || 'BALCAO'; label = v?.name || 'Vendedor não inf.'; subLabel = 'CONSULTOR'; break;
-          default: key = t.id; label = t.description; subLabel = t.category;
-        }
-
-        if (!groups[key]) {
-          groups[key] = { col1: '---', col2: subLabel, col3: label, col4: 'Venda(s)', value: 0, count: 0 };
-        }
-        groups[key].value += t.value;
-        groups[key].count += 1;
-        groups[key].col4 = `${groups[key].count} Venda(s)`;
-      });
+      return Object.values(groups).map(g => ({
+        ...g,
+        col4: `${g.qty.toLocaleString('pt-BR')} UN`,
+        value: g.revenue,
+        margin: g.revenue > 0 ? (g.profit / g.revenue) * 100 : 0
+      })).sort((a, b) => b.value - a.value);
     }
 
-    return Object.values(groups).sort((a, b) => b.value - a.value);
+    // Relatório de Vendedores com Comissões
+    if (reportType === 'por_vendedor') {
+      baseFilteredData.forEach(t => {
+        const vendor = users.find(u => u.id === t.vendorId);
+        const key = t.vendorId || 'BALCAO';
+        const vName = vendor?.name || 'Vendedor não inf.';
+        const rate = vendor?.commissionRate || 0;
+
+        if (!groups[key]) {
+          groups[key] = { col1: vendor?.role || '---', col2: t.store, col3: vName, count: 0, value: 0, commission: 0 };
+        }
+        groups[key].count += 1;
+        groups[key].value += t.value;
+        groups[key].commission += (t.value * (rate / 100));
+      });
+      return Object.values(groups).map(g => ({
+        ...g,
+        col4: `${g.count} Venda(s)`,
+        extra: `R$ ${g.commission.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`
+      })).sort((a, b) => b.value - a.value);
+    }
+
+    // Outros Agrupamentos (Unidade, Cliente)
+    baseFilteredData.forEach(t => {
+      let key = '';
+      let label = '';
+      let subLabel = '';
+      switch (reportType) {
+        case 'por_unidade': key = t.store; label = t.store; subLabel = 'UNIDADE'; break;
+        case 'por_cliente': key = t.client || 'FINAL'; label = t.client || 'Consumidor Final'; subLabel = 'CLIENTE'; break;
+        default: key = t.id; label = t.description; subLabel = t.category;
+      }
+      if (!groups[key]) {
+        groups[key] = { col1: '---', col2: subLabel, col3: label, count: 0, value: 0 };
+      }
+      groups[key].value += t.value;
+      groups[key].count += 1;
+    });
+    return Object.values(groups).map(g => ({
+      ...g,
+      col4: `${g.count} Movimentações`,
+      value: g.value
+    })).sort((a, b) => b.value - a.value);
+
   }, [baseFilteredData, reportType, users]);
 
-  // Cálculos para os Cards (Sempre sobre a base filtrada)
+  // Métricas Consolidadas
   const metrics = useMemo(() => {
     const faturamento = baseFilteredData.reduce((acc, t) => acc + t.value, 0);
     const operacoes = baseFilteredData.length;
     const ticketMedio = operacoes > 0 ? faturamento / operacoes : 0;
-    const uniqueClients = new Set(baseFilteredData.map(t => t.clientId || t.client)).size;
-    return { faturamento, operacoes, ticketMedio, uniqueClients };
+    
+    let totalCusto = 0;
+    baseFilteredData.forEach(t => {
+       t.items?.forEach(item => totalCusto += (item.costPrice * item.quantity));
+    });
+    
+    const lucroBruto = faturamento - totalCusto;
+    const markup = totalCusto > 0 ? (lucroBruto / totalCusto) * 100 : 0;
+
+    return { faturamento, operacoes, ticketMedio, lucroBruto, markup };
   }, [baseFilteredData]);
 
   const getTableHeaders = () => {
     switch (reportType) {
-      case 'por_produto': return ['SKU', 'Tipo', 'Descrição do Produto', 'Qtd Total', 'Total Bruto'];
-      case 'por_cliente': return ['---', 'Tipo', 'Nome do Cliente', 'Frequência', 'Total Gasto'];
-      case 'por_vendedor': return ['---', 'Cargo', 'Nome do Consultor', 'Atendimentos', 'Total Vendido'];
+      case 'por_produto': 
+      case 'margem_bruta': return ['SKU', 'Categoria', 'Produto', 'Quantidade', 'Lucro (R$)', 'Total Bruto'];
+      case 'por_vendedor': return ['Cargo', 'Loja', 'Consultor', 'Qtd. Vendas', 'Comissão Est.', 'Total'];
+      case 'por_cliente': return ['---', 'Perfil', 'Nome do Cliente', 'Frequência', 'Total Gasto'];
       case 'por_unidade': return ['---', 'Tipo', 'Unidade/Loja', 'Movimento', 'Total Loja'];
-      default: return ['Data', 'Loja/Unidade', 'Cliente/Descrição', 'Pagamento', 'Valor Total'];
+      default: return ['Data', 'Unidade', 'Cliente', 'Qtd Itens', 'Pagamento', 'Total'];
     }
-  };
-
-  const clearFilters = () => {
-    setFilterStore('TODAS LOJAS');
-    setFilterCustomer('');
-    setFilterPayment('TODOS PAGTOS');
-    setStartDate(thirtyDaysAgoStr);
-    setEndDate(todayStr);
   };
 
   return (
     <div className="p-8 space-y-8 animate-in fade-in duration-500 bg-[#0f172a] min-h-screen text-slate-100 print:bg-white print:text-black print:p-0">
       
-      {/* HEADER RELATÓRIO */}
+      {/* HEADER */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 print:mb-8">
         <div className="space-y-1">
-          <h2 className="text-3xl font-black uppercase tracking-tight text-white print:text-black">
-            {reportType.replace('_', ' ')} de Vendas
+          <h2 className="text-4xl font-black uppercase tracking-tighter text-white print:text-black">
+            Relatório {reportType.replace('_', ' ')}
           </h2>
           <div className="flex items-center gap-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-             <span>Período: {startDate} até {endDate}</span>
+             <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">calendar_today</span> {startDate} a {endDate}</span>
              <span className="size-1 bg-slate-600 rounded-full"></span>
-             <span>Unidade: {isAdmin ? filterStore : currentStoreName}</span>
+             <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">store</span> {isAdmin ? filterStore : currentStoreName}</span>
           </div>
         </div>
         
         <div className="flex items-center gap-3 bg-slate-900/50 p-3 rounded-[2rem] border border-slate-800 print:hidden">
            <div className="flex items-center gap-2 px-4 border-r border-slate-800">
-              <span className="material-symbols-outlined text-slate-500 text-lg">calendar_month</span>
               <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-transparent border-none text-[11px] font-black text-white focus:ring-0 uppercase" />
            </div>
            <div className="flex items-center gap-2 px-4 border-r border-slate-800">
-              <span className="material-symbols-outlined text-slate-500 text-lg">calendar_month</span>
               <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-transparent border-none text-[11px] font-black text-white focus:ring-0 uppercase" />
            </div>
            <button onClick={() => window.print()} className="flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-2xl text-[10px] font-black uppercase shadow-lg shadow-primary/20 hover:scale-105 transition-all">
-              <span className="material-symbols-outlined text-lg">print</span> Imprimir
+              <span className="material-symbols-outlined text-lg">print</span> Gerar PDF
            </button>
         </div>
       </div>
 
-      {/* CARDS DE RESUMO */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 print:grid-cols-4">
-         <MetricCard title="Ticket Médio" value={`R$ ${metrics.ticketMedio.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`} icon="payments" iconBg="bg-blue-500/10 text-blue-500" />
-         <MetricCard title="Faturamento Bruto" value={`R$ ${metrics.faturamento.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`} icon="trending_up" iconBg="bg-emerald-500/10 text-emerald-500" />
-         <MetricCard title="Operações" value={metrics.operacoes.toString()} icon="shopping_bag" iconBg="bg-amber-500/10 text-amber-500" />
-         <MetricCard title="Itens/Clientes" value={metrics.uniqueClients.toString()} icon="layers" iconBg="bg-indigo-500/10 text-indigo-500" />
+      {/* METRICAS ANALÍTICAS */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 print:grid-cols-5">
+         <MetricCard title="Faturamento" value={`R$ ${metrics.faturamento.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`} icon="trending_up" color="text-emerald-500" />
+         <MetricCard title="Lucro Bruto (PDV)" value={`R$ ${metrics.lucroBruto.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`} icon="account_balance_wallet" color="text-primary" />
+         <MetricCard title="Markup Médio" value={`${metrics.markup.toFixed(1)}%`} icon="percent" color="text-amber-500" />
+         <MetricCard title="Ticket Médio" value={`R$ ${metrics.ticketMedio.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`} icon="receipt_long" color="text-indigo-400" />
+         <MetricCard title="Operações" value={metrics.operacoes.toString()} icon="shopping_bag" color="text-rose-400" />
       </div>
 
-      {/* BARRA DE FILTROS SECUNDÁRIA */}
-      <div className="bg-[#1e293b]/50 p-4 rounded-[2rem] border border-slate-800 flex flex-wrap items-center gap-4 print:hidden">
+      {/* FILTROS ADICIONAIS */}
+      <div className="bg-[#1e293b]/50 p-5 rounded-[2.5rem] border border-slate-800 flex flex-wrap items-center gap-4 print:hidden">
          {isAdmin && (
-           <select 
-             value={filterStore} 
-             onChange={e => setFilterStore(e.target.value)}
-             className="h-12 bg-slate-900/50 border border-slate-700 rounded-xl px-4 text-[10px] font-black uppercase text-slate-300 outline-none focus:ring-2 focus:ring-primary min-w-[180px]"
-           >
-              <option>TODAS LOJAS</option>
-              {establishments.map(e => <option key={e.id} value={e.name}>{e.name}</option>)}
-           </select>
+           <div className="flex flex-col gap-1.5">
+             <label className="text-[9px] font-black text-slate-500 uppercase px-2">Unidade</label>
+             <select value={filterStore} onChange={e => setFilterStore(e.target.value)} className="h-11 bg-slate-900/80 border-none rounded-xl px-4 text-[10px] font-black uppercase text-slate-300 min-w-[180px]">
+                <option>TODAS LOJAS</option>
+                {establishments.map(e => <option key={e.id} value={e.name}>{e.name}</option>)}
+             </select>
+           </div>
          )}
-
-         <div className="flex-1 relative min-w-[200px]">
-            <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-lg">person_search</span>
-            <input 
-              value={filterCustomer}
-              onChange={e => setFilterCustomer(e.target.value)}
-              placeholder="BUSCAR CLIENTE..." 
-              className="w-full h-12 bg-slate-900/50 border border-slate-700 rounded-xl pl-12 pr-4 text-[10px] font-black uppercase text-white outline-none focus:ring-2 focus:ring-primary" 
-            />
+         <div className="flex flex-col gap-1.5 flex-1">
+           <label className="text-[9px] font-black text-slate-500 uppercase px-2">Buscar Cliente</label>
+           <input value={filterCustomer} onChange={e => setFilterCustomer(e.target.value)} placeholder="NOME OU DOCUMENTO..." className="w-full h-11 bg-slate-900/80 border-none rounded-xl px-4 text-[10px] font-black uppercase text-white outline-none focus:ring-2 focus:ring-primary" />
          </div>
-
-         <select 
-           value={filterPayment}
-           onChange={e => setFilterPayment(e.target.value)}
-           className="h-12 bg-slate-900/50 border border-slate-700 rounded-xl px-4 text-[10px] font-black uppercase text-slate-300 outline-none focus:ring-2 focus:ring-primary min-w-[180px]"
-         >
-            <option>TODOS PAGTOS</option>
-            <option>Dinheiro</option>
-            <option>Pix</option>
-            <option>Debito</option>
-            <option>Credito</option>
-         </select>
-
-         <button onClick={clearFilters} className="text-[10px] font-black uppercase text-primary hover:underline px-4">Limpar</button>
+         <div className="flex flex-col gap-1.5">
+           <label className="text-[9px] font-black text-slate-500 uppercase px-2">Forma Pagt.</label>
+           <select value={filterPayment} onChange={e => setFilterPayment(e.target.value)} className="h-11 bg-slate-900/80 border-none rounded-xl px-4 text-[10px] font-black uppercase text-slate-300 min-w-[180px]">
+              <option>TODOS PAGTOS</option>
+              {['Dinheiro', 'Pix', 'Debito', 'Credito'].map(m => <option key={m}>{m}</option>)}
+           </select>
+         </div>
       </div>
 
-      {/* TABELA DE RESULTADOS */}
-      <div className="bg-[#1e293b] rounded-[2.5rem] border border-slate-800 overflow-hidden shadow-2xl print:border-none print:shadow-none">
+      {/* TABELA ANALÍTICA */}
+      <div className="bg-[#1e293b] rounded-[3rem] border border-slate-800 overflow-hidden shadow-2xl print:border-none">
          <table className="w-full text-left">
             <thead>
-               <tr className="bg-slate-800/50 border-b border-slate-700">
+               <tr className="bg-slate-800/80 border-b border-slate-700">
                   {getTableHeaders().map((h, i) => (
-                    <th key={i} className={`px-8 py-6 text-[10px] font-black uppercase text-slate-400 ${i === 4 ? 'text-right' : ''}`}>{h}</th>
+                    <th key={i} className={`px-8 py-6 text-[10px] font-black uppercase text-slate-400 tracking-widest ${i >= 4 ? 'text-right' : ''}`}>{h}</th>
                   ))}
                </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/50">
                {displayData.map((row: any, idx: number) => (
-                 <tr key={row.id || idx} className="hover:bg-slate-800/30 transition-all font-bold group">
-                    <td className="px-8 py-5 text-xs text-slate-400">{row.col1}</td>
-                    <td className="px-8 py-5 text-xs text-primary uppercase">{row.col2}</td>
-                    <td className="px-8 py-5 text-xs text-slate-200 uppercase">{row.col3}</td>
-                    <td className="px-8 py-5 text-[10px] text-slate-500 uppercase">{row.col4}</td>
-                    <td className="px-8 py-5 text-right text-sm font-black text-white print:text-black tabular-nums">R$ {row.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                 <tr key={idx} className="hover:bg-slate-800/40 transition-all group">
+                    <td className="px-8 py-5 text-xs text-slate-500 font-mono">{row.col1}</td>
+                    <td className="px-8 py-5 text-xs text-primary font-black uppercase">{row.col2}</td>
+                    <td className="px-8 py-5 text-xs text-slate-200 font-bold uppercase truncate max-w-[250px]">{row.col3}</td>
+                    <td className="px-8 py-5 text-[10px] text-slate-400 font-black uppercase">{row.col4}</td>
+                    <td className="px-8 py-5 text-right font-black">
+                       {reportType === 'por_vendedor' ? (
+                          <span className="text-emerald-500 text-[11px] tabular-nums">{row.extra}</span>
+                       ) : reportType === 'por_produto' || reportType === 'margem_bruta' ? (
+                          <div className="flex flex-col">
+                             <span className={`text-[11px] tabular-nums ${row.profit > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>R$ {row.profit?.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                             <span className="text-[9px] text-slate-500 font-bold">{row.margin?.toFixed(1)}% margem</span>
+                          </div>
+                       ) : (
+                          <span className="text-slate-400 text-[10px] tabular-nums">{row.extra || row.col5 || '---'}</span>
+                       )}
+                    </td>
+                    <td className="px-8 py-5 text-right text-sm font-black text-white tabular-nums">
+                       R$ {row.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                    </td>
                  </tr>
                ))}
                {displayData.length === 0 && (
-                 <tr>
-                    <td colSpan={5} className="px-8 py-20 text-center text-[10px] font-black uppercase text-slate-600 tracking-widest">Nenhum registro localizado no período</td>
-                 </tr>
+                 <tr><td colSpan={6} className="px-8 py-32 text-center text-[11px] font-black uppercase text-slate-600 tracking-[0.3em]">Nenhum dado analítico no período</td></tr>
                )}
             </tbody>
             {displayData.length > 0 && (
-              <tfoot className="bg-slate-800/20 border-t border-slate-700">
+              <tfoot className="bg-slate-800/30 border-t border-slate-700">
                  <tr>
-                    <td colSpan={4} className="px-8 py-6 text-[10px] font-black uppercase text-slate-400 text-right">Somatória Geral:</td>
-                    <td className="px-8 py-6 text-right text-lg font-black text-primary tabular-nums">R$ {metrics.faturamento.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                    <td colSpan={5} className="px-8 py-8 text-[11px] font-black uppercase text-slate-400 text-right tracking-widest">Somatória Geral do Período:</td>
+                    <td className="px-8 py-8 text-right text-2xl font-black text-primary tabular-nums">R$ {metrics.faturamento.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                  </tr>
               </tfoot>
             )}
@@ -247,30 +277,28 @@ const Reports: React.FC = () => {
 
       <style>{`
         @media print {
-          aside, header, nav, .print\\:hidden, button, select, input { display: none !important; }
-          body { background-color: white !important; color: black !important; margin: 0 !important; padding: 0 !important; }
-          #root, main, div[class*="overflow-y-auto"] { overflow: visible !important; height: auto !important; width: 100% !important; position: static !important; }
-          .p-8 { padding: 0 !important; }
-          table { border-collapse: collapse !important; width: 100% !important; }
-          tr { page-break-inside: avoid !important; }
-          th { background-color: #f8fafc !important; color: #475569 !important; border-bottom: 2px solid #e2e8f0 !important; }
-          td, th { border: 1px solid #e2e8f0 !important; padding: 8px !important; }
-          .text-white { color: black !important; }
+          body { background: white !important; color: black !important; }
+          .print\\:hidden { display: none !important; }
+          table { border: 1px solid #e2e8f0 !important; width: 100% !important; }
+          th { background: #f8fafc !important; color: #64748b !important; border-bottom: 2px solid #e2e8f0 !important; }
+          td { border-bottom: 1px solid #f1f5f9 !important; padding: 10px !important; color: black !important; }
+          .text-white, .text-slate-100, .text-slate-200 { color: black !important; }
           .text-primary { color: #136dec !important; }
+          .bg-[#0f172a], .bg-[#1e293b] { background: white !important; }
         }
       `}</style>
     </div>
   );
 };
 
-const MetricCard = ({ title, value, icon, iconBg }: any) => (
-  <div className="bg-[#1e293b] p-8 rounded-[2.5rem] border border-slate-800 shadow-lg flex flex-col gap-6 group hover:border-primary transition-all print:border-slate-200">
-     <div className={`size-14 rounded-2xl flex items-center justify-center ${iconBg} shadow-inner`}>
-        <span className="material-symbols-outlined text-3xl">{icon}</span>
+const MetricCard = ({ title, value, icon, color }: any) => (
+  <div className="bg-[#1e293b] p-6 rounded-[2.5rem] border border-slate-800 shadow-xl flex flex-col gap-4 group hover:border-primary/50 transition-all print:border-slate-200">
+     <div className={`size-12 rounded-2xl bg-slate-800/50 ${color} flex items-center justify-center shadow-inner`}>
+        <span className="material-symbols-outlined text-2xl">{icon}</span>
      </div>
-     <div className="space-y-1">
-        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{title}</p>
-        <h3 className="text-3xl font-black text-white print:text-black tabular-nums tracking-tighter">{value}</h3>
+     <div>
+        <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">{title}</p>
+        <h3 className="text-2xl font-black text-white print:text-black tabular-nums tracking-tighter">{value}</h3>
      </div>
   </div>
 );
