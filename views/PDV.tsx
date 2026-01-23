@@ -56,6 +56,8 @@ const PDV: React.FC = () => {
   const [returnSearchTerm, setReturnSearchTerm] = useState('');
   const [selectedReturnSale, setSelectedReturnSale] = useState<Transaction | null>(null);
 
+  // Estados Novo Cliente Rápido
+  const [activeCustomerTab, setActiveCustomerTab] = useState<'basic' | 'address'>('basic');
   const initialCustomerForm: Omit<Customer, 'id'> = { 
     name: '', phone: '', email: '', birthDate: new Date().toISOString().split('T')[0],
     cpfCnpj: '', zipCode: '', address: '', number: '', neighborhood: '', city: '', state: ''
@@ -188,6 +190,7 @@ const PDV: React.FC = () => {
     setSelectedCustomerId(newId);
     setShowCustomerModal(false);
     setCustomerForm(initialCustomerForm);
+    setActiveCustomerTab('basic');
   };
 
   const filteredReturnSales = useMemo(() => {
@@ -541,18 +544,118 @@ const PDV: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL NOVO CLIENTE */}
+      {/* --------------------------------------------------------- */}
+      {/* MODAL NOVO CLIENTE RÁPIDO (CONFORME IMAGEM) */}
+      {/* --------------------------------------------------------- */}
       {showCustomerModal && (
-        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 print:hidden">
-           <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
-              <div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-primary text-white flex justify-between items-center">
-                 <h3 className="text-xl font-black uppercase">Novo Cliente (PDV)</h3>
-                 <button onClick={() => setShowCustomerModal(false)} className="material-symbols-outlined">close</button>
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 animate-in fade-in">
+           <div className="bg-[#0b111a] w-full max-w-lg rounded-[2.5rem] shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden animate-in zoom-in-95 border border-white/5">
+              {/* HEADER AZUL */}
+              <div className="p-8 bg-primary text-white flex justify-between items-center">
+                 <h3 className="text-2xl font-black uppercase tracking-tight">NOVO CLIENTE RÁPIDO</h3>
+                 <button onClick={() => { setShowCustomerModal(false); setActiveCustomerTab('basic'); }} className="size-10 hover:bg-white/10 rounded-full flex items-center justify-center transition-all">
+                    <span className="material-symbols-outlined text-2xl">close</span>
+                 </button>
               </div>
-              <form onSubmit={handleSaveCustomer} className="p-8 space-y-4">
-                 <input required placeholder="NOME DO CLIENTE" value={customerForm.name} onChange={e => setCustomerForm({...customerForm, name: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold uppercase" />
-                 <input placeholder="WHATSAPP / TELEFONE" value={customerForm.phone} onChange={e => setCustomerForm({...customerForm, phone: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold" />
-                 <button type="submit" className="w-full h-16 bg-primary text-white rounded-2xl font-black text-xs uppercase shadow-xl">Cadastrar e Usar</button>
+              
+              <form onSubmit={handleSaveCustomer} className="p-8 space-y-6">
+                 {/* ABAS ESTILIZADAS */}
+                 <div className="bg-[#1a2433] p-1.5 rounded-2xl flex gap-1">
+                    <button 
+                       type="button" 
+                       onClick={() => setActiveCustomerTab('basic')}
+                       className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${activeCustomerTab === 'basic' ? 'bg-white text-[#0b111a] shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+                    >
+                       BÁSICO
+                    </button>
+                    <button 
+                       type="button" 
+                       onClick={() => setActiveCustomerTab('address')}
+                       className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${activeCustomerTab === 'address' ? 'bg-white text-[#0b111a] shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+                    >
+                       ENDEREÇO
+                    </button>
+                 </div>
+
+                 {/* CONTEÚDO DAS ABAS */}
+                 <div className="space-y-4 min-h-[320px]">
+                    {activeCustomerTab === 'basic' ? (
+                       <div className="space-y-4 animate-in fade-in slide-in-from-left-2">
+                          <input 
+                             required 
+                             placeholder="NOME COMPLETO" 
+                             value={customerForm.name} 
+                             onChange={e => setCustomerForm({...customerForm, name: e.target.value})} 
+                             className="w-full h-16 bg-[#1a2433] border-none rounded-2xl px-6 text-sm font-black text-white placeholder:text-slate-600 uppercase focus:ring-2 focus:ring-primary outline-none transition-all" 
+                          />
+                          <input 
+                             placeholder="WhatsApp (DDD)" 
+                             value={customerForm.phone} 
+                             onChange={e => setCustomerForm({...customerForm, phone: e.target.value})} 
+                             className="w-full h-16 bg-[#1a2433] border-none rounded-2xl px-6 text-sm font-black text-white placeholder:text-slate-600 uppercase focus:ring-2 focus:ring-primary outline-none transition-all" 
+                          />
+                          <input 
+                             placeholder="CPF/CNPJ" 
+                             value={customerForm.cpfCnpj} 
+                             onChange={e => setCustomerForm({...customerForm, cpfCnpj: e.target.value})} 
+                             className="w-full h-16 bg-[#1a2433] border-none rounded-2xl px-6 text-sm font-black text-white placeholder:text-slate-600 uppercase focus:ring-2 focus:ring-primary outline-none transition-all" 
+                          />
+                          <input 
+                             placeholder="E-mail (Opcional)" 
+                             type="email"
+                             value={customerForm.email} 
+                             onChange={e => setCustomerForm({...customerForm, email: e.target.value})} 
+                             className="w-full h-16 bg-[#1a2433] border-none rounded-2xl px-6 text-sm font-black text-white placeholder:text-slate-600 uppercase focus:ring-2 focus:ring-primary outline-none transition-all" 
+                          />
+                       </div>
+                    ) : (
+                       <div className="space-y-4 animate-in fade-in slide-in-from-right-2">
+                          <div className="grid grid-cols-2 gap-4">
+                             <input 
+                                placeholder="CEP" 
+                                value={customerForm.zipCode} 
+                                onChange={e => setCustomerForm({...customerForm, zipCode: e.target.value})} 
+                                className="w-full h-16 bg-[#1a2433] border-none rounded-2xl px-6 text-sm font-black text-white placeholder:text-slate-600 uppercase focus:ring-2 focus:ring-primary outline-none transition-all" 
+                             />
+                             <input 
+                                placeholder="NÚMERO" 
+                                value={customerForm.number} 
+                                onChange={e => setCustomerForm({...customerForm, number: e.target.value})} 
+                                className="w-full h-16 bg-[#1a2433] border-none rounded-2xl px-6 text-sm font-black text-white placeholder:text-slate-600 uppercase focus:ring-2 focus:ring-primary outline-none transition-all" 
+                             />
+                          </div>
+                          <input 
+                             placeholder="LOGRADOURO" 
+                             value={customerForm.address} 
+                             onChange={e => setCustomerForm({...customerForm, address: e.target.value})} 
+                             className="w-full h-16 bg-[#1a2433] border-none rounded-2xl px-6 text-sm font-black text-white placeholder:text-slate-600 uppercase focus:ring-2 focus:ring-primary outline-none transition-all" 
+                          />
+                          <div className="grid grid-cols-2 gap-4">
+                             <input 
+                                placeholder="CIDADE" 
+                                value={customerForm.city} 
+                                onChange={e => setCustomerForm({...customerForm, city: e.target.value})} 
+                                className="w-full h-16 bg-[#1a2433] border-none rounded-2xl px-6 text-sm font-black text-white placeholder:text-slate-600 uppercase focus:ring-2 focus:ring-primary outline-none transition-all" 
+                             />
+                             <input 
+                                placeholder="UF" 
+                                maxLength={2}
+                                value={customerForm.state} 
+                                onChange={e => setCustomerForm({...customerForm, state: e.target.value})} 
+                                className="w-full h-16 bg-[#1a2433] border-none rounded-2xl px-6 text-sm font-black text-white placeholder:text-slate-600 uppercase focus:ring-2 focus:ring-primary outline-none transition-all" 
+                             />
+                          </div>
+                       </div>
+                    )}
+                 </div>
+
+                 {/* BOTÃO FINALIZAR */}
+                 <button 
+                    type="submit" 
+                    className="w-full h-20 bg-primary text-white rounded-[2rem] font-black text-sm uppercase tracking-widest shadow-2xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all mt-4"
+                 >
+                    CADASTRAR E SELECIONAR
+                 </button>
               </form>
            </div>
         </div>
