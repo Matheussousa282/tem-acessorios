@@ -24,7 +24,7 @@ interface SystemConfig {
 interface AppContextType {
   currentUser: User | null;
   systemConfig: SystemConfig;
-  rolePermissions: Record<UserRole, RolePermissions>;
+  rolePermissions: Record<string, RolePermissions>;
   products: Product[];
   transactions: Transaction[];
   customers: Customer[];
@@ -66,7 +66,8 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const INITIAL_PERMS: Record<UserRole, RolePermissions> = {
+// Permissões Padrão para garantir que o sistema funcione mesmo sem DB
+export const INITIAL_PERMS: Record<string, RolePermissions> = {
   [UserRole.ADMIN]: { dashboard: true, pdv: true, customers: true, reports: true, inventory: true, balance: true, incomes: true, expenses: true, financial: true, settings: true, serviceOrders: true },
   [UserRole.MANAGER]: { dashboard: true, pdv: true, customers: true, reports: true, inventory: true, balance: true, incomes: true, expenses: true, financial: true, settings: false, serviceOrders: true },
   [UserRole.CASHIER]: { dashboard: true, pdv: true, customers: true, reports: false, inventory: false, balance: false, incomes: true, expenses: false, financial: false, settings: false, serviceOrders: true },
@@ -75,11 +76,10 @@ const INITIAL_PERMS: Record<UserRole, RolePermissions> = {
 
 const SESSION_KEY = 'tem_acessorios_user_session';
 const LAST_ACTIVITY_KEY = 'tem_acessorios_last_activity';
-const INACTIVITY_LIMIT = 60 * 60 * 1000;
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [rolePermissions, setRolePermissions] = useState<Record<UserRole, RolePermissions>>(INITIAL_PERMS);
+  const [rolePermissions, setRolePermissions] = useState<Record<string, RolePermissions>>(INITIAL_PERMS);
   const [serviceOrders, setServiceOrders] = useState<ServiceOrder[]>([]);
   const [cashSessions, setCashSessions] = useState<CashSession[]>([]);
   const [cashEntries, setCashEntries] = useState<CashEntry[]>([]);
@@ -131,9 +131,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setCardBrands(responses[9]);
       
       if (responses[10]) setSystemConfig(responses[10]);
+      
+      // Merge permissões: Usa o padrão e sobrescreve com o que vier do banco
       if (responses[11] && Array.isArray(responses[11])) {
         const permsMap = { ...INITIAL_PERMS };
-        responses[11].forEach((p: any) => { permsMap[p.role as UserRole] = p.permissions; });
+        responses[11].forEach((p: any) => { 
+          if (p.role && p.permissions) {
+            permsMap[p.role] = p.permissions; 
+          }
+        });
         setRolePermissions(permsMap);
       }
 
