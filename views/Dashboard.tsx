@@ -319,7 +319,10 @@ const Dashboard: React.FC = () => {
                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {vendorPerformance.map((v, idx) => (
                       <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 text-[10px] font-medium text-slate-700 dark:text-slate-300">
-                         <td className="px-3 py-2 border-r border-slate-100 uppercase font-bold">{v.name}</td>
+                         <td className="px-3 py-2 border-r border-slate-100 uppercase font-bold flex items-center gap-2">
+                           <span>{v.reaction.emoji}</span>
+                           <span className="truncate">{v.name}</span>
+                         </td>
                          <td className="px-3 py-2 border-r border-slate-100 text-right tabular-nums">{v.qtyProds.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
                          <td className="px-3 py-2 border-r border-slate-100 text-right tabular-nums">{v.qtySales}</td>
                          <td className="px-3 py-2 border-r border-slate-100 text-right tabular-nums">{v.prodAvg.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
