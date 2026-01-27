@@ -80,107 +80,176 @@ const SalesInquiry: React.FC = () => {
     return users.find(u => u.id === userId);
   };
 
+  const handlePrintDocument = (t: Transaction) => {
+    setSelectedTransaction(t);
+    setViewingDetail(t);
+    setTimeout(() => window.print(), 100);
+  };
+
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-background-dark font-sans text-[11px] uppercase font-bold">
       
-      {/* HEADER AZUL PREMIUM */}
-      <header className="bg-primary p-4 flex items-center justify-between text-white shadow-lg shrink-0">
-        <div className="flex items-center gap-4">
-           <div className="bg-white rounded-lg p-1.5 flex items-center justify-center">
-              <span className="material-symbols-outlined text-primary text-2xl">point_of_sale</span>
-           </div>
-           <h1 className="text-sm font-black tracking-tight">DOCUMENTOS DE VENDAS PDV</h1>
-        </div>
-        <div className="flex items-center gap-6">
-           <div className="flex items-center gap-2">
-              <span className="size-2 bg-emerald-400 rounded-full animate-pulse"></span>
-              <span className="text-[10px] font-black">SISTEMA ONLINE</span>
-           </div>
-        </div>
-      </header>
+      {/* ESPELHO DE IMPRESSÃO (Oculto em tela, visível apenas no papel) */}
+      <div id="print-document-area" className="hidden print:block p-8 bg-white text-black font-sans text-[10px]">
+         {viewingDetail && (
+           <div className="space-y-6">
+              <div className="flex justify-between border-b-2 border-black pb-4">
+                 <div>
+                    <h1 className="text-xl font-black">DETALHE DO DOCUMENTO FISCAL (NFC-E)</h1>
+                    <p>UNIDADE: {viewingDetail.store}</p>
+                 </div>
+                 <div className="text-right">
+                    <p className="font-bold">ID: {viewingDetail.id}</p>
+                    <p>EMISSÃO: {viewingDetail.date} 10:00</p>
+                 </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                 <div className="border p-2"><p className="font-black text-[8px] uppercase">Cliente</p><p className="font-bold uppercase">{viewingDetail.client || 'CONSUMIDOR FINAL'}</p></div>
+                 <div className="border p-2"><p className="font-black text-[8px] uppercase">Vendedor</p><p className="font-bold uppercase">{getUserData(viewingDetail.vendorId)?.name || 'NÃO INFORMADO'}</p></div>
+              </div>
 
-      {/* BARRA DE FILTROS */}
-      <div className="p-4 flex gap-2 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-         <button className="px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 flex items-center gap-2 text-slate-600">
-            Filtro <span className="material-symbols-outlined text-sm">arrow_drop_down</span>
-         </button>
-         <div className="flex-1 max-w-xs relative ml-2">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">search</span>
-            <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="PESQUISAR DOCUMENTO OU CLIENTE..." className="w-full h-9 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded pl-10 text-[10px] outline-none focus:ring-1 focus:ring-primary/30" />
-         </div>
+              <table className="w-full border-collapse mt-4">
+                 <thead>
+                    <tr className="border-b-2 border-black text-left">
+                       <th className="py-1">SEQ</th>
+                       <th className="py-1">CÓDIGO</th>
+                       <th className="py-1">PRODUTO</th>
+                       <th className="py-1 text-right">QTD</th>
+                       <th className="py-1 text-right">UNIT</th>
+                       <th className="py-1 text-right">TOTAL</th>
+                    </tr>
+                 </thead>
+                 <tbody className="divide-y divide-gray-300">
+                    {viewingDetail.items?.map((item, i) => (
+                      <tr key={i}>
+                         <td className="py-1">{(i+1).toString().padStart(3, '0')}</td>
+                         <td className="py-1">{item.sku}</td>
+                         <td className="py-1 uppercase">{item.name}</td>
+                         <td className="py-1 text-right">{item.quantity.toFixed(2)}</td>
+                         <td className="py-1 text-right">R$ {item.salePrice.toLocaleString('pt-BR')}</td>
+                         <td className="py-1 text-right">R$ {(item.quantity * item.salePrice).toLocaleString('pt-BR')}</td>
+                      </tr>
+                    ))}
+                 </tbody>
+                 <tfoot>
+                    <tr className="border-t-2 border-black font-black text-lg">
+                       <td colSpan={5} className="py-2 text-right">VALOR TOTAL DO DOCUMENTO:</td>
+                       <td className="py-2 text-right">R$ {viewingDetail.value.toLocaleString('pt-BR')}</td>
+                    </tr>
+                 </tfoot>
+              </table>
+
+              <div className="mt-8 grid grid-cols-2 gap-4 text-[8px] uppercase opacity-50">
+                 <div>OPERADOR: {getUserData(viewingDetail.cashierId)?.name || 'SISTEMA'}</div>
+                 <div className="text-right">GERADO EM: {new Date().toLocaleString()}</div>
+              </div>
+           </div>
+         )}
       </div>
 
-      {/* TABELA DE DOCUMENTOS */}
-      <div className="flex-1 overflow-auto bg-white dark:bg-slate-900">
-        <table className="w-full text-left border-collapse min-w-[1200px]">
-          <thead className="bg-primary text-white sticky top-0 z-20">
-            <tr className="divide-x divide-white/10">
-              <th className="px-3 py-2 text-center w-10"><span className="material-symbols-outlined text-sm">settings</span></th>
-              <th className="px-3 py-2 w-20">Opções</th>
-              <th className="px-3 py-2 w-24">ID</th>
-              <th className="px-3 py-2 w-32">Loja</th>
-              <th className="px-3 py-2 w-20">Vend.</th>
-              <th className="px-3 py-2 w-40">Data de Emissão</th>
-              <th className="px-3 py-2">Cliente</th>
-              <th className="px-3 py-2 w-24 text-right">Qtd. Itens</th>
-              <th className="px-3 py-2 w-32 text-right">Vr. Total</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {sales.map(s => (
-              <tr key={s.id} onClick={() => setViewingDetail(s)} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 divide-x divide-slate-100 dark:divide-slate-800 transition-colors cursor-pointer group">
-                <td className="px-3 py-1.5 text-center">
-                   <div className="size-2.5 bg-blue-600 rounded-full mx-auto"></div>
-                </td>
-                <td className="px-3 py-1.5 relative" onClick={(e) => e.stopPropagation()}>
-                   <button onClick={() => setShowOptionsId(showOptionsId === s.id ? null : s.id)} className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-2 py-0.5 hover:bg-primary hover:text-white transition-all flex items-center justify-center">
-                      <span className="material-symbols-outlined text-sm">list</span>
-                   </button>
-                   {showOptionsId === s.id && (
-                     <div className="absolute left-full top-0 ml-1 z-50 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-slate-700 rounded-lg py-2 w-56">
-                        <p className="px-4 py-1 text-[9px] text-slate-400 font-black border-b mb-1">Ações Disponíveis</p>
-                        <button onClick={() => { window.print(); setShowOptionsId(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"><span className="material-symbols-outlined text-sm">print</span> 01 - Imprimir</button>
-                        <button onClick={() => { setSelectedTransaction(s); setShowCustomerModal(true); setShowOptionsId(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"><span className="material-symbols-outlined text-sm">person_edit</span> 05 - Alterar Cliente</button>
-                        <button onClick={() => { setSelectedTransaction(s); setShowVendorModal(true); setShowOptionsId(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"><span className="material-symbols-outlined text-sm">badge</span> 06 - Alterar Vendedor</button>
-                     </div>
-                   )}
-                </td>
-                <td className="px-3 py-1.5 font-mono text-slate-400">{s.id.slice(-6)}</td>
-                <td className="px-3 py-1.5 text-primary">{s.store}</td>
-                <td className="px-3 py-1.5 text-primary">{getUserData(s.vendorId)?.name.split(' ')[0] || '---'}</td>
-                <td className="px-3 py-1.5 text-slate-500">{s.date} 10:00</td>
-                <td className="px-3 py-1.5"><span className="truncate max-w-[200px] uppercase">{s.client || 'Consumidor Final'}</span></td>
-                <td className="px-3 py-1.5 text-right font-black tabular-nums">{s.items?.reduce((acc, i) => acc + i.quantity, 0).toFixed(2)}</td>
-                <td className="px-3 py-1.5 text-right font-black text-slate-900 dark:text-white tabular-nums">R$ {s.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+      {/* UI NORMAL (Oculta na impressão) */}
+      <div className="print:hidden h-full flex flex-col">
+        {/* HEADER AZUL PREMIUM */}
+        <header className="bg-primary p-4 flex items-center justify-between text-white shadow-lg shrink-0">
+          <div className="flex items-center gap-4">
+            <div className="bg-white rounded-lg p-1.5 flex items-center justify-center">
+                <span className="material-symbols-outlined text-primary text-2xl">point_of_sale</span>
+            </div>
+            <h1 className="text-sm font-black tracking-tight">DOCUMENTOS DE VENDAS PDV</h1>
+          </div>
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
+                <span className="size-2 bg-emerald-400 rounded-full animate-pulse"></span>
+                <span className="text-[10px] font-black">SISTEMA ONLINE</span>
+            </div>
+          </div>
+        </header>
+
+        {/* BARRA DE FILTROS */}
+        <div className="p-4 flex gap-2 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+          <button className="px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 flex items-center gap-2 text-slate-600">
+              Filtro <span className="material-symbols-outlined text-sm">arrow_drop_down</span>
+          </button>
+          <div className="flex-1 max-w-xs relative ml-2">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">search</span>
+              <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="PESQUISAR DOCUMENTO OU CLIENTE..." className="w-full h-9 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded pl-10 text-[10px] outline-none focus:ring-1 focus:ring-primary/30" />
+          </div>
+        </div>
+
+        {/* TABELA DE DOCUMENTOS */}
+        <div className="flex-1 overflow-auto bg-white dark:bg-slate-900">
+          <table className="w-full text-left border-collapse min-w-[1200px]">
+            <thead className="bg-primary text-white sticky top-0 z-20">
+              <tr className="divide-x divide-white/10">
+                <th className="px-3 py-2 text-center w-10"><span className="material-symbols-outlined text-sm">settings</span></th>
+                <th className="px-3 py-2 w-20">Opções</th>
+                <th className="px-3 py-2 w-24">ID</th>
+                <th className="px-3 py-2 w-32">Loja</th>
+                <th className="px-3 py-2 w-20">Vend.</th>
+                <th className="px-3 py-2 w-40">Data de Emissão</th>
+                <th className="px-3 py-2">Cliente</th>
+                <th className="px-3 py-2 w-24 text-right">Qtd. Itens</th>
+                <th className="px-3 py-2 w-32 text-right">Vr. Total</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {sales.map(s => (
+                <tr key={s.id} onClick={() => setViewingDetail(s)} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 divide-x divide-slate-100 dark:divide-slate-800 transition-colors cursor-pointer group">
+                  <td className="px-3 py-1.5 text-center">
+                    <div className="size-2.5 bg-blue-600 rounded-full mx-auto"></div>
+                  </td>
+                  <td className="px-3 py-1.5 relative" onClick={(e) => e.stopPropagation()}>
+                    <button onClick={() => setShowOptionsId(showOptionsId === s.id ? null : s.id)} className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-2 py-0.5 hover:bg-primary hover:text-white transition-all flex items-center justify-center">
+                        <span className="material-symbols-outlined text-sm">list</span>
+                    </button>
+                    {showOptionsId === s.id && (
+                      <div className="absolute left-full top-0 ml-1 z-50 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-slate-700 rounded-lg py-2 w-56 text-[10px]">
+                          <p className="px-4 py-1 text-[9px] text-slate-400 font-black border-b mb-1 uppercase">Ações Disponíveis</p>
+                          <button onClick={() => { handlePrintDocument(s); setShowOptionsId(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"><span className="material-symbols-outlined text-sm">print</span> 01 - Imprimir</button>
+                          <button onClick={() => { setSelectedTransaction(s); setShowCustomerModal(true); setShowOptionsId(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"><span className="material-symbols-outlined text-sm">person_edit</span> 05 - Alterar Cliente</button>
+                          <button onClick={() => { setSelectedTransaction(s); setShowVendorModal(true); setShowOptionsId(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"><span className="material-symbols-outlined text-sm">badge</span> 06 - Alterar Vendedor</button>
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-3 py-1.5 font-mono text-slate-400">{s.id.slice(-6)}</td>
+                  <td className="px-3 py-1.5 text-primary">{s.store}</td>
+                  <td className="px-3 py-1.5 text-primary">{getUserData(s.vendorId)?.name.split(' ')[0] || '---'}</td>
+                  <td className="px-3 py-1.5 text-slate-500">{s.date} 10:00</td>
+                  <td className="px-3 py-1.5"><span className="truncate max-w-[200px] uppercase">{s.client || 'Consumidor Final'}</span></td>
+                  <td className="px-3 py-1.5 text-right font-black tabular-nums">{s.items?.reduce((acc, i) => acc + i.quantity, 0).toFixed(2)}</td>
+                  <td className="px-3 py-1.5 text-right font-black text-slate-900 dark:text-white tabular-nums">R$ {s.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* RODAPÉ DE TOTAIS GERAL */}
+        <footer className="bg-slate-400 p-2 flex justify-between items-center text-slate-900 font-black shrink-0">
+          <div className="flex items-center gap-4"><span className="text-[12px]">TOTAL GERAL PESQUISA</span></div>
+          <div className="flex gap-10 pr-4">
+              <span className="text-[12px] tabular-nums">{totals.qtyItems.toFixed(2).replace('.', ',')}</span>
+              <span className="text-[12px] tabular-nums">R$ {totals.totalValue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+          </div>
+        </footer>
       </div>
 
-      {/* RODAPÉ DE TOTAIS GERAL */}
-      <footer className="bg-slate-400 p-2 flex justify-between items-center text-slate-900 font-black shrink-0">
-         <div className="flex items-center gap-4"><span className="text-[12px]">TOTAL GERAL PESQUISA</span></div>
-         <div className="flex gap-10 pr-4">
-            <span className="text-[12px] tabular-nums">{totals.qtyItems.toFixed(2).replace('.', ',')}</span>
-            <span className="text-[12px] tabular-nums">R$ {totals.totalValue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-         </div>
-      </footer>
-
-      {/* MODAL DETALHE DO DOCUMENTO (O que você circulou) */}
+      {/* MODAL DETALHE DO DOCUMENTO (Oculto na Impressão) */}
       {viewingDetail && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 p-4 animate-in fade-in">
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 p-4 animate-in fade-in print:hidden">
            <div className="bg-slate-100 w-full max-w-[1200px] h-[90vh] rounded shadow-2xl flex flex-col overflow-hidden text-slate-700">
-              {/* Header do Documento - Nome Ajustado */}
               <div className="bg-white p-3 border-b border-slate-300 flex items-center justify-between">
                  <h2 className="text-sm font-bold flex items-center gap-2">
                     Informações Gerais do Documento <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-[10px]">NFC</span>
                  </h2>
-                 <button onClick={() => setViewingDetail(null)} className="size-8 hover:bg-rose-500 hover:text-white flex items-center justify-center rounded transition-all"><span className="material-symbols-outlined">close</span></button>
+                 <div className="flex items-center gap-2">
+                    <button onClick={() => handlePrintDocument(viewingDetail)} className="size-8 hover:bg-primary hover:text-white flex items-center justify-center rounded transition-all"><span className="material-symbols-outlined">print</span></button>
+                    <button onClick={() => setViewingDetail(null)} className="size-8 hover:bg-rose-500 hover:text-white flex items-center justify-center rounded transition-all"><span className="material-symbols-outlined">close</span></button>
+                 </div>
               </div>
 
               <div className="p-4 space-y-4 overflow-y-auto">
-                 {/* Campos Filtrados: Apenas os que NÃO tinham X vermelho */}
                  <div className="grid grid-cols-12 gap-2">
                     <div className="col-span-2"><DetailField label="ID:" value={viewingDetail.id.slice(-6)} /></div>
                     <div className="col-span-10"><DetailField label="LOJA:" value={viewingDetail.store} borderHighlight /></div>
@@ -193,10 +262,10 @@ const SalesInquiry: React.FC = () => {
 
                  <div className="grid grid-cols-12 gap-2">
                     <div className="col-span-3"><DetailField label="REPRESENTANTE:" value="000275 - ALAGOAS" /></div>
-                    {/* Vendedor, Caixa e Operador - Dados Reais */}
                     <div className="col-span-3"><DetailField label="VENDEDOR:" value={getUserData(viewingDetail.vendorId)?.name || 'NÃO INF.'} borderHighlight /></div>
-                    <div className="col-span-3"><DetailField label="CAIXA:" value={viewingDetail.method || 'CAIXA PDV 01'} borderHighlight /></div>
-                    <div className="col-span-3"><DetailField label="OPERADOR:" value={getUserData(viewingDetail.vendorId)?.name || 'SISTEMA'} borderHighlight /></div>
+                    {/* Campos Caixa e Operador preenchidos com o colaborador que operou o PDV */}
+                    <div className="col-span-3"><DetailField label="CAIXA:" value={getUserData(viewingDetail.cashierId)?.name || 'CAIXA PDV 01'} borderHighlight /></div>
+                    <div className="col-span-3"><DetailField label="OPERADOR:" value={getUserData(viewingDetail.cashierId)?.name || 'SISTEMA'} borderHighlight /></div>
                  </div>
 
                  <div className="bg-primary text-white flex items-center px-4 py-1.5 gap-8 mt-2">
@@ -261,7 +330,7 @@ const SalesInquiry: React.FC = () => {
 
       {/* MODAIS DE EDIÇÃO (MANTIDOS) */}
       {showVendorModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in print:hidden">
            <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl border overflow-hidden">
               <div className="p-6 bg-primary text-white flex justify-between items-center"><h3 className="font-black uppercase">Alterar Vendedor</h3><button onClick={() => setShowVendorModal(false)}><span className="material-symbols-outlined">close</span></button></div>
               <div className="p-8 space-y-4 max-h-60 overflow-y-auto">
@@ -277,7 +346,7 @@ const SalesInquiry: React.FC = () => {
       )}
 
       {showCustomerModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in print:hidden">
            <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl border overflow-hidden">
               <div className="p-6 bg-primary text-white flex justify-between items-center"><h3 className="font-black uppercase">Alterar Cliente</h3><button onClick={() => setShowCustomerModal(false)}><span className="material-symbols-outlined">close</span></button></div>
               <div className="p-8 space-y-4 max-h-60 overflow-y-auto">
@@ -295,6 +364,17 @@ const SalesInquiry: React.FC = () => {
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 20px; }
+
+        @media print {
+          body * { visibility: hidden !important; }
+          #root { display: block !important; }
+          aside, header, main, nav, footer, .fixed, .backdrop-blur { display: none !important; opacity: 0 !important; }
+          #print-document-area, #print-document-area * { visibility: visible !important; display: block !important; }
+          #print-document-area { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 20px; background: white; }
+          table { width: 100% !important; border-collapse: collapse !important; }
+          th, td { border-bottom: 1px solid #ddd !important; padding: 4px !important; }
+          @page { size: A4; margin: 10mm; }
+        }
       `}</style>
     </div>
   );

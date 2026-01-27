@@ -106,6 +106,7 @@ export interface Transaction {
   client?: string;
   clientId?: string;
   vendorId?: string;
+  cashierId?: string;
   items?: CartItem[];
   installments?: number;
   authNumber?: string;

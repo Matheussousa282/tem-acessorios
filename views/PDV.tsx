@@ -307,116 +307,119 @@ const PDV: React.FC = () => {
       </div>
       {/* --------------------------------------------------------- */}
 
-      {/* HEADER PDV (Oculto na Impressão) */}
-      <header className="flex items-center justify-between px-8 py-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 z-30 shadow-sm shrink-0 print:hidden">
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-3 relative">
-             <div onClick={() => setShowTerminalMenu(!showTerminalMenu)} className="size-12 rounded-xl bg-primary flex items-center justify-center text-white shadow-lg overflow-hidden cursor-pointer hover:scale-105 transition-all">
-                {currentStore.logoUrl ? <img src={currentStore.logoUrl} className="size-full object-cover" alt="Terminal Logo" /> : <span className="material-symbols-outlined">point_of_sale</span>}
-             </div>
-             <div>
-                <h1 className="text-lg font-black uppercase text-slate-900 dark:text-white leading-none">{currentStore.name}</h1>
-                <p className="text-[10px] font-black text-slate-400 uppercase mt-1">Terminal em Operação</p>
-             </div>
-          </div>
-          <div className="h-8 w-px bg-slate-200 dark:border-slate-800 mx-2"></div>
-          <div className="flex gap-2 overflow-x-auto no-scrollbar max-w-[450px]">
-             {categories.map(cat => (
-               <button key={cat} onClick={() => setCategory(cat)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all whitespace-nowrap ${category === cat ? 'bg-primary text-white shadow-lg' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200'}`}>{cat}</button>
-             ))}
-          </div>
-        </div>
-        <div className="flex gap-3">
-           <button onClick={() => { setCancelSearchId(''); setShowCancelModal(true); }} className="px-5 py-2.5 bg-rose-500/10 text-rose-500 rounded-xl font-black text-[10px] hover:bg-rose-500 hover:text-white transition-all uppercase flex items-center gap-2"><span className="material-symbols-outlined text-lg">cancel</span> Cancelamento</button>
-           <button onClick={() => { setReturnSearchTerm(''); setShowReturnsModal(true); }} className="px-5 py-2.5 bg-amber-500/10 text-amber-600 rounded-xl font-black text-[10px] hover:bg-amber-500 hover:text-white transition-all uppercase flex items-center gap-2"><span className="material-symbols-outlined text-lg">history</span> Trocas</button>
-           <button onClick={() => setShowPriceInquiry(true)} className="px-5 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl font-black text-[10px] hover:bg-primary hover:text-white transition-all uppercase flex items-center gap-2"><span className="material-symbols-outlined text-lg">sell</span> Consulta Preço</button>
-           <button onClick={() => navigate('/servicos?tab=list')} className="px-5 py-2.5 bg-slate-900 text-white rounded-xl font-black text-[10px] hover:bg-primary transition-all uppercase flex items-center gap-2"><span className="material-symbols-outlined text-lg">build</span> Gerenciar OS</button>
-           <button onClick={() => window.history.back()} className="px-5 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-xl font-black text-[10px] hover:bg-rose-500 hover:text-white transition-all uppercase tracking-widest">Sair</button>
-        </div>
-      </header>
-
-      <main className="flex flex-1 overflow-hidden print:hidden">
-        {/* LADO ESQUERDO: LISTA DE PRODUTOS */}
-        <section className="flex-1 flex flex-col">
-          <div className="p-6 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shrink-0">
-            <div className="relative">
-               <span className="material-symbols-outlined absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 text-2xl">search</span>
-               <input ref={searchInputRef} value={search} onChange={e => setSearch(e.target.value)} placeholder="Pesquisar produto ou bipar código..." className="w-full h-16 bg-slate-100 dark:bg-slate-800 border-none rounded-2xl pl-16 pr-6 text-xl font-bold outline-none focus:ring-4 focus:ring-primary/10 transition-all" />
+      {/* UI PDV (Oculto na Impressão) */}
+      <div className="print:hidden h-full flex flex-col">
+        {/* HEADER PDV */}
+        <header className="flex items-center justify-between px-8 py-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 z-30 shadow-sm shrink-0">
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3 relative">
+               <div onClick={() => setShowTerminalMenu(!showTerminalMenu)} className="size-12 rounded-xl bg-primary flex items-center justify-center text-white shadow-lg overflow-hidden cursor-pointer hover:scale-105 transition-all">
+                  {currentStore.logoUrl ? <img src={currentStore.logoUrl} className="size-full object-cover" alt="Terminal Logo" /> : <span className="material-symbols-outlined">point_of_sale</span>}
+               </div>
+               <div>
+                  <h1 className="text-lg font-black uppercase text-slate-900 dark:text-white leading-none">{currentStore.name}</h1>
+                  <p className="text-[10px] font-black text-slate-400 uppercase mt-1">Terminal em Operação</p>
+               </div>
+            </div>
+            <div className="h-8 w-px bg-slate-200 dark:border-slate-800 mx-2"></div>
+            <div className="flex gap-2 overflow-x-auto no-scrollbar max-w-[450px]">
+               {categories.map(cat => (
+                 <button key={cat} onClick={() => setCategory(cat)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all whitespace-nowrap ${category === cat ? 'bg-primary text-white shadow-lg' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200'}`}>{cat}</button>
+               ))}
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto p-6 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 content-start custom-scrollbar">
-            {filteredProducts.map(p => (
-              <div key={p.id} onClick={() => addToCart(p)} className="bg-white dark:bg-slate-800 p-3 rounded-3xl border-2 border-transparent hover:border-primary transition-all cursor-pointer shadow-sm group relative flex flex-col h-fit">
-                <div className="absolute top-4 left-4 z-10"><span className={`px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-tighter shadow-sm ${p.isService ? 'bg-amber-500 text-white' : 'bg-slate-900/60 text-white backdrop-blur-md'}`}>{p.isService ? 'Serviço' : p.category}</span></div>
-                <div className={`aspect-square w-full rounded-2xl mb-3 overflow-hidden flex items-center justify-center shrink-0 ${p.isService ? 'bg-amber-500/5' : 'bg-slate-100 dark:bg-slate-700'}`}>
-                  {p.isService ? <span className="material-symbols-outlined text-4xl text-amber-500/50">build</span> : <img src={p.image} className="size-full object-cover group-hover:scale-110 transition-transform duration-500" alt={p.name} />}
-                </div>
-                <div className="flex flex-col flex-1 px-1">
-                   <h4 className="text-[11px] font-black uppercase text-slate-700 dark:text-slate-200 line-clamp-2 min-h-[32px] leading-tight mb-1">{p.name}</h4>
-                   <div className="mt-auto flex justify-between items-end">
-                      <div className="flex flex-col"><span className="text-[14px] font-black text-primary leading-none">R$ {p.salePrice.toLocaleString('pt-BR')}</span></div>
-                      {!p.isService && <div className="text-right"><p className={`text-xs font-black leading-none ${p.stock <= 5 ? 'text-rose-500' : 'text-slate-600 dark:text-slate-300'}`}>{p.stock} <span className="text-[8px]">un</span></p></div>}
-                   </div>
-                </div>
-              </div>
-            ))}
+          <div className="flex gap-3">
+             <button onClick={() => { setCancelSearchId(''); setShowCancelModal(true); }} className="px-5 py-2.5 bg-rose-500/10 text-rose-500 rounded-xl font-black text-[10px] hover:bg-rose-500 hover:text-white transition-all uppercase flex items-center gap-2"><span className="material-symbols-outlined text-lg">cancel</span> Cancelamento</button>
+             <button onClick={() => { setReturnSearchTerm(''); setShowReturnsModal(true); }} className="px-5 py-2.5 bg-amber-500/10 text-amber-600 rounded-xl font-black text-[10px] hover:bg-amber-500 hover:text-white transition-all uppercase flex items-center gap-2"><span className="material-symbols-outlined text-lg">history</span> Trocas</button>
+             <button onClick={() => setShowPriceInquiry(true)} className="px-5 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl font-black text-[10px] hover:bg-primary hover:text-white transition-all uppercase flex items-center gap-2"><span className="material-symbols-outlined text-lg">sell</span> Consulta Preço</button>
+             <button onClick={() => navigate('/servicos?tab=list')} className="px-5 py-2.5 bg-slate-900 text-white rounded-xl font-black text-[10px] hover:bg-primary transition-all uppercase flex items-center gap-2"><span className="material-symbols-outlined text-lg">build</span> Gerenciar OS</button>
+             <button onClick={() => window.history.back()} className="px-5 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-xl font-black text-[10px] hover:bg-rose-500 hover:text-white transition-all uppercase tracking-widest">Sair</button>
           </div>
-        </section>
+        </header>
 
-        {/* LADO DIREITO: CARRINHO */}
-        <aside className="w-[480px] bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 flex flex-col shadow-2xl shrink-0">
-          <div className="p-6 space-y-4 border-b border-slate-100 dark:border-slate-800">
-             <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-2">Vendedor</label>
-                   <select value={selectedVendorId} onChange={e => setSelectedVendorId(e.target.value)} className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-[10px] font-black uppercase">
-                      <option value="">Selecione Vendedor</option>
-                      {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-                   </select>
-                </div>
-                <div className="space-y-1.5">
-                   <div className="flex justify-between items-center px-2">
-                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Cliente</label>
-                      <button onClick={() => setShowCustomerModal(true)} className="text-[9px] font-black text-primary uppercase hover:underline flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">person_add</span> Novo</button>
-                   </div>
-                   <select value={selectedCustomerId} onChange={e => setSelectedCustomerId(e.target.value)} className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-[10px] font-black uppercase">
-                      <option value="">Consumidor Final</option>
-                      {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                   </select>
-                </div>
-             </div>
-          </div>
-          <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
-             {cart.length === 0 ? (
-               <div className="h-full flex flex-col items-center justify-center opacity-20"><span className="material-symbols-outlined text-7xl">shopping_cart</span><p className="text-xs font-black uppercase mt-4">Carrinho Vazio</p></div>
-             ) : cart.map(item => (
-               <div key={item.id} className="flex items-center gap-4 bg-slate-50 dark:bg-slate-800 p-4 rounded-3xl group border border-transparent hover:border-primary/20 transition-all">
-                  <div className="flex-1 min-w-0">
-                     <p className="text-xs font-black uppercase truncate leading-none">{item.name}</p>
-                     <div className="flex justify-between items-center mt-2">
-                        <div className="flex items-center gap-3">
-                           <button onClick={() => setCart(prev => prev.map(i => i.id === item.id ? { ...i, quantity: Math.max(1, i.quantity - 1) } : i))} className="size-6 bg-slate-200 dark:bg-slate-700 rounded-lg flex items-center justify-center text-slate-500"><span className="material-symbols-outlined text-sm">remove</span></button>
-                           <span className="text-xs font-black tabular-nums">{item.quantity}</span>
-                           <button onClick={() => addToCart(item)} className="size-6 bg-primary/10 text-primary rounded-lg flex items-center justify-center"><span className="material-symbols-outlined text-sm">add</span></button>
-                        </div>
-                        <span className="text-sm font-black text-primary">R$ {(item.salePrice * item.quantity).toLocaleString('pt-BR')}</span>
+        <main className="flex flex-1 overflow-hidden">
+          {/* LADO ESQUERDO: LISTA DE PRODUTOS */}
+          <section className="flex-1 flex flex-col">
+            <div className="p-6 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shrink-0">
+              <div className="relative">
+                 <span className="material-symbols-outlined absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 text-2xl">search</span>
+                 <input ref={searchInputRef} value={search} onChange={e => setSearch(e.target.value)} placeholder="Pesquisar produto ou bipar código..." className="w-full h-16 bg-slate-100 dark:bg-slate-800 border-none rounded-2xl pl-16 pr-6 text-xl font-bold outline-none focus:ring-4 focus:ring-primary/10 transition-all" />
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 content-start custom-scrollbar">
+              {filteredProducts.map(p => (
+                <div key={p.id} onClick={() => addToCart(p)} className="bg-white dark:bg-slate-800 p-3 rounded-3xl border-2 border-transparent hover:border-primary transition-all cursor-pointer shadow-sm group relative flex flex-col h-fit">
+                  <div className="absolute top-4 left-4 z-10"><span className={`px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-tighter shadow-sm ${p.isService ? 'bg-amber-500 text-white' : 'bg-slate-900/60 text-white backdrop-blur-md'}`}>{p.isService ? 'Serviço' : p.category}</span></div>
+                  <div className={`aspect-square w-full rounded-2xl mb-3 overflow-hidden flex items-center justify-center shrink-0 ${p.isService ? 'bg-amber-500/5' : 'bg-slate-100 dark:bg-slate-700'}`}>
+                    {p.isService ? <span className="material-symbols-outlined text-4xl text-amber-500/50">build</span> : <img src={p.image} className="size-full object-cover group-hover:scale-110 transition-transform duration-500" alt={p.name} />}
+                  </div>
+                  <div className="flex flex-col flex-1 px-1">
+                     <h4 className="text-[11px] font-black uppercase text-slate-700 dark:text-slate-200 line-clamp-2 min-h-[32px] leading-tight mb-1">{p.name}</h4>
+                     <div className="mt-auto flex justify-between items-end">
+                        <div className="flex flex-col"><span className="text-[14px] font-black text-primary leading-none">R$ {p.salePrice.toLocaleString('pt-BR')}</span></div>
+                        {!p.isService && <div className="text-right"><p className={`text-xs font-black leading-none ${p.stock <= 5 ? 'text-rose-500' : 'text-slate-600 dark:text-slate-300'}`}>{p.stock} <span className="text-[8px]">un</span></p></div>}
                      </div>
                   </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* LADO DIREITO: CARRINHO */}
+          <aside className="w-[480px] bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 flex flex-col shadow-2xl shrink-0">
+            <div className="p-6 space-y-4 border-b border-slate-100 dark:border-slate-800">
+               <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-2">Vendedor</label>
+                     <select value={selectedVendorId} onChange={e => setSelectedVendorId(e.target.value)} className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-[10px] font-black uppercase">
+                        <option value="">Selecione Vendedor</option>
+                        {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                     </select>
+                  </div>
+                  <div className="space-y-1.5">
+                     <div className="flex justify-between items-center px-2">
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Cliente</label>
+                        <button onClick={() => setShowCustomerModal(true)} className="text-[9px] font-black text-primary uppercase hover:underline flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">person_add</span> Novo</button>
+                     </div>
+                     <select value={selectedCustomerId} onChange={e => setSelectedCustomerId(e.target.value)} className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-[10px] font-black uppercase">
+                        <option value="">Consumidor Final</option>
+                        {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                     </select>
+                  </div>
                </div>
-             ))}
-          </div>
-          <div className="p-8 border-t-2 border-slate-100 dark:border-slate-800 space-y-4 bg-white dark:bg-slate-900 shadow-[0_-20px_50px_rgba(0,0,0,0.05)] shrink-0">
-             <div className="space-y-2">
-                <div className="flex justify-between text-slate-500"><span className="text-[10px] font-black uppercase tracking-widest">Subtotal</span><span className="text-sm font-black tabular-nums">R$ {subtotal.toLocaleString('pt-BR')}</span></div>
-                <div className="flex justify-between pt-4 border-t border-slate-100 dark:border-slate-800"><span className="text-xs font-black uppercase opacity-50 tracking-widest">Total Geral</span><span className="text-4xl font-black text-slate-900 dark:text-white tabular-nums">R$ {totalGeral.toLocaleString('pt-BR')}</span></div>
-             </div>
-             <div className="grid grid-cols-2 gap-4 pt-2">
-                <button disabled={cart.length === 0} onClick={() => { if(!selectedCustomerId) { alert('Selecione um cliente!'); return; } setShowOSModal(true); }} className="py-5 bg-amber-500 hover:bg-amber-600 disabled:opacity-30 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl flex items-center justify-center gap-2 active:scale-95 transition-all">Gerar OS</button>
-                <button disabled={cart.length === 0} onClick={() => setShowCheckout(true)} className="py-5 bg-primary hover:bg-blue-600 disabled:opacity-30 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl flex items-center justify-center gap-2 active:scale-95 transition-all">Vender</button>
-             </div>
-          </div>
-        </aside>
-      </main>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+               {cart.length === 0 ? (
+                 <div className="h-full flex flex-col items-center justify-center opacity-20"><span className="material-symbols-outlined text-7xl">shopping_cart</span><p className="text-xs font-black uppercase mt-4">Carrinho Vazio</p></div>
+               ) : cart.map(item => (
+                 <div key={item.id} className="flex items-center gap-4 bg-slate-50 dark:bg-slate-800 p-4 rounded-3xl group border border-transparent hover:border-primary/20 transition-all">
+                    <div className="flex-1 min-w-0">
+                       <p className="text-xs font-black uppercase truncate leading-none">{item.name}</p>
+                       <div className="flex justify-between items-center mt-2">
+                          <div className="flex items-center gap-3">
+                             <button onClick={() => setCart(prev => prev.map(i => i.id === item.id ? { ...i, quantity: Math.max(1, i.quantity - 1) } : i))} className="size-6 bg-slate-200 dark:bg-slate-700 rounded-lg flex items-center justify-center text-slate-500"><span className="material-symbols-outlined text-sm">remove</span></button>
+                             <span className="text-xs font-black tabular-nums">{item.quantity}</span>
+                             <button onClick={() => addToCart(item)} className="size-6 bg-primary/10 text-primary rounded-lg flex items-center justify-center"><span className="material-symbols-outlined text-sm">add</span></button>
+                          </div>
+                          <span className="text-sm font-black text-primary">R$ {(item.salePrice * item.quantity).toLocaleString('pt-BR')}</span>
+                       </div>
+                    </div>
+                 </div>
+               ))}
+            </div>
+            <div className="p-8 border-t-2 border-slate-100 dark:border-slate-800 space-y-4 bg-white dark:bg-slate-900 shadow-[0_-20px_50px_rgba(0,0,0,0.05)] shrink-0">
+               <div className="space-y-2">
+                  <div className="flex justify-between text-slate-500"><span className="text-[10px] font-black uppercase tracking-widest">Subtotal</span><span className="text-sm font-black tabular-nums">R$ {subtotal.toLocaleString('pt-BR')}</span></div>
+                  <div className="flex justify-between pt-4 border-t border-slate-100 dark:border-slate-800"><span className="text-xs font-black uppercase opacity-50 tracking-widest">Total Geral</span><span className="text-4xl font-black text-slate-900 dark:text-white tabular-nums">R$ {totalGeral.toLocaleString('pt-BR')}</span></div>
+               </div>
+               <div className="grid grid-cols-2 gap-4 pt-2">
+                  <button disabled={cart.length === 0} onClick={() => { if(!selectedCustomerId) { alert('Selecione um cliente!'); return; } setShowOSModal(true); }} className="py-5 bg-amber-500 hover:bg-amber-600 disabled:opacity-30 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl flex items-center justify-center gap-2 active:scale-95 transition-all">Gerar OS</button>
+                  <button disabled={cart.length === 0} onClick={() => setShowCheckout(true)} className="py-5 bg-primary hover:bg-blue-600 disabled:opacity-30 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl flex items-center justify-center gap-2 active:scale-95 transition-all">Vender</button>
+               </div>
+            </div>
+          </aside>
+        </main>
+      </div>
 
       {/* MODAL CHECKOUT */}
       {showCheckout && (
@@ -467,7 +470,7 @@ const PDV: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL TROCAS (Aproveitando a Lógica de Busca) */}
+      {/* MODAL TROCAS */}
       {showReturnsModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-in fade-in print:hidden">
            <div className="bg-[#0b111a] w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 border border-white/5">
@@ -497,13 +500,10 @@ const PDV: React.FC = () => {
         </div>
       )}
 
-      {/* --------------------------------------------------------- */}
-      {/* MODAL CANCELAMENTO / ESTORNO (CONFORME IMAGEM) */}
-      {/* --------------------------------------------------------- */}
+      {/* MODAL CANCELAMENTO / ESTORNO */}
       {showCancelModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 animate-in fade-in print:hidden">
            <div className="bg-[#0b111a] w-full max-w-2xl rounded-[3rem] shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden animate-in zoom-in-95 border border-white/5">
-              {/* HEADER VERMELHO CORAL */}
               <div className="p-8 bg-rose-500 text-white flex justify-between items-center">
                  <h3 className="text-2xl font-black uppercase tracking-tight">ESTORNO DE VENDA</h3>
                  <button onClick={() => setShowCancelModal(false)} className="size-10 hover:bg-white/10 rounded-full flex items-center justify-center transition-all">
@@ -512,7 +512,6 @@ const PDV: React.FC = () => {
               </div>
               
               <div className="p-8 space-y-6">
-                 {/* BUSCA COM BORDA AZULADA */}
                  <div className="relative group">
                     <input 
                        autoFocus 
@@ -523,7 +522,6 @@ const PDV: React.FC = () => {
                     />
                  </div>
 
-                 {/* LISTA DE RESULTADOS ESTILIZADA */}
                  <div className="space-y-3 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
                     {transactions
                       .filter(t => t.type === 'INCOME' && (t.id.toLowerCase().includes(cancelSearchId.toLowerCase()) || t.client?.toLowerCase().includes(cancelSearchId.toLowerCase())))
@@ -545,14 +543,6 @@ const PDV: React.FC = () => {
                           </div>
                        </div>
                     ))}
-
-                    {cancelSearchId !== '' && transactions.filter(t => t.type === 'INCOME' && (t.id.toLowerCase().includes(cancelSearchId.toLowerCase()) || t.client?.toLowerCase().includes(cancelSearchId.toLowerCase()))).length === 0 && (
-                       <div className="text-center py-10 opacity-20 uppercase font-black text-[10px] tracking-widest text-white">Nenhum registro encontrado</div>
-                    )}
-                    
-                    {cancelSearchId === '' && (
-                       <p className="text-center py-10 text-slate-600 font-black text-[10px] uppercase">Digite algo para buscar vendas...</p>
-                    )}
                  </div>
               </div>
            </div>
@@ -575,12 +565,6 @@ const PDV: React.FC = () => {
                     </div>
                  )}
 
-                 {successType === 'CANCEL' && (
-                    <div className="bg-rose-50 p-6 rounded-3xl border border-rose-100 text-rose-600 font-black uppercase text-xs">
-                       O estorno foi processado e o estoque atualizado com sucesso.
-                    </div>
-                 )}
-
                  <div className="grid grid-cols-2 gap-3 pt-4">
                     <button onClick={() => { if(successType === 'SALE') window.print(); setShowSuccessModal(false); }} className={`py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg flex items-center justify-center gap-2 hover:bg-black transition-all ${successType === 'CANCEL' ? 'opacity-20 pointer-events-none' : ''}`}><span className="material-symbols-outlined text-lg">print</span> Imprimir Recibo</button>
                     <button onClick={() => setShowSuccessModal(false)} className="py-4 bg-primary text-white rounded-2xl font-black text-[10px] uppercase shadow-lg hover:bg-blue-600 transition-all">Concluir</button>
@@ -592,7 +576,7 @@ const PDV: React.FC = () => {
 
       {/* MODAL NOVO CLIENTE RÁPIDO */}
       {showCustomerModal && (
-        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 animate-in fade-in">
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 animate-in fade-in print:hidden">
            <div className="bg-[#0b111a] w-full max-w-lg rounded-[2.5rem] shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden animate-in zoom-in-95 border border-white/5">
               <div className="p-8 bg-primary text-white flex justify-between items-center">
                  <h3 className="text-2xl font-black uppercase tracking-tight">NOVO CLIENTE RÁPIDO</h3>
@@ -604,28 +588,6 @@ const PDV: React.FC = () => {
                  <div className="bg-[#1a2433] p-1.5 rounded-2xl flex gap-1">
                     <button type="button" onClick={() => setActiveCustomerTab('basic')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${activeCustomerTab === 'basic' ? 'bg-white text-[#0b111a] shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}>BÁSICO</button>
                     <button type="button" onClick={() => setActiveCustomerTab('address')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${activeCustomerTab === 'address' ? 'bg-white text-[#0b111a] shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}>ENDEREÇO</button>
-                 </div>
-                 <div className="space-y-4 min-h-[320px]">
-                    {activeCustomerTab === 'basic' ? (
-                       <div className="space-y-4 animate-in fade-in slide-in-from-left-2">
-                          <input required placeholder="NOME COMPLETO" value={customerForm.name} onChange={e => setCustomerForm({...customerForm, name: e.target.value})} className="w-full h-16 bg-[#1a2433] border-none rounded-2xl px-6 text-sm font-black text-white placeholder:text-slate-600 uppercase focus:ring-2 focus:ring-primary outline-none transition-all" />
-                          <input placeholder="WhatsApp (DDD)" value={customerForm.phone} onChange={e => setCustomerForm({...customerForm, phone: e.target.value})} className="w-full h-16 bg-[#1a2433] border-none rounded-2xl px-6 text-sm font-black text-white placeholder:text-slate-600 uppercase focus:ring-2 focus:ring-primary outline-none transition-all" />
-                          <input placeholder="CPF/CNPJ" value={customerForm.cpfCnpj} onChange={e => setCustomerForm({...customerForm, cpfCnpj: e.target.value})} className="w-full h-16 bg-[#1a2433] border-none rounded-2xl px-6 text-sm font-black text-white placeholder:text-slate-600 uppercase focus:ring-2 focus:ring-primary outline-none transition-all" />
-                          <input placeholder="E-mail (Opcional)" type="email" value={customerForm.email} onChange={e => setCustomerForm({...customerForm, email: e.target.value})} className="w-full h-16 bg-[#1a2433] border-none rounded-2xl px-6 text-sm font-black text-white placeholder:text-slate-600 uppercase focus:ring-2 focus:ring-primary outline-none transition-all" />
-                       </div>
-                    ) : (
-                       <div className="space-y-4 animate-in fade-in slide-in-from-right-2">
-                          <div className="grid grid-cols-2 gap-4">
-                             <input placeholder="CEP" value={customerForm.zipCode} onChange={e => setCustomerForm({...customerForm, zipCode: e.target.value})} className="w-full h-16 bg-[#1a2433] border-none rounded-2xl px-6 text-sm font-black text-white placeholder:text-slate-600 uppercase focus:ring-2 focus:ring-primary outline-none transition-all" />
-                             <input placeholder="NÚMERO" value={customerForm.number} onChange={e => setCustomerForm({...customerForm, number: e.target.value})} className="w-full h-16 bg-[#1a2433] border-none rounded-2xl px-6 text-sm font-black text-white placeholder:text-slate-600 uppercase focus:ring-2 focus:ring-primary outline-none transition-all" />
-                          </div>
-                          <input placeholder="LOGRADOURO" value={customerForm.address} onChange={e => setCustomerForm({...customerForm, address: e.target.value})} className="w-full h-16 bg-[#1a2433] border-none rounded-2xl px-6 text-sm font-black text-white placeholder:text-slate-600 uppercase focus:ring-2 focus:ring-primary outline-none transition-all" />
-                          <div className="grid grid-cols-2 gap-4">
-                             <input placeholder="CIDADE" value={customerForm.city} onChange={e => setCustomerForm({...customerForm, city: e.target.value})} className="w-full h-16 bg-[#1a2433] border-none rounded-2xl px-6 text-sm font-black text-white placeholder:text-slate-600 uppercase focus:ring-2 focus:ring-primary outline-none transition-all" />
-                             <input placeholder="UF" maxLength={2} value={customerForm.state} onChange={e => setCustomerForm({...customerForm, state: e.target.value})} className="w-full h-16 bg-[#1a2433] border-none rounded-2xl px-6 text-sm font-black text-white placeholder:text-slate-600 uppercase focus:ring-2 focus:ring-primary outline-none transition-all" />
-                          </div>
-                       </div>
-                    )}
                  </div>
                  <button type="submit" className="w-full h-20 bg-primary text-white rounded-[2rem] font-black text-sm uppercase tracking-widest shadow-2xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all mt-4">CADASTRAR E SELECIONAR</button>
               </form>
@@ -657,7 +619,7 @@ const PDV: React.FC = () => {
         @media print {
           body * { visibility: hidden !important; }
           #root { display: block !important; }
-          aside, header, main, .print\\:hidden, div[class*="fixed"], div[class*="backdrop-blur"] {
+          aside, header, main, .print\\:hidden, div[class*="fixed"], div[class*="backdrop-blur"], .p-8 {
             display: none !important;
             opacity: 0 !important;
           }
@@ -669,15 +631,14 @@ const PDV: React.FC = () => {
             position: absolute !important;
             left: 0 !important;
             top: 0 !important;
-            width: 100% !important;
-            max-width: 80mm !important;
-            padding: 10px !important;
+            width: 80mm !important;
+            padding: 5mm !important;
             margin: 0 !important;
             background: white !important;
             color: black !important;
             border: none !important;
           }
-          @page { size: auto; margin: 0mm; }
+          @page { size: 80mm auto; margin: 0mm; }
         }
       `}</style>
     </div>
