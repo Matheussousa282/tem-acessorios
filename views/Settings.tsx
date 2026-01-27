@@ -68,8 +68,8 @@ const Settings: React.FC = () => {
   return (
     <div className="p-8 space-y-8 animate-in fade-in duration-500 pb-20">
       <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Ajustes do Sistema</h1>
-        <p className="text-slate-500 text-sm font-bold uppercase tracking-tight">Identidade, Equipe e Acessos.</p>
+        <h1 className="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Configurações</h1>
+        <p className="text-slate-500 text-sm font-bold uppercase tracking-tight">Gestão de Identidade, Equipe e Unidades.</p>
       </div>
 
       <div className="flex border-b overflow-x-auto no-scrollbar gap-2 shadow-sm">
@@ -81,10 +81,11 @@ const Settings: React.FC = () => {
       </div>
 
       <div className="mt-6">
+        {/* ABA COLABORADORES */}
         {activeTab === 'users' && (
           <div className="space-y-6">
             <div className="flex justify-end">
-              <button onClick={() => setShowUserModal(true)} className="px-6 py-3 bg-primary text-white rounded-xl font-black text-xs uppercase shadow-lg hover:scale-105 transition-all">Novo Colaborador</button>
+              <button onClick={() => { setUserForm({ name: '', email: '', role: UserRole.VENDOR, storeId: 'matriz', active: true, password: '123456' }); setShowUserModal(true); }} className="px-6 py-3 bg-primary text-white rounded-xl font-black text-xs uppercase shadow-lg hover:scale-105 transition-all">Novo Colaborador</button>
             </div>
             <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border shadow-sm overflow-hidden">
                <table className="w-full text-left">
@@ -109,10 +110,11 @@ const Settings: React.FC = () => {
           </div>
         )}
 
+        {/* ABA UNIDADES */}
         {activeTab === 'stores' && (
           <div className="space-y-6">
             <div className="flex justify-end">
-              <button onClick={() => setShowStoreModal(true)} className="px-6 py-3 bg-primary text-white rounded-xl font-black text-xs uppercase shadow-lg hover:scale-105 transition-all">Nova Unidade</button>
+              <button onClick={() => { setStoreForm({ name: '', cnpj: '', location: '', active: true, hasStockAccess: true }); setShowStoreModal(true); }} className="px-6 py-3 bg-primary text-white rounded-xl font-black text-xs uppercase shadow-lg hover:scale-105 transition-all">Nova Unidade</button>
             </div>
             <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border shadow-sm overflow-hidden">
                <table className="w-full text-left">
@@ -134,6 +136,24 @@ const Settings: React.FC = () => {
                </table>
             </div>
           </div>
+        )}
+
+        {activeTab === 'general' && (
+           <div className="max-w-4xl bg-white dark:bg-slate-900 p-10 rounded-[3rem] border shadow-sm animate-in fade-in">
+              <div className="flex items-center gap-10">
+                 <div onClick={() => logoInputRef.current?.click()} className="size-32 bg-slate-50 dark:bg-slate-800 rounded-3xl border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden cursor-pointer group">
+                    {localConfig.logoUrl ? <img src={localConfig.logoUrl} className="size-full object-contain" /> : <span className="material-symbols-outlined text-4xl text-slate-300 group-hover:scale-110 transition-transform">image</span>}
+                 </div>
+                 <div className="flex-1 space-y-4">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Nome Comercial</label>
+                    <input type="text" value={localConfig.companyName} onChange={e => setLocalConfig({...localConfig, companyName: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 font-black uppercase text-sm border-none outline-none focus:ring-2 focus:ring-primary shadow-inner" />
+                    <input type="file" ref={logoInputRef} className="hidden" accept="image/*" onChange={e => {
+                       const f = e.target.files?.[0]; if(f){ const r = new FileReader(); r.onloadend = () => setLocalConfig({...localConfig, logoUrl: r.result as string}); r.readAsDataURL(f); }
+                    }} />
+                 </div>
+              </div>
+              <button onClick={() => updateConfig(localConfig)} className="w-full h-16 bg-primary text-white rounded-2xl font-black text-xs uppercase shadow-xl mt-10 hover:scale-[1.02] transition-all">Salvar Alterações</button>
+           </div>
         )}
 
         {activeTab === 'permissions' && localPerms && (
@@ -158,51 +178,25 @@ const Settings: React.FC = () => {
                     </div>
                  ))}
               </div>
-              <button onClick={handleSavePermissions} disabled={isSaving} className="w-full h-16 bg-primary text-white rounded-2xl font-black text-xs uppercase shadow-xl flex items-center justify-center gap-2 transition-transform active:scale-95">Salvar Configuração de Acesso</button>
-           </div>
-        )}
-
-        {activeTab === 'general' && (
-           <div className="max-w-4xl bg-white dark:bg-slate-900 p-10 rounded-[3rem] border shadow-sm animate-in fade-in">
-              <div className="flex items-center gap-10">
-                 <div onClick={() => logoInputRef.current?.click()} className="size-32 bg-slate-50 dark:bg-slate-800 rounded-3xl border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden cursor-pointer group">
-                    {localConfig.logoUrl ? <img src={localConfig.logoUrl} className="size-full object-contain" /> : <span className="material-symbols-outlined text-4xl text-slate-300 group-hover:scale-110 transition-transform">image</span>}
-                 </div>
-                 <div className="flex-1 space-y-4">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Nome Comercial</label>
-                    <input type="text" value={localConfig.companyName} onChange={e => setLocalConfig({...localConfig, companyName: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 font-black uppercase text-sm border-none outline-none focus:ring-2 focus:ring-primary shadow-inner" />
-                    <input type="file" ref={logoInputRef} className="hidden" accept="image/*" onChange={e => {
-                       const f = e.target.files?.[0]; if(f){ const r = new FileReader(); r.onloadend = () => setLocalConfig({...localConfig, logoUrl: r.result as string}); r.readAsDataURL(f); }
-                    }} />
-                 </div>
-              </div>
-              <button onClick={() => updateConfig(localConfig)} className="w-full h-16 bg-primary text-white rounded-2xl font-black text-xs uppercase shadow-xl mt-10 hover:scale-[1.02] transition-all">Atualizar Identidade</button>
-           </div>
-        )}
-
-        {activeTab === 'db' && isAdmin && (
-           <div className="max-w-4xl bg-slate-900 p-12 rounded-[3rem] text-white shadow-2xl relative overflow-hidden animate-in zoom-in-95">
-              <div className="absolute top-0 right-0 size-64 bg-primary/10 blur-[100px] rounded-full"></div>
-              <h2 className="text-3xl font-black uppercase tracking-tighter">Manutenção Neon</h2>
-              <p className="text-slate-400 mt-4 uppercase text-xs font-bold leading-relaxed">Força a sincronização das tabelas e colunas do banco de dados.</p>
-              <button onClick={async () => { await fetch('/api/init-db'); await refreshData(); alert('Banco sincronizado!'); }} className="px-10 py-5 bg-primary text-white rounded-2xl font-black text-xs uppercase mt-8 shadow-xl hover:scale-105 transition-all">Sincronizar Estrutura</button>
+              <button onClick={handleSavePermissions} disabled={isSaving} className="w-full h-16 bg-primary text-white rounded-2xl font-black text-xs uppercase shadow-xl flex items-center justify-center gap-2 transition-transform active:scale-95">Salvar Acessos</button>
            </div>
         )}
       </div>
 
+      {/* MODAIS */}
       {showUserModal && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
            <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden border">
               <div className="p-6 bg-primary text-white flex justify-between items-center"><h3 className="font-black uppercase tracking-tight">Dados do Colaborador</h3><button onClick={() => setShowUserModal(false)} className="material-symbols-outlined">close</button></div>
               <form onSubmit={handleSaveUser} className="p-8 space-y-4">
-                 <div className="space-y-1"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Nome Completo</label><input required value={userForm.name} onChange={e => setUserForm({...userForm, name: e.target.value})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 border-none font-bold uppercase text-xs focus:ring-2 focus:ring-primary" /></div>
-                 <div className="space-y-1"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">E-mail / Login</label><input required value={userForm.email} onChange={e => setUserForm({...userForm, email: e.target.value})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 border-none font-bold text-xs" /></div>
-                 <div className="space-y-1"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Senha Provisória</label><input required value={userForm.password} onChange={e => setUserForm({...userForm, password: e.target.value})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 border-none font-bold text-xs" /></div>
+                 <div className="space-y-1"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Nome Completo</label><input required value={userForm.name} onChange={e => setUserForm({...userForm, name: e.target.value})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 border-none font-bold uppercase text-xs" /></div>
+                 <div className="space-y-1"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Login / E-mail</label><input required value={userForm.email} onChange={e => setUserForm({...userForm, email: e.target.value})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 border-none font-bold text-xs" /></div>
+                 <div className="space-y-1"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Senha</label><input required value={userForm.password} onChange={e => setUserForm({...userForm, password: e.target.value})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 border-none font-bold text-xs" /></div>
                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Perfil de Acesso</label><select value={userForm.role} onChange={e => setUserForm({...userForm, role: e.target.value as UserRole})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 border-none font-bold uppercase text-[10px]">{Object.values(UserRole).map(r => <option key={r} value={r}>{r}</option>)}</select></div>
-                    <div className="space-y-1"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Unidade Alocada</label><select value={userForm.storeId} onChange={e => setUserForm({...userForm, storeId: e.target.value})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 border-none font-bold uppercase text-[10px]">{establishments.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}</select></div>
+                    <div className="space-y-1"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Perfil</label><select value={userForm.role} onChange={e => setUserForm({...userForm, role: e.target.value as UserRole})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 border-none font-bold uppercase text-[10px]">{Object.values(UserRole).map(r => <option key={r} value={r}>{r}</option>)}</select></div>
+                    <div className="space-y-1"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Unidade</label><select value={userForm.storeId} onChange={e => setUserForm({...userForm, storeId: e.target.value})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 border-none font-bold uppercase text-[10px]">{establishments.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}</select></div>
                  </div>
-                 <button type="submit" className="w-full h-14 bg-primary text-white rounded-2xl font-black text-xs uppercase shadow-xl mt-4 hover:bg-blue-600 transition-all">Salvar Colaborador</button>
+                 <button type="submit" className="w-full h-14 bg-primary text-white rounded-2xl font-black text-xs uppercase shadow-xl mt-4">Salvar</button>
               </form>
            </div>
         </div>
@@ -213,10 +207,10 @@ const Settings: React.FC = () => {
            <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden border">
               <div className="p-6 bg-primary text-white flex justify-between items-center"><h3 className="font-black uppercase tracking-tight">Dados da Unidade</h3><button onClick={() => setShowStoreModal(false)} className="material-symbols-outlined">close</button></div>
               <form onSubmit={handleSaveStore} className="p-8 space-y-4">
-                 <div className="space-y-1"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Nome da Loja / Filial</label><input required value={storeForm.name} onChange={e => setStoreForm({...storeForm, name: e.target.value})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 border-none font-bold uppercase text-xs focus:ring-2 focus:ring-primary" /></div>
-                 <div className="space-y-1"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Endereço Completo / Cidade</label><input required value={storeForm.location} onChange={e => setStoreForm({...storeForm, location: e.target.value})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 border-none font-bold uppercase text-xs" /></div>
+                 <div className="space-y-1"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Nome da Loja</label><input required value={storeForm.name} onChange={e => setStoreForm({...storeForm, name: e.target.value})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 border-none font-bold uppercase text-xs" /></div>
+                 <div className="space-y-1"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Endereço</label><input required value={storeForm.location} onChange={e => setStoreForm({...storeForm, location: e.target.value})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 border-none font-bold uppercase text-xs" /></div>
                  <div className="space-y-1"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">CNPJ</label><input value={storeForm.cnpj} onChange={e => setStoreForm({...storeForm, cnpj: e.target.value})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 border-none font-bold uppercase text-xs" /></div>
-                 <button type="submit" className="w-full h-14 bg-primary text-white rounded-2xl font-black text-xs uppercase shadow-xl mt-4 hover:bg-blue-600 transition-all">Salvar Unidade</button>
+                 <button type="submit" className="w-full h-14 bg-primary text-white rounded-2xl font-black text-xs uppercase shadow-xl mt-4">Salvar</button>
               </form>
            </div>
         </div>
@@ -227,7 +221,7 @@ const Settings: React.FC = () => {
 
 const getLabelForModule = (key: string) => {
   const labels: Record<string, string> = {
-    dashboard: 'Dashboard Analítico', pdv: 'Frente de Caixa (PDV)', cashControl: 'Controle de Caixa', customers: 'Gestão de Clientes', reports: 'Relatórios de Venda', inventory: 'Produtos / Catálogo', balance: 'Balanço de Estoque', incomes: 'Controle de Receitas', expenses: 'Controle de Despesas', financial: 'DRE / Resultado', settings: 'Configurações Sistema', serviceOrders: 'Ordens de Serviço (OS)', cardManagement: 'Gestão de Cartões'
+    dashboard: 'Dashboard', pdv: 'Frente de Caixa (PDV)', cashControl: 'Controle de Caixa', customers: 'Gestão de Clientes', reports: 'Relatórios', inventory: 'Produtos', balance: 'Balanço de Estoque', incomes: 'Receitas', expenses: 'Despesas', financial: 'DRE / Resultado', settings: 'Configurações', serviceOrders: 'Ordens de Serviço (OS)', cardManagement: 'Cartões'
   };
   return labels[key] || key;
 };

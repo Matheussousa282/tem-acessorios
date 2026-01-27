@@ -36,14 +36,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     return rolePermissions[currentUser.role] || INITIAL_PERMS[currentUser.role] || INITIAL_PERMS[UserRole.VENDOR];
   }, [rolePermissions, currentUser?.role]);
 
-  useEffect(() => {
-    if (location.pathname.includes('estoque')) setIsStockOpen(true);
-    if (location.pathname.includes('pdv') || location.pathname.includes('clientes') || location.pathname.includes('relatorios') || location.pathname.includes('caixa') || location.pathname.includes('documentos')) {
-      setIsVendasOpen(true);
-    }
-    if (location.pathname.includes('entradas') || location.pathname.includes('dre') || location.pathname.includes('cartoes')) setIsFinancialOpen(true);
-  }, [location.pathname]);
-
   if (!currentUser) return null;
   if (isPDV) return <div className="h-screen w-full overflow-hidden">{children}</div>;
 
@@ -57,7 +49,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </div>
             <div className="flex flex-col min-w-0">
               <h1 className="text-slate-900 dark:text-white text-sm font-black leading-tight truncate uppercase">{systemConfig.companyName}</h1>
-              <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Gestão Integrada</p>
+              <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Gestão Neon</p>
             </div>
           </div>
 
@@ -66,14 +58,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             
             <div className="flex flex-col">
               <button onClick={() => setIsVendasOpen(!isVendasOpen)} className="flex items-center justify-between px-3 py-2.5 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
-                <div className="flex items-center gap-3"><span className="material-symbols-outlined text-xl">shopping_cart</span><span className="text-xs font-black uppercase tracking-widest">Vendas / PDV</span></div>
+                <div className="flex items-center gap-3"><span className="material-symbols-outlined text-xl">shopping_cart</span><span className="text-xs font-black uppercase tracking-widest">Vendas</span></div>
                 <span className={`material-symbols-outlined text-sm transition-transform ${isVendasOpen ? 'rotate-180' : ''}`}>expand_more</span>
               </button>
               {isVendasOpen && (
                 <div className="flex flex-col ml-9 mt-1 border-l dark:border-slate-800 gap-1">
-                  {perms.cashControl && <SidebarSubItem to="/caixa" label="Controle de Caixa" />}
+                  {perms.cashControl && <SidebarSubItem to="/caixa" label="Caixa" />}
                   {perms.pdv && <SidebarSubItem to="/pdv" label="Frente de Caixa" />}
-                  <SidebarSubItem to="/documentos" label="Documentos Venda" />
+                  <SidebarSubItem to="/documentos" label="Documentos" />
                   {perms.customers && <SidebarSubItem to="/clientes" label="Clientes" />}
                   {perms.reports && <SidebarSubItem to="/relatorios" label="Relatórios" />}
                 </div>
@@ -107,7 +99,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   <div className="flex flex-col ml-9 mt-1 border-l dark:border-slate-800 gap-1">
                     <SidebarSubItem to="/entradas" label="Receitas" />
                     <SidebarSubItem to="/saidas" label="Despesas" />
-                    <SidebarSubItem to="/dre" label="DRE Automatizada" />
+                    <SidebarSubItem to="/dre" label="DRE" />
                   </div>
                 )}
               </div>
@@ -119,7 +111,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
         <div className="pt-4 border-t dark:border-slate-800">
            <div className="flex items-center gap-3 px-2 py-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl">
-              <div className="size-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-black">{currentUser.name.charAt(0)}</div>
+              <div className="size-10 rounded-xl bg-primary text-white flex items-center justify-center font-black">{currentUser.name.charAt(0)}</div>
               <div className="flex-1 min-w-0"><p className="text-[11px] font-black dark:text-white uppercase truncate">{currentUser.name}</p><p className="text-[9px] font-bold text-slate-400 uppercase">{currentUser.role}</p></div>
               <button onClick={() => { logout(); navigate('/login'); }} className="text-rose-500 hover:scale-110 transition-transform"><span className="material-symbols-outlined text-lg">logout</span></button>
            </div>
@@ -128,7 +120,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       <main className="flex-1 flex flex-col overflow-hidden bg-background-light dark:bg-background-dark">
         <header className="h-16 flex-shrink-0 border-b dark:border-slate-800 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md flex items-center justify-between px-8">
-           <div></div>
+           <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest"><span className="size-2 bg-primary rounded-full animate-pulse"></span> Sistema Operacional</div>
            <div className="flex items-center gap-4">
               <button onClick={() => setIsLightMode(!isLightMode)} className="material-symbols-outlined text-slate-400 hover:text-primary transition-colors">{isLightMode ? 'dark_mode' : 'light_mode'}</button>
               <div className="h-6 w-px bg-slate-200 dark:bg-slate-800"></div>
