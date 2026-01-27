@@ -167,11 +167,11 @@ const SalesInquiry: React.FC = () => {
          </div>
       </footer>
 
-      {/* MODAL DETALHE DO DOCUMENTO (O que você circulou) */}
+      {/* MODAL DETALHE DO DOCUMENTO */}
       {viewingDetail && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 p-4 animate-in fade-in">
            <div className="bg-slate-100 w-full max-w-[1200px] h-[90vh] rounded shadow-2xl flex flex-col overflow-hidden text-slate-700">
-              {/* Header do Documento - Nome Ajustado */}
+              {/* Header do Documento */}
               <div className="bg-white p-3 border-b border-slate-300 flex items-center justify-between">
                  <h2 className="text-sm font-bold flex items-center gap-2">
                     Informações Gerais do Documento <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-[10px]">NFC</span>
@@ -180,7 +180,6 @@ const SalesInquiry: React.FC = () => {
               </div>
 
               <div className="p-4 space-y-4 overflow-y-auto">
-                 {/* Campos Filtrados: Apenas os que NÃO tinham X vermelho */}
                  <div className="grid grid-cols-12 gap-2">
                     <div className="col-span-2"><DetailField label="ID:" value={viewingDetail.id.slice(-6)} /></div>
                     <div className="col-span-10"><DetailField label="LOJA:" value={viewingDetail.store} borderHighlight /></div>
@@ -195,8 +194,9 @@ const SalesInquiry: React.FC = () => {
                     <div className="col-span-3"><DetailField label="REPRESENTANTE:" value="000275 - ALAGOAS" /></div>
                     {/* Vendedor, Caixa e Operador - Dados Reais */}
                     <div className="col-span-3"><DetailField label="VENDEDOR:" value={getUserData(viewingDetail.vendorId)?.name || 'NÃO INF.'} borderHighlight /></div>
-                    <div className="col-span-3"><DetailField label="CAIXA:" value={viewingDetail.method || 'CAIXA PDV 01'} borderHighlight /></div>
-                    <div className="col-span-3"><DetailField label="OPERADOR:" value={getUserData(viewingDetail.vendorId)?.name || 'SISTEMA'} borderHighlight /></div>
+                    {/* Aqui trazemos o nome do operador que passou a venda */}
+                    <div className="col-span-3"><DetailField label="CAIXA:" value={getUserData(viewingDetail.cashierId)?.name || viewingDetail.method || 'SISTEMA'} borderHighlight /></div>
+                    <div className="col-span-3"><DetailField label="OPERADOR:" value={getUserData(viewingDetail.cashierId)?.name || 'SISTEMA'} borderHighlight /></div>
                  </div>
 
                  <div className="bg-primary text-white flex items-center px-4 py-1.5 gap-8 mt-2">

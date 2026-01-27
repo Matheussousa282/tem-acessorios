@@ -231,6 +231,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       clientId,
       client: client?.name || 'Consumidor Final',
       vendorId,
+      cashierId: currentUser?.id,
       items,
       ...cardDetails
     };

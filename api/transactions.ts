@@ -22,6 +22,7 @@ export default async function handler(req: any, res: any) {
       client: t.client,
       clientId: t.client_id,
       vendorId: t.vendor_id,
+      cashierId: t.cashier_id,
       items: t.items,
       installments: t.installments,
       authNumber: t.auth_number,
@@ -36,16 +37,17 @@ export default async function handler(req: any, res: any) {
       await sql`
         INSERT INTO transactions (
           id, date, due_date, description, store, category, status, value, shipping_value, type, method, 
-          client, client_id, vendor_id, items, installments, auth_number, transaction_sku
+          client, client_id, vendor_id, cashier_id, items, installments, auth_number, transaction_sku
         )
         VALUES (
           ${t.id}, ${t.date}, ${t.dueDate}, ${t.description}, ${t.store}, ${t.category}, ${t.status}, ${t.value}, ${t.shippingValue || 0}, ${t.type}, ${t.method}, 
-          ${t.client}, ${t.clientId}, ${t.vendorId}, ${JSON.stringify(t.items)}, ${t.installments || null}, ${t.authNumber || null}, ${t.transactionSku || null}
+          ${t.client}, ${t.clientId}, ${t.vendorId}, ${t.cashierId || null}, ${JSON.stringify(t.items)}, ${t.installments || null}, ${t.authNumber || null}, ${t.transactionSku || null}
         )
         ON CONFLICT (id) DO UPDATE SET
           client = EXCLUDED.client,
           client_id = EXCLUDED.client_id,
           vendor_id = EXCLUDED.vendor_id,
+          cashier_id = EXCLUDED.cashier_id,
           status = EXCLUDED.status,
           value = EXCLUDED.value,
           items = EXCLUDED.items
