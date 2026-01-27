@@ -7,8 +7,7 @@ import { CartItem, Product, Customer, UserRole, User, ServiceOrder, ServiceOrder
 const PDV: React.FC = () => {
   const { 
     products, customers, users, currentUser, processSale, 
-    establishments, addServiceOrder, addCustomer, addEstablishment, 
-    addUser, transactions, addTransaction, systemConfig, 
+    establishments, addServiceOrder, addCustomer, transactions, addTransaction, 
     addProduct, cashSessions, cardOperators, cardBrands 
   } = useApp();
   
@@ -17,14 +16,15 @@ const PDV: React.FC = () => {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('Todos');
   
-  // Lógica garantida para detectar caixa aberto para o usuário atual
+  // Detecção de caixa aberto garantida
   const isCashOpen = useMemo(() => {
     return cashSessions.some(s => 
       s.status === CashSessionStatus.OPEN && 
-      (s.storeId === currentUser?.storeId || s.openingOperatorId === currentUser?.id)
+      (s.storeId === currentUser?.storeId)
     );
   }, [cashSessions, currentUser]);
 
+  // Estados de Modais
   const [showCheckout, setShowCheckout] = useState(false);
   const [showOSModal, setShowOSModal] = useState(false);
   const [showPriceInquiry, setShowPriceInquiry] = useState(false);
@@ -32,8 +32,8 @@ const PDV: React.FC = () => {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showCustomerModal, setShowCustomerModal] = useState(false);
-  const [showTerminalMenu, setShowTerminalMenu] = useState(false);
   
+  // Estados de Negócio
   const [successType, setSuccessType] = useState<'SALE' | 'OS' | 'RETURN' | 'CANCEL'>('SALE');
   const [paymentMethod, setPaymentMethod] = useState('Dinheiro');
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
@@ -41,26 +41,12 @@ const PDV: React.FC = () => {
   const [lastSaleData, setLastSaleData] = useState<any>(null);
   const [isFinalizing, setIsFinalizing] = useState(false);
 
-  const [cardInstallments, setCardInstallments] = useState(1);
-  const [cardAuthNumber, setCardAuthNumber] = useState('');
-  const [cardNsu, setCardNsu] = useState('');
-  const [selectedOperatorId, setSelectedOperatorId] = useState('');
-  const [selectedBrandId, setSelectedBrandId] = useState('');
-
+  // Estados Adicionais
   const [osDescription, setOsDescription] = useState('');
   const [shippingValue, setShippingValue] = useState(0);
   const [priceInquirySearch, setPriceInquirySearch] = useState('');
   const [cancelSearchId, setCancelSearchId] = useState('');
-
   const [returnSearchTerm, setReturnSearchTerm] = useState('');
-  const [selectedReturnSale, setSelectedReturnSale] = useState<Transaction | null>(null);
-
-  const [activeCustomerTab, setActiveCustomerTab] = useState<'basic' | 'address'>('basic');
-  const initialCustomerForm: Omit<Customer, 'id'> = { 
-    name: '', phone: '', email: '', birthDate: new Date().toISOString().split('T')[0],
-    cpfCnpj: '', zipCode: '', address: '', number: '', neighborhood: '', city: '', state: ''
-  };
-  const [customerForm, setCustomerForm] = useState(initialCustomerForm);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -84,12 +70,8 @@ const PDV: React.FC = () => {
     return users.filter(u => (u.role === UserRole.VENDOR || u.role === UserRole.ADMIN || u.role === UserRole.MANAGER) && (isAdmin || u.storeId === currentUser?.storeId));
   }, [users, currentUser, isAdmin]);
 
-  const filteredBrands = useMemo(() => {
-    return cardBrands.filter(b => b.operatorId === selectedOperatorId);
-  }, [cardBrands, selectedOperatorId]);
-
   const subtotal = useMemo(() => cart.reduce((acc, item) => acc + (item.salePrice * item.quantity), 0), [cart]);
-  const totalGeral = useMemo(() => subtotal + (Number(shippingValue) || 0), [subtotal, shippingValue]);
+  const totalGeral = subtotal + (Number(shippingValue) || 0);
 
   const addToCart = (product: Product) => {
     if (!product.isService && product.stock <= 0) { alert('Produto sem estoque!'); return; }
@@ -104,75 +86,39 @@ const PDV: React.FC = () => {
 
   const handleFinalizeSale = async () => {
     if (cart.length === 0 || isFinalizing) return;
-    
-    if ((paymentMethod === 'Credito' || paymentMethod === 'Debito')) {
-       if (!selectedOperatorId || !selectedBrandId) {
-          alert("Selecione a Operadora e a Bandeira do cartão!");
-          return;
-       }
-    }
-
     setIsFinalizing(true);
     try {
-      const saleId = `SALE-${Date.now()}`;
       const vendor = vendors.find(v => v.id === selectedVendorId);
       const customer = customers.find(c => c.id === selectedCustomerId);
-      
-      const cardDetails = (paymentMethod === 'Credito' || paymentMethod === 'Debito') ? {
-        installments: cardInstallments,
-        authNumber: cardAuthNumber,
-        transactionSku: cardNsu,
-        cardOperatorId: selectedOperatorId,
-        cardBrandId: selectedBrandId
-      } : {};
-
       const currentSaleData = {
-        id: saleId, items: [...cart], subtotal, shipping: shippingValue, total: totalGeral,
+        id: `SALE-${Date.now()}`, items: [...cart], subtotal, shipping: shippingValue, total: totalGeral,
         payment: paymentMethod, date: new Date().toLocaleString('pt-BR'),
-        vendor: vendor?.name || 'Vendedor Não Informado', 
-        customer: customer?.name || 'Consumidor Final',
-        store: currentStore, ...cardDetails
+        vendor: vendor?.name || 'BALCÃO', customer: customer?.name || 'CONSUMIDOR FINAL',
+        store: currentStore
       };
-      
       setLastSaleData(currentSaleData);
-
-      await processSale(cart, totalGeral, paymentMethod, selectedCustomerId, selectedVendorId, shippingValue, cardDetails);
-      
+      await processSale(cart, totalGeral, paymentMethod, selectedCustomerId, selectedVendorId, shippingValue);
       setCart([]);
-      setShippingValue(0);
       setSuccessType('SALE');
       setShowCheckout(false);
       setShowSuccessModal(true);
-    } catch (e) {
-      alert("Erro ao processar venda.");
-    } finally {
-      setIsFinalizing(false);
-    }
+    } catch (e) { alert("Erro ao processar venda."); } finally { setIsFinalizing(false); }
   };
 
-  const handleSaveCustomer = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const newId = `c-${Date.now()}`;
-    await addCustomer({ ...customerForm, id: newId });
-    setSelectedCustomerId(newId);
-    setShowCustomerModal(false);
-  };
-
-  const processSaleCancellation = async (sale: Transaction) => {
-    if(confirm(`Deseja estornar a venda ${sale.id}?`)) {
-        const estorno: Transaction = {
-          ...sale, id: `CANCEL-${Date.now()}`, description: `ESTORNO: ${sale.id}`,
-          type: 'EXPENSE', category: 'Devolução', date: new Date().toISOString().split('T')[0], value: sale.value
-        };
-        const stockUpdates = (sale.items || []).map(item => {
-           const p = products.find(x => x.id === item.id);
-           if(p && !p.isService) return addProduct({ ...p, stock: p.stock + item.quantity });
-           return Promise.resolve();
-        });
-        await Promise.all([...stockUpdates, addTransaction(estorno)]);
-        setShowCancelModal(false);
-        alert("Venda estornada com sucesso!");
-     }
+  const handleCreateOS = async () => {
+    if (!selectedCustomerId || cart.length === 0) return;
+    const customer = customers.find(c => c.id === selectedCustomerId)!;
+    const newOS: ServiceOrder = {
+      id: `OS-${Date.now()}`, date: new Date().toLocaleDateString('pt-BR'),
+      customerId: selectedCustomerId, customerName: customer.name,
+      description: osDescription, status: ServiceOrderStatus.OPEN,
+      items: [...cart], totalValue: totalGeral, store: currentStore.name
+    };
+    await addServiceOrder(newOS);
+    setCart([]);
+    setShowOSModal(false);
+    setSuccessType('OS');
+    setShowSuccessModal(true);
   };
 
   if (!isCashOpen) {
@@ -181,7 +127,7 @@ const PDV: React.FC = () => {
         <div className="bg-white dark:bg-slate-900 p-12 rounded-[3.5rem] shadow-2xl border border-slate-200 dark:border-slate-800 text-center max-w-lg space-y-8 animate-in zoom-in-95">
            <div className="size-24 bg-rose-500/10 text-rose-500 rounded-[2rem] flex items-center justify-center mx-auto animate-pulse"><span className="material-symbols-outlined text-5xl">lock</span></div>
            <h2 className="text-3xl font-black uppercase">Caixa Fechado</h2>
-           <p className="text-slate-500 font-bold text-sm uppercase">Para iniciar as operações de venda, realize a abertura do movimento diário.</p>
+           <p className="text-slate-500 font-bold text-sm uppercase leading-relaxed">É necessário realizar a abertura do caixa para iniciar as operações de venda.</p>
            <button onClick={() => navigate('/caixa')} className="w-full py-5 bg-primary text-white rounded-2xl font-black text-xs uppercase shadow-xl hover:scale-105 transition-all">Ir para Abertura de Caixa</button>
            <button onClick={() => navigate('/')} className="w-full py-5 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-2xl font-black text-xs uppercase transition-all">Voltar ao Início</button>
         </div>
@@ -192,7 +138,7 @@ const PDV: React.FC = () => {
   return (
     <div className="h-screen flex flex-col bg-slate-50 dark:bg-background-dark overflow-hidden font-display relative">
       
-      {/* RECIBO PARA IMPRESSÃO (Oculto em tela) */}
+      {/* RECIBO PARA IMPRESSÃO */}
       <div id="receipt-print" className="hidden print:block bg-white text-black font-mono text-[11px] p-4 w-[80mm]">
         <div className="text-center space-y-1 mb-4 border-b border-dashed border-black pb-2">
            <h2 className="text-[14px] font-black uppercase">{lastSaleData?.store?.name}</h2>
@@ -203,75 +149,75 @@ const PDV: React.FC = () => {
            <span>DOC: {lastSaleData?.id?.slice(-8)}</span>
            <span>{lastSaleData?.date}</span>
         </div>
-        <div className="border-y border-black py-1 mb-2 font-black flex justify-between uppercase text-[9px]">
-           <span>QTD</span><span className="flex-1 px-2">PRODUTO</span><span className="w-16 text-right">VALOR</span>
-        </div>
         <div className="space-y-1 mb-4">
            {lastSaleData?.items?.map((item: any, idx: number) => (
-             <div key={idx} className="flex justify-between items-start uppercase">
-                <span className="w-8">{item.quantity}</span>
-                <span className="flex-1 px-2">{item.name}</span>
-                <span className="w-16 text-right">{(item.quantity * item.salePrice).toLocaleString('pt-BR')}</span>
+             <div key={idx} className="flex justify-between uppercase">
+                <span className="flex-1 truncate">{item.quantity}x {item.name}</span>
+                <span className="ml-2 font-bold">R$ {(item.quantity * item.salePrice).toLocaleString('pt-BR')}</span>
              </div>
            ))}
         </div>
         <div className="border-t-2 border-black pt-2 mb-4 text-[13px] font-black flex justify-between">
-           <span>TOTAL GERAL:</span><span>R$ {lastSaleData?.total?.toLocaleString('pt-BR')}</span>
-        </div>
-        <div className="text-center border-t border-dashed border-black pt-2 text-[9px]">
-           <p className="font-black">OBRIGADO PELA PREFERÊNCIA!</p>
+           <span>TOTAL:</span><span>R$ {lastSaleData?.total?.toLocaleString('pt-BR')}</span>
         </div>
       </div>
 
-      {/* UI PDV */}
+      {/* UI PRINCIPAL */}
       <div className="print:hidden h-full flex flex-col">
-        <header className="flex items-center justify-between px-8 py-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 z-30 shadow-sm shrink-0">
+        <header className="flex items-center justify-between px-8 py-4 bg-white dark:bg-slate-900 border-b z-30 shadow-sm shrink-0">
           <div className="flex items-center gap-6">
-            <div className="flex items-center gap-3 relative">
-               <div onClick={() => setShowTerminalMenu(!showTerminalMenu)} className="size-12 rounded-xl bg-primary flex items-center justify-center text-white shadow-lg overflow-hidden cursor-pointer hover:scale-105 transition-all">
+            <div className="flex items-center gap-3">
+               <div className="size-12 rounded-xl bg-primary flex items-center justify-center text-white shadow-lg overflow-hidden">
                   {currentStore.logoUrl ? <img src={currentStore.logoUrl} className="size-full object-cover" /> : <span className="material-symbols-outlined">point_of_sale</span>}
                </div>
                <div>
                   <h1 className="text-lg font-black uppercase text-slate-900 dark:text-white leading-none">{currentStore.name}</h1>
-                  <p className="text-[10px] font-black text-slate-400 uppercase mt-1">Terminal Aberto por: {currentUser?.name}</p>
+                  <p className="text-[10px] font-black text-slate-400 uppercase mt-1">Terminal em Operação por {currentUser?.name}</p>
                </div>
+            </div>
+            <div className="flex gap-2 ml-4">
+               {categories.map(cat => (
+                 <button key={cat} onClick={() => setCategory(cat)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all whitespace-nowrap ${category === cat ? 'bg-primary text-white shadow-lg' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200'}`}>{cat}</button>
+               ))}
             </div>
           </div>
           <div className="flex gap-3">
              <button onClick={() => setShowCancelModal(true)} className="px-5 py-2.5 bg-rose-500/10 text-rose-500 rounded-xl font-black text-[10px] uppercase flex items-center gap-2"><span className="material-symbols-outlined text-lg">cancel</span> Cancelar</button>
+             <button onClick={() => setShowReturnsModal(true)} className="px-5 py-2.5 bg-amber-500/10 text-amber-600 rounded-xl font-black text-[10px] uppercase flex items-center gap-2"><span className="material-symbols-outlined text-lg">history</span> Trocas</button>
              <button onClick={() => setShowPriceInquiry(true)} className="px-5 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 rounded-xl font-black text-[10px] uppercase flex items-center gap-2"><span className="material-symbols-outlined text-lg">sell</span> Consulta Preço</button>
-             <button onClick={() => window.history.back()} className="px-5 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-xl font-black text-[10px] uppercase">Sair</button>
+             <button onClick={() => navigate('/')} className="px-5 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-xl font-black text-[10px] uppercase tracking-widest">Sair</button>
           </div>
         </header>
 
         <main className="flex flex-1 overflow-hidden">
           <section className="flex-1 flex flex-col">
-            <div className="p-6 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shrink-0">
+            <div className="p-6 bg-white dark:bg-slate-900 border-b shrink-0">
               <div className="relative">
                  <span className="material-symbols-outlined absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 text-2xl">search</span>
                  <input ref={searchInputRef} value={search} onChange={e => setSearch(e.target.value)} placeholder="Pesquisar produto ou bipar..." className="w-full h-16 bg-slate-100 dark:bg-slate-800 border-none rounded-2xl pl-16 pr-6 text-xl font-bold outline-none focus:ring-4 focus:ring-primary/10 transition-all" />
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-6 grid grid-cols-2 md:grid-cols-4 xl:grid-cols-5 gap-4 content-start custom-scrollbar">
+            <div className="flex-1 overflow-y-auto p-6 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 content-start custom-scrollbar">
               {filteredProducts.map(p => (
                 <div key={p.id} onClick={() => addToCart(p)} className="bg-white dark:bg-slate-800 p-3 rounded-3xl border-2 border-transparent hover:border-primary transition-all cursor-pointer shadow-sm group">
                   <div className={`aspect-square w-full rounded-2xl mb-3 overflow-hidden flex items-center justify-center bg-slate-100 dark:bg-slate-700`}>
                     <img src={p.image} className="size-full object-cover group-hover:scale-110 transition-transform duration-500" />
                   </div>
-                  <div className="px-1">
-                     <h4 className="text-[11px] font-black uppercase text-slate-700 dark:text-slate-200 truncate">{p.name}</h4>
-                     <p className="text-[14px] font-black text-primary leading-none mt-2">R$ {p.salePrice.toLocaleString('pt-BR')}</p>
+                  <h4 className="text-[11px] font-black uppercase text-slate-700 dark:text-slate-200 truncate">{p.name}</h4>
+                  <div className="flex justify-between items-center mt-2">
+                     <p className="text-[14px] font-black text-primary leading-none">R$ {p.salePrice.toLocaleString('pt-BR')}</p>
+                     <span className="text-[9px] font-black text-slate-400">{p.stock} un</span>
                   </div>
                 </div>
               ))}
             </div>
           </section>
 
-          <aside className="w-[480px] bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 flex flex-col shadow-2xl shrink-0">
+          <aside className="w-[480px] bg-white dark:bg-slate-900 border-l flex flex-col shadow-2xl shrink-0">
             <div className="p-6 space-y-4 border-b">
                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-2">Vendedor</label><select value={selectedVendorId} onChange={e => setSelectedVendorId(e.target.value)} className="w-full h-12 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 text-[10px] font-black uppercase border-none">{vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}</select></div>
-                  <div className="space-y-1.5"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-2">Cliente</label><select value={selectedCustomerId} onChange={e => setSelectedCustomerId(e.target.value)} className="w-full h-12 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 text-[10px] font-black uppercase border-none"><option value="">Consumidor Final</option>{customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+                  <div className="space-y-1.5"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-2">Vendedor</label><select value={selectedVendorId} onChange={e => setSelectedVendorId(e.target.value)} className="w-full h-12 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 text-[10px] font-black uppercase border-none"><option value="">SELECIONE VENDEDOR</option>{vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}</select></div>
+                  <div className="space-y-1.5"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-2">Cliente</label><select value={selectedCustomerId} onChange={e => setSelectedCustomerId(e.target.value)} className="w-full h-12 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 text-[10px] font-black uppercase border-none"><option value="">CONSUMIDOR FINAL</option>{customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
                </div>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
@@ -281,8 +227,8 @@ const PDV: React.FC = () => {
                        <p className="text-xs font-black uppercase truncate leading-none">{item.name}</p>
                        <div className="flex justify-between items-center mt-2">
                           <div className="flex items-center gap-3">
-                             <button onClick={() => setCart(prev => prev.map(i => i.id === item.id ? { ...i, quantity: Math.max(1, i.quantity - 1) } : i))} className="size-6 bg-slate-200 rounded-lg flex items-center justify-center text-slate-500"><span className="material-symbols-outlined text-sm">remove</span></button>
-                             <span className="text-xs font-black">{item.quantity}</span>
+                             <button onClick={() => setCart(prev => prev.map(i => i.id === item.id ? { ...i, quantity: Math.max(1, i.quantity - 1) } : i))} className="size-6 bg-slate-200 dark:bg-slate-700 rounded-lg flex items-center justify-center text-slate-500 transition-colors"><span className="material-symbols-outlined text-sm">remove</span></button>
+                             <span className="text-xs font-black tabular-nums">{item.quantity}</span>
                              <button onClick={() => addToCart(item)} className="size-6 bg-primary/10 text-primary rounded-lg flex items-center justify-center"><span className="material-symbols-outlined text-sm">add</span></button>
                           </div>
                           <span className="text-sm font-black text-primary">R$ {(item.salePrice * item.quantity).toLocaleString('pt-BR')}</span>
@@ -296,7 +242,10 @@ const PDV: React.FC = () => {
                   <div className="flex justify-between text-slate-500 font-black uppercase text-[10px]"><span>Subtotal</span><span>R$ {subtotal.toLocaleString('pt-BR')}</span></div>
                   <div className="flex justify-between pt-4 border-t"><span className="text-xs font-black uppercase opacity-50">Total Geral</span><span className="text-4xl font-black text-slate-900 dark:text-white">R$ {totalGeral.toLocaleString('pt-BR')}</span></div>
                </div>
-               <button disabled={cart.length === 0} onClick={() => setShowCheckout(true)} className="w-full py-5 bg-primary hover:bg-blue-600 disabled:opacity-30 text-white rounded-2xl font-black text-sm uppercase shadow-xl transition-all">FINALIZAR VENDA (F5)</button>
+               <div className="grid grid-cols-2 gap-4">
+                  <button disabled={cart.length === 0} onClick={() => { if(!selectedCustomerId) { alert('Selecione um cliente!'); return; } setShowOSModal(true); }} className="py-5 bg-amber-500 hover:bg-amber-600 disabled:opacity-30 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl transition-all">GERAR OS</button>
+                  <button disabled={cart.length === 0} onClick={() => setShowCheckout(true)} className="py-5 bg-primary hover:bg-blue-600 disabled:opacity-30 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl transition-all">FINALIZAR VENDA</button>
+               </div>
             </div>
           </aside>
         </main>
@@ -327,12 +276,30 @@ const PDV: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL SUCESSO */}
+      {/* OUTROS MODAIS (CONSULTA PREÇO, TROCAS, CANCELAMENTO) */}
+      {showPriceInquiry && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-in fade-in print:hidden">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden p-8 animate-in zoom-in-95">
+              <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-black uppercase">Consulta de Preço</h3><button onClick={() => setShowPriceInquiry(false)} className="material-symbols-outlined">close</button></div>
+              <input autoFocus value={priceInquirySearch} onChange={e => setPriceInquirySearch(e.target.value)} placeholder="Bipe o produto..." className="w-full h-16 bg-slate-100 dark:bg-slate-800 border-none rounded-2xl px-6 text-xl font-bold uppercase mb-6" />
+              <div className="space-y-3">
+                 {products.filter(p => p.name.toLowerCase().includes(priceInquirySearch.toLowerCase()) || p.barcode?.includes(priceInquirySearch)).slice(0, 5).map(p => (
+                    <div key={p.id} className="flex justify-between items-center p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl">
+                       <div><p className="text-xs font-black uppercase">{p.name}</p><p className="text-[9px] text-slate-400 font-bold">Ref: {p.sku}</p></div>
+                       <p className="text-xl font-black text-primary">R$ {p.salePrice.toLocaleString('pt-BR')}</p>
+                    </div>
+                 ))}
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* SUCESSO MODAL */}
       {showSuccessModal && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/90 backdrop-blur-2xl p-4 animate-in fade-in print:hidden">
            <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[4rem] shadow-2xl overflow-hidden text-center p-12 space-y-8 animate-in zoom-in-95">
               <div className="size-24 bg-emerald-500 text-white rounded-[2rem] flex items-center justify-center mx-auto shadow-emerald-500/30 animate-bounce"><span className="material-symbols-outlined text-5xl">check</span></div>
-              <h2 className="text-3xl font-black uppercase tracking-tighter">Venda Realizada!</h2>
+              <h2 className="text-3xl font-black uppercase tracking-tighter">Operação Realizada!</h2>
               <div className="grid grid-cols-2 gap-3 pt-4">
                  <button onClick={() => { window.print(); setShowSuccessModal(false); }} className="py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase flex items-center justify-center gap-2 shadow-lg"><span className="material-symbols-outlined text-lg">print</span> Imprimir Recibo</button>
                  <button onClick={() => setShowSuccessModal(false)} className="py-4 bg-primary text-white rounded-2xl font-black text-[10px] uppercase shadow-lg">Concluir</button>
@@ -341,7 +308,26 @@ const PDV: React.FC = () => {
         </div>
       )}
 
+      {/* MODAL ORDEM DE SERVIÇO */}
+      {showOSModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-in fade-in print:hidden">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+              <div className="p-8 border-b bg-amber-500 text-white flex justify-between items-center">
+                 <h3 className="text-xl font-black uppercase">Gerar Ordem de Serviço</h3>
+                 <button onClick={() => setShowOSModal(false)} className="material-symbols-outlined">close</button>
+              </div>
+              <div className="p-8 space-y-6">
+                 <textarea value={osDescription} onChange={e => setOsDescription(e.target.value)} className="w-full h-32 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl p-4 text-xs font-bold uppercase" placeholder="Descreva o problema relatado..." />
+                 <button onClick={handleCreateOS} className="w-full h-16 bg-amber-500 text-white rounded-2xl font-black text-xs uppercase shadow-xl hover:bg-amber-600 transition-all">Confirmar e Gerar OS</button>
+              </div>
+           </div>
+        </div>
+      )}
+
       <style>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 20px; }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; }
         @media print {
           body * { visibility: hidden !important; }
           #root { display: block !important; }

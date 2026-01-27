@@ -66,7 +66,6 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-// GARANTINDO QUE O CAIXA TENHA AS PERMISSÕES NECESSÁRIAS
 export const INITIAL_PERMS: Record<string, RolePermissions> = {
   [UserRole.ADMIN]: { dashboard: true, pdv: true, cashControl: true, customers: true, reports: true, inventory: true, balance: true, incomes: true, expenses: true, financial: true, settings: true, serviceOrders: true, cardManagement: true },
   [UserRole.MANAGER]: { dashboard: true, pdv: true, cashControl: true, customers: true, reports: true, inventory: true, balance: true, incomes: true, expenses: true, financial: true, settings: false, serviceOrders: true, cardManagement: true },
@@ -176,7 +175,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const addProduct = async (p: Product) => { 
-    const res = await fetch('/api/products', { 
+    await fetch('/api/products', { 
       method: 'POST', 
       headers: {'Content-Type': 'application/json'}, 
       body: JSON.stringify(p)
@@ -184,7 +183,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     await refreshData(); 
   };
 
-  const addTransaction = async (t: Transaction) => { await fetch('/api/transactions', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(t)}); await refreshData(); };
+  const addTransaction = async (t: Transaction) => { 
+    await fetch('/api/transactions', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(t)}); 
+    await refreshData(); 
+  };
+  
   const addCustomer = async (c: Customer) => { await fetch('/api/customers', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(c)}); await refreshData(); };
   const addUser = async (u: User) => { await fetch('/api/users', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(u)}); await refreshData(); };
   const addEstablishment = async (e: Establishment) => { await fetch('/api/establishments', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(e)}); await refreshData(); };
@@ -228,7 +231,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       clientId,
       client: client?.name || 'Consumidor Final',
       vendorId,
-      cashierId: currentUser?.id, // CAPTURA QUEM ESTAVA LOGADO NO CAIXA
+      cashierId: currentUser?.id,
       items,
       ...cardDetails
     };
