@@ -6,35 +6,46 @@ import { Transaction, UserRole, Customer, User } from '../types';
 const SalesInquiry: React.FC = () => {
   const { transactions, users, customers, currentUser, establishments, addTransaction, cardOperators, cardBrands } = useApp();
   
-  // Estados de Filtro e Seleção
+  // Estados de Filtro
   const [filter, setFilter] = useState('');
+  const [startDate, setStartDate] = useState(new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const [storeFilter, setStoreFilter] = useState('TODAS');
+
+  // Estados de Seleção e Modais
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [showOptionsId, setShowOptionsId] = useState<string | null>(null);
-  
-  // Estado para o Modal Detalhado
   const [viewingDetail, setViewingDetail] = useState<Transaction | null>(null);
   const [activeDetailTab, setActiveDetailTab] = useState<'ITENS' | 'PAGAMENTO' | 'DEVOLUCOES'>('ITENS');
-
-  // Estados de Edição
   const [showVendorModal, setShowVendorModal] = useState(false);
   const [showCustomerModal, setShowCustomerModal] = useState(false);
 
   const isAdmin = currentUser?.role === UserRole.ADMIN;
   const currentStore = establishments.find(e => e.id === currentUser?.storeId);
 
-  // Filtragem das Vendas
+  // Filtragem das Vendas com as novas regras de Período e Loja
   const sales = useMemo(() => {
     return transactions.filter(t => {
       const isSale = t.type === 'INCOME' && (t.category === 'Venda' || t.category === 'Serviço');
-      const matchesStore = isAdmin || t.store === currentStore?.name;
+      
+      // Filtro de Loja: Se não for admin, trava na loja dele. Se for admin, usa o seletor.
+      const matchesStore = isAdmin 
+        ? (storeFilter === 'TODAS' || t.store === storeFilter)
+        : (t.store === currentStore?.name);
+
+      // Filtro de Período
+      const matchesDate = t.date >= startDate && t.date <= endDate;
+
+      // Filtro de Texto (ID ou Cliente)
       const matchesSearch = !filter || 
         t.id.toLowerCase().includes(filter.toLowerCase()) || 
         t.client?.toLowerCase().includes(filter.toLowerCase());
-      return isSale && matchesStore && matchesSearch;
-    });
-  }, [transactions, isAdmin, currentStore, filter]);
 
-  // Totais do Rodapé da Lista Geral
+      return isSale && matchesStore && matchesDate && matchesSearch;
+    });
+  }, [transactions, isAdmin, currentStore, filter, startDate, endDate, storeFilter]);
+
+  // Totais do Rodapé
   const totals = useMemo(() => {
     let qtyItems = 0;
     let totalValue = 0;
@@ -51,8 +62,7 @@ const SalesInquiry: React.FC = () => {
     setShowVendorModal(false);
     setSelectedTransaction(null);
     if(viewingDetail?.id === selectedTransaction.id) {
-       const updated = { ...selectedTransaction, vendorId };
-       setViewingDetail(updated);
+       setViewingDetail({ ...selectedTransaction, vendorId });
     }
   };
 
@@ -72,9 +82,7 @@ const SalesInquiry: React.FC = () => {
     }
   };
 
-  const getUserData = (userId?: string) => {
-    return users.find(u => u.id === userId);
-  };
+  const getUserData = (userId?: string) => users.find(u => u.id === userId);
 
   const getCardInfo = (opId?: string, brId?: string) => {
     const op = cardOperators.find(o => o.id === opId);
@@ -83,33 +91,73 @@ const SalesInquiry: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 dark:bg-background-dark font-sans text-[11px] uppercase font-bold">
+    <div className="min-h-screen bg-slate-100 dark:bg-background-dark font-sans text-[11px] uppercase font-bold flex flex-col">
       
       {/* HEADER AZUL PREMIUM */}
       <header className="bg-primary p-4 flex items-center justify-between text-white shadow-lg shrink-0">
         <div className="flex items-center gap-4">
            <div className="bg-white rounded-lg p-1.5 flex items-center justify-center">
-              <span className="material-symbols-outlined text-primary text-2xl">point_of_sale</span>
+              <span className="material-symbols-outlined text-primary text-2xl">receipt_long</span>
            </div>
            <h1 className="text-sm font-black tracking-tight">DOCUMENTOS DE VENDAS PDV</h1>
         </div>
         <div className="flex items-center gap-6">
            <div className="flex items-center gap-2">
               <span className="size-2 bg-emerald-400 rounded-full animate-pulse"></span>
-              <span className="text-[10px] font-black">SISTEMA ONLINE</span>
+              <span className="text-[10px] font-black">SISTEMA EM OPERAÇÃO</span>
            </div>
         </div>
       </header>
 
-      {/* BARRA DE FILTROS */}
-      <div className="p-4 flex gap-2 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-         <button className="px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 flex items-center gap-2 text-slate-600">
-            Filtro <span className="material-symbols-outlined text-sm">arrow_drop_down</span>
-         </button>
-         <div className="flex-1 max-w-xs relative ml-2">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">search</span>
-            <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="PESQUISAR DOCUMENTO OU CLIENTE..." className="w-full h-9 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded pl-10 text-[10px] outline-none focus:ring-1 focus:ring-primary/30" />
+      {/* BARRA DE FILTROS AVANÇADOS */}
+      <div className="p-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-end gap-4 shadow-sm">
+         
+         {/* Filtro de Período */}
+         <div className="space-y-1">
+            <label className="text-[9px] text-slate-400 font-black px-1">DATA INICIAL:</label>
+            <div className="h-10 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-3 flex items-center gap-2">
+               <span className="material-symbols-outlined text-slate-400 text-sm">calendar_today</span>
+               <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-transparent border-none text-[10px] font-black outline-none focus:ring-0 p-0 w-24" />
+            </div>
          </div>
+
+         <div className="space-y-1">
+            <label className="text-[9px] text-slate-400 font-black px-1">DATA FINAL:</label>
+            <div className="h-10 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-3 flex items-center gap-2">
+               <span className="material-symbols-outlined text-slate-400 text-sm">calendar_today</span>
+               <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-transparent border-none text-[10px] font-black outline-none focus:ring-0 p-0 w-24" />
+            </div>
+         </div>
+
+         {/* Filtro de Loja */}
+         <div className="space-y-1">
+            <label className="text-[9px] text-slate-400 font-black px-1">UNIDADE / LOJA:</label>
+            <div className="h-10 bg-slate-50 dark:dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-3 flex items-center gap-2">
+               <span className="material-symbols-outlined text-slate-400 text-sm">store</span>
+               <select 
+                disabled={!isAdmin}
+                value={storeFilter} 
+                onChange={e => setStoreFilter(e.target.value)}
+                className="bg-transparent border-none text-[10px] font-black outline-none focus:ring-0 p-0 pr-8"
+               >
+                  <option value="TODAS">TODAS AS LOJAS</option>
+                  {establishments.map(est => <option key={est.id} value={est.name}>{est.name}</option>)}
+               </select>
+            </div>
+         </div>
+
+         {/* Busca de Texto */}
+         <div className="flex-1 space-y-1">
+            <label className="text-[9px] text-slate-400 font-black px-1">PESQUISA RÁPIDA (ID OU CLIENTE):</label>
+            <div className="relative">
+               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">search</span>
+               <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="DIGITE PARA BUSCAR..." className="w-full h-10 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded pl-10 text-[10px] font-black outline-none focus:ring-1 focus:ring-primary/30 uppercase" />
+            </div>
+         </div>
+
+         <button onClick={() => { setFilter(''); setStoreFilter('TODAS'); }} className="h-10 px-4 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[9px] font-black hover:bg-rose-50 hover:text-rose-600 transition-all flex items-center gap-2">
+            <span className="material-symbols-outlined text-sm">filter_alt_off</span> LIMPAR
+         </button>
       </div>
 
       {/* TABELA DE DOCUMENTOS */}
@@ -156,6 +204,9 @@ const SalesInquiry: React.FC = () => {
                 <td className="px-3 py-1.5 text-right font-black text-slate-900 dark:text-white tabular-nums">R$ {s.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
               </tr>
             ))}
+            {sales.length === 0 && (
+              <tr><td colSpan={9} className="px-10 py-20 text-center opacity-20 font-black tracking-[0.5em] text-sm">NENHUM DOCUMENTO LOCALIZADO NO PERÍODO</td></tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -173,7 +224,6 @@ const SalesInquiry: React.FC = () => {
       {viewingDetail && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 p-4 animate-in fade-in">
            <div className="bg-slate-100 w-full max-w-[1200px] h-[90vh] rounded shadow-2xl flex flex-col overflow-hidden text-slate-700">
-              {/* Header do Documento */}
               <div className="bg-white p-3 border-b border-slate-300 flex items-center justify-between">
                  <h2 className="text-sm font-bold flex items-center gap-2">
                     Informações Gerais do Documento <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-[10px]">NFC</span>
@@ -192,36 +242,18 @@ const SalesInquiry: React.FC = () => {
                     <div className="col-span-2"><DetailField label="DATA EMISSÃO:" value={`${viewingDetail.date} 10:00`} borderHighlight /></div>
                  </div>
 
-                 {/* Linha de Operadores Redesenhada - Sem Representante */}
                  <div className="grid grid-cols-12 gap-2">
                     <div className="col-span-4"><DetailField label="VENDEDOR:" value={getUserData(viewingDetail.vendorId)?.name || 'NÃO INF.'} borderHighlight /></div>
                     <div className="col-span-4"><DetailField label="CAIXA:" value={getUserData(viewingDetail.cashierId)?.name || viewingDetail.method || 'SISTEMA'} borderHighlight /></div>
                     <div className="col-span-4"><DetailField label="OPERADOR:" value={getUserData(viewingDetail.cashierId)?.name || 'SISTEMA'} borderHighlight /></div>
                  </div>
 
-                 {/* Barra de Abas Azul */}
                  <div className="bg-primary text-white flex items-center px-4 py-1.5 gap-8 mt-2">
-                    <button 
-                      onClick={() => setActiveDetailTab('ITENS')}
-                      className={`text-[10px] font-black pb-0.5 uppercase transition-all ${activeDetailTab === 'ITENS' ? 'border-b-2 border-white' : 'opacity-70'}`}
-                    >
-                      ITENS <span className="opacity-50 text-[8px] ml-1">ALT+1</span>
-                    </button>
-                    <button 
-                      onClick={() => setActiveDetailTab('PAGAMENTO')}
-                      className={`text-[10px] font-black pb-0.5 uppercase transition-all ${activeDetailTab === 'PAGAMENTO' ? 'border-b-2 border-white' : 'opacity-70'}`}
-                    >
-                      FORMAS DE PAGAMENTO <span className="opacity-50 text-[8px] ml-1">ALT+2</span>
-                    </button>
-                    <button 
-                      onClick={() => setActiveDetailTab('DEVOLUCOES')}
-                      className={`text-[10px] font-black pb-0.5 uppercase transition-all ${activeDetailTab === 'DEVOLUCOES' ? 'border-b-2 border-white' : 'opacity-70'}`}
-                    >
-                      DEVOLUÇÕES <span className="opacity-50 text-[8px] ml-1">ALT+3</span>
-                    </button>
+                    <button onClick={() => setActiveDetailTab('ITENS')} className={`text-[10px] font-black pb-0.5 uppercase transition-all ${activeDetailTab === 'ITENS' ? 'border-b-2 border-white' : 'opacity-70'}`}>ITENS <span className="opacity-50 text-[8px] ml-1">ALT+1</span></button>
+                    <button onClick={() => setActiveDetailTab('PAGAMENTO')} className={`text-[10px] font-black pb-0.5 uppercase transition-all ${activeDetailTab === 'PAGAMENTO' ? 'border-b-2 border-white' : 'opacity-70'}`}>FORMAS DE PAGAMENTO <span className="opacity-50 text-[8px] ml-1">ALT+2</span></button>
+                    <button onClick={() => setActiveDetailTab('DEVOLUCOES')} className={`text-[10px] font-black pb-0.5 uppercase transition-all ${activeDetailTab === 'DEVOLUCOES' ? 'border-b-2 border-white' : 'opacity-70'}`}>DEVOLUÇÕES <span className="opacity-50 text-[8px] ml-1">ALT+3</span></button>
                  </div>
 
-                 {/* Conteúdo Dinâmico das Abas */}
                  <div className="bg-white border border-slate-300 flex flex-col min-h-[300px]">
                     {activeDetailTab === 'ITENS' && (
                        <div className="overflow-auto flex-1">
@@ -253,9 +285,7 @@ const SalesInquiry: React.FC = () => {
                                      <td className="px-2 py-1 text-blue-600 font-bold">5.102</td>
                                      <td className="px-2 py-1 text-blue-600 font-bold">V27</td>
                                      <td className="px-2 py-1 text-slate-400 uppercase">{item.category}</td>
-                                     <td className="px-2 py-1">
-                                        <span className="text-blue-600 font-black">{item.sku}</span> - <span className="uppercase">{item.name}</span>
-                                     </td>
+                                     <td className="px-2 py-1"><span className="text-blue-600 font-black">{item.sku}</span> - <span className="uppercase">{item.name}</span></td>
                                      <td className="px-2 py-1 text-right font-black tabular-nums">{item.quantity.toFixed(2)} KT</td>
                                      <td className="px-2 py-1 text-right tabular-nums">R$ {item.salePrice.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                                      <td className="px-2 py-1 text-right font-black tabular-nums">R$ {(item.quantity * item.salePrice).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
@@ -283,7 +313,6 @@ const SalesInquiry: React.FC = () => {
                                 <p className="text-sm font-black text-blue-600">{viewingDetail.status}</p>
                              </div>
                           </div>
-
                           {(viewingDetail.method === 'Credito' || viewingDetail.method === 'Debito') && (
                              <div className="space-y-4">
                                 <h4 className="text-[10px] font-black text-slate-400">DETALHES DO CARTÃO</h4>
@@ -331,12 +360,12 @@ const SalesInquiry: React.FC = () => {
         </div>
       )}
 
-      {/* MODAIS DE EDIÇÃO */}
+      {/* MODAIS DE EDIÇÃO (Vendedor / Cliente) */}
       {showVendorModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
            <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl border overflow-hidden">
               <div className="p-6 bg-primary text-white flex justify-between items-center"><h3 className="font-black uppercase">Alterar Vendedor</h3><button onClick={() => setShowVendorModal(false)}><span className="material-symbols-outlined">close</span></button></div>
-              <div className="p-8 space-y-4 max-h-60 overflow-y-auto">
+              <div className="p-8 space-y-4 max-h-60 overflow-y-auto custom-scrollbar">
                  {users.map(u => (
                    <button key={u.id} onClick={() => handleUpdateVendor(u.id)} className={`w-full text-left p-4 rounded-xl border-2 flex items-center gap-3 ${selectedTransaction?.vendorId === u.id ? 'border-primary bg-primary/5' : 'border-slate-100 hover:border-primary/20'}`}>
                       <div className="size-8 rounded-full bg-slate-200 flex items-center justify-center">{u.name.charAt(0)}</div>
@@ -352,7 +381,7 @@ const SalesInquiry: React.FC = () => {
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
            <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl border overflow-hidden">
               <div className="p-6 bg-primary text-white flex justify-between items-center"><h3 className="font-black uppercase">Alterar Cliente</h3><button onClick={() => setShowCustomerModal(false)}><span className="material-symbols-outlined">close</span></button></div>
-              <div className="p-8 space-y-4 max-h-60 overflow-y-auto">
+              <div className="p-8 space-y-4 max-h-60 overflow-y-auto custom-scrollbar">
                  {customers.map(c => (
                    <button key={c.id} onClick={() => handleUpdateCustomer(c.id)} className={`w-full text-left p-4 rounded-xl border-2 flex items-center gap-3 ${selectedTransaction?.clientId === c.id ? 'border-primary bg-primary/5' : 'border-slate-100 hover:border-primary/20'}`}>
                       <div className="size-8 rounded bg-primary text-white flex items-center justify-center"><span className="material-symbols-outlined text-sm">person</span></div>
