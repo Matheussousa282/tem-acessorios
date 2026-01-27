@@ -58,20 +58,27 @@ const CashMovement: React.FC = () => {
   const sessionData = useMemo(() => {
     if (!viewingSession) return null;
 
-    const sessionDateParts = viewingSession.openingTime?.split(' ')[0].split('/');
-    const sessionDateFormatted = sessionDateParts ? `${sessionDateParts[2]}-${sessionDateParts[1]}-${sessionDateParts[0]}` : '';
+    // LIMPEZA DA DATA: O toLocaleString às vezes coloca uma vírgula (ex: 27/01/2026, 13:52)
+    // Precisamos remover a vírgula para pegar apenas a parte da data DD/MM/YYYY
+    const cleanOpeningTime = viewingSession.openingTime?.replace(',', '').trim() || '';
+    const datePart = cleanOpeningTime.split(' ')[0];
+    const sessionDateParts = datePart.split('/');
+    const sessionDateFormatted = sessionDateParts.length === 3 
+      ? `${sessionDateParts[2]}-${sessionDateParts[1]}-${sessionDateParts[0]}` 
+      : '';
 
-    const sessionVendas = transactions.filter(t => 
-      t.store === viewingSession.storeName && 
-      t.cashierId === viewingSession.openingOperatorId &&
-      t.type === 'INCOME' &&
-      (t.category === 'Venda' || t.category === 'Serviço') &&
-      t.date === sessionDateFormatted
-    );
+    // 1. FILTRAR VENDAS DO BANCO
+    const sessionVendas = transactions.filter(t => {
+      const matchesStore = t.store === viewingSession.storeName;
+      const matchesOperator = t.cashierId === viewingSession.openingOperatorId;
+      const isSale = t.type === 'INCOME' && (t.category === 'Venda' || t.category === 'Serviço');
+      const matchesDate = t.date === sessionDateFormatted;
+      return matchesStore && matchesOperator && isSale && matchesDate;
+    });
 
     const sessionManualEntries = cashEntries.filter(e => e.sessionId === viewingSession.id);
 
-    // Mapeamento de códigos conforme imagem
+    // Mapeamento de códigos conforme imagem fornecida
     const methodCodes: Record<string, string> = {
       'DINHEIRO': '0001 - DINHEIRO',
       'PIX': '0139 - PIX SANTANDER',
@@ -88,7 +95,7 @@ const CashMovement: React.FC = () => {
 
     const totalVendasBruto = sessionVendas.reduce((acc, t) => acc + t.value, 0);
     
-    // ENTRADAS EM DINHEIRO (O que afeta o saldo físico)
+    // ENTRADAS EM DINHEIRO (O que afeta o saldo físico/gaveta)
     const vendasEmDinheiro = sessionVendas
       .filter(v => v.method?.toUpperCase() === 'DINHEIRO')
       .reduce((acc, v) => acc + v.value, 0);
@@ -201,7 +208,7 @@ const CashMovement: React.FC = () => {
     return (
       <div className="p-6 space-y-6 animate-in slide-in-from-right-10 duration-500 pb-20">
         
-        {/* RELATÓRIO DE IMPRESSÃO (FUTURO PDF/PAPEL) */}
+        {/* RELATÓRIO DE IMPRESSÃO (ESTILO EXATO DA IMAGEM) */}
         <div id="cash-report-print" className="hidden print:block bg-white text-black font-sans p-6 text-[10px] leading-tight">
            <div className="border-b border-slate-300 pb-2 mb-4">
               <h1 className="font-black uppercase text-[11px] mb-1">DADOS DO MOVIMENTO</h1>
@@ -217,13 +224,13 @@ const CashMovement: React.FC = () => {
               </div>
            </div>
 
-           <div className="bg-[#136dec] text-white p-2 text-center font-black uppercase mb-4 text-[10px] print:bg-slate-500 print:text-white">
+           <div className="bg-[#136dec] text-white p-2 text-center font-black uppercase mb-4 text-[10px] print:bg-slate-300 print:text-black">
               CAIXA: {viewingSession.id.slice(-4)} - {viewingSession.openingOperatorName?.toUpperCase()}
            </div>
 
            <div className="grid grid-cols-2 gap-1 mb-4">
               <table className="w-full border-collapse">
-                 <thead className="bg-[#136dec] text-white print:bg-slate-300 print:text-black"><tr><th colSpan={3} className="p-1 uppercase text-center border border-slate-400">Aberturas</th></tr></thead>
+                 <thead className="bg-[#136dec] text-white print:bg-slate-200 print:text-black"><tr><th colSpan={3} className="p-1 uppercase text-center border border-slate-400">Aberturas</th></tr></thead>
                  <tbody>
                     <tr className="text-[7px] font-black uppercase bg-slate-100 border border-slate-400">
                        <td className="p-1 border-r border-slate-400">ID</td><td className="p-1 border-r border-slate-400">DATA/HORA</td><td className="p-1">OPERADOR</td>
@@ -236,7 +243,7 @@ const CashMovement: React.FC = () => {
                  </tbody>
               </table>
               <table className="w-full border-collapse">
-                 <thead className="bg-[#136dec] text-white print:bg-slate-300 print:text-black"><tr><th colSpan={3} className="p-1 uppercase text-center border border-slate-400">Fechamentos</th></tr></thead>
+                 <thead className="bg-[#136dec] text-white print:bg-slate-200 print:text-black"><tr><th colSpan={3} className="p-1 uppercase text-center border border-slate-400">Fechamentos</th></tr></thead>
                  <tbody>
                     <tr className="text-[7px] font-black uppercase bg-slate-100 border border-slate-400">
                        <td className="p-1 border-r border-slate-400">ID</td><td className="p-1 border-r border-slate-400">DATA/HORA</td><td className="p-1">OPERADOR</td>
@@ -252,30 +259,30 @@ const CashMovement: React.FC = () => {
               </table>
            </div>
 
-           <div className="bg-[#136dec] text-white p-1 text-center font-black uppercase mb-1 print:bg-slate-400 print:text-white">
+           <div className="bg-[#136dec] text-white p-1 text-center font-black uppercase mb-1 print:bg-slate-200 print:text-black">
               LANÇAMENTOS DO DIA
            </div>
 
            <div className="grid grid-cols-2 gap-1 mb-4">
               <table className="w-full border-collapse border border-slate-400">
-                 <thead className="bg-[#136dec] text-white print:bg-slate-300 print:text-black"><tr><th colSpan={2} className="p-1 uppercase border border-slate-400">Entradas</th></tr></thead>
+                 <thead className="bg-[#136dec] text-white print:bg-slate-100 print:text-black"><tr><th colSpan={2} className="p-1 uppercase border border-slate-400">Entradas</th></tr></thead>
                  <tbody>
                     <tr className="text-[7px] font-black uppercase bg-slate-100 border-b border-slate-400"><td className="p-1 border-r border-slate-400">CLASSIFICAÇÃO</td><td className="p-1 text-right">VALOR</td></tr>
                     <tr className="border-b border-slate-400"><td className="p-1 border-r border-slate-400 uppercase">001.015 - VENDAS (DINHEIRO)</td><td className="p-1 text-right tabular-nums">R$ {sessionData?.vendasEmDinheiro.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
-                    <tr className="font-black"><td className="p-1 border-r border-slate-400">TOTAIS</td><td className="p-1 text-right">R$ {sessionData?.totalEntradasCaixa.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
+                    <tr className="font-black bg-slate-50"><td className="p-1 border-r border-slate-400">TOTAIS</td><td className="p-1 text-right">R$ {sessionData?.totalEntradasCaixa.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
                  </tbody>
               </table>
               <table className="w-full border-collapse border border-slate-400">
-                 <thead className="bg-[#136dec] text-white print:bg-slate-300 print:text-black"><tr><th colSpan={2} className="p-1 uppercase border border-slate-400">Saídas</th></tr></thead>
+                 <thead className="bg-[#136dec] text-white print:bg-slate-100 print:text-black"><tr><th colSpan={2} className="p-1 uppercase border border-slate-400">Saídas</th></tr></thead>
                  <tbody>
                     <tr className="text-[7px] font-black uppercase bg-slate-100 border-b border-slate-400"><td className="p-1 border-r border-slate-400">CLASSIFICAÇÃO</td><td className="p-1 text-right">VALOR</td></tr>
                     <tr className="border-b border-slate-400"><td className="p-1 border-r border-slate-400 uppercase">004.001 - SANGRIAS / PAGOS</td><td className="p-1 text-right tabular-nums">R$ {sessionData?.totalSaidasCaixa.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
-                    <tr className="font-black"><td className="p-1 border-r border-slate-400">TOTAIS</td><td className="p-1 text-right">R$ {sessionData?.totalSaidasCaixa.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
+                    <tr className="font-black bg-slate-50"><td className="p-1 border-r border-slate-400">TOTAIS</td><td className="p-1 text-right">R$ {sessionData?.totalSaidasCaixa.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
                  </tbody>
               </table>
            </div>
 
-           <div className="bg-[#136dec] text-white p-1 text-center font-black uppercase mb-1 print:bg-slate-400 print:text-white">
+           <div className="bg-[#136dec] text-white p-1 text-center font-black uppercase mb-1 print:bg-slate-200 print:text-black">
               RESUMO DAS VENDAS DO DIA
            </div>
            <table className="w-full border-collapse border border-slate-400 mb-4">
@@ -294,7 +301,7 @@ const CashMovement: React.FC = () => {
               </tbody>
            </table>
 
-           <div className="bg-[#136dec] text-white p-1 text-center font-black uppercase mb-2 print:bg-slate-400 print:text-white">
+           <div className="bg-[#136dec] text-white p-1 text-center font-black uppercase mb-2 print:bg-slate-200 print:text-black">
               OUTRAS OPERAÇÕES
            </div>
            <div className="space-y-1">
@@ -560,7 +567,7 @@ const CashMovement: React.FC = () => {
             background: white !important;
             color: black !important;
           }
-          @page { size: auto; margin: 5mm; }
+          @page { size: auto; margin: 10mm; }
         }
       `}</style>
     </div>
