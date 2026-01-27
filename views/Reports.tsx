@@ -90,7 +90,7 @@ const Reports: React.FC = () => {
         <div className="flex gap-2 bg-slate-900/50 p-2 rounded-2xl border border-slate-800">
            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-transparent border-none text-[10px] font-black text-white uppercase" />
            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-transparent border-none text-[10px] font-black text-white uppercase" />
-           <button onClick={() => window.print()} className="bg-primary px-6 py-2 rounded-xl text-[10px] font-black uppercase">Imprimir</button>
+           <button onClick={() => window.print()} className="bg-primary px-6 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-blue-600 transition-all">Imprimir Relatório</button>
         </div>
       </div>
 
@@ -113,10 +113,13 @@ const Reports: React.FC = () => {
                   <td className="px-8 py-4 text-primary">{row.col2}</td>
                   <td className="px-8 py-4 text-white truncate max-w-[200px]">{row.col3}</td>
                   <td className="px-8 py-4 text-slate-400">{row.col4}</td>
-                  <td className="px-8 py-4">{row.profit ? `R$ ${row.profit.toLocaleString('pt-BR')}` : (row.col5 || 'OK')}</td>
+                  <td className="px-8 py-4">{row.profit ? `R$ ${row.profit.toLocaleString('pt-BR')}` : (row.col5 || 'CONCLUÍDO')}</td>
                   <td className="px-8 py-4 text-right font-black text-white">R$ {row.value.toLocaleString('pt-BR')}</td>
                 </tr>
               ))}
+              {displayData.length === 0 && (
+                <tr><td colSpan={6} className="px-8 py-20 text-center opacity-20 font-black tracking-widest">NENHUM DADO ENCONTRADO NO PERÍODO</td></tr>
+              )}
             </tbody>
          </table>
       </div>
@@ -126,6 +129,8 @@ const Reports: React.FC = () => {
           .print\\:hidden { display: none !important; }
           .bg-[#1e293b], .bg-[#0f172a] { background: white !important; border: 1px solid #ddd !important; }
           .text-white, .text-slate-100 { color: black !important; }
+          table { border-collapse: collapse !important; width: 100% !important; }
+          th, td { border: 1px solid #eee !important; color: black !important; }
           @page { size: A4 landscape; margin: 10mm; }
         }
       `}</style>
@@ -136,7 +141,7 @@ const Reports: React.FC = () => {
 const MetricCard = ({ title, value, icon, color }: any) => (
   <div className="bg-[#1e293b] p-6 rounded-[2rem] border border-slate-800 flex items-center gap-4">
      <div className={`size-12 rounded-xl bg-slate-800 flex items-center justify-center ${color}`}><span className="material-symbols-outlined">{icon}</span></div>
-     <div><p className="text-[9px] font-black text-slate-500 uppercase">{title}</p><p className="text-xl font-black">{value}</p></div>
+     <div><p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{title}</p><p className="text-xl font-black">{value}</p></div>
   </div>
 );
 
