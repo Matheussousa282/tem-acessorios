@@ -16,9 +16,9 @@ import ServiceOrders from './views/ServiceOrders';
 import Login from './views/Login';
 import CashMovement from './views/CashMovement';
 import CardManagement from './views/CardManagement';
+import SalesInquiry from './views/SalesInquiry';
 import { UserRole } from './types';
 
-// Fix: Mark children as optional in the prop type definition to satisfy TypeScript's JSX checks when children are passed as nested elements.
 const ProtectedRoute = ({ children, perm }: { children?: React.ReactNode, perm?: string }) => {
   const { currentUser, rolePermissions } = useApp();
   
@@ -60,6 +60,7 @@ const AppRoutes: React.FC = () => {
     <Routes>
       <Route path="/" element={<Layout><Dashboard /></Layout>} />
       <Route path="/pdv" element={<ProtectedRoute perm="pdv"><PDV /></ProtectedRoute>} />
+      <Route path="/documentos" element={<Layout><SalesInquiry /></Layout>} />
       <Route path="/caixa" element={<Layout><ProtectedRoute perm="cashControl"><CashMovement /></ProtectedRoute></Layout>} />
       <Route path="/clientes" element={<Layout><ProtectedRoute perm="customers"><Customers /></ProtectedRoute></Layout>} />
       <Route path="/relatorios" element={<Layout><ProtectedRoute perm="reports"><Reports /></ProtectedRoute></Layout>} />

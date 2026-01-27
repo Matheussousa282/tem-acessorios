@@ -6,8 +6,7 @@ export default async function handler(req: any, res: any) {
   const sql = neon(process.env.DATABASE_URL);
 
   if (req.method === 'GET') {
-    // Aumentado o limite para 5000 para suportar relatórios analíticos completos
-    const data = await sql`SELECT * FROM transactions ORDER BY date DESC LIMIT 5000`;
+    const data = await sql`SELECT * FROM transactions ORDER BY date DESC, id DESC LIMIT 5000`;
     const mapped = data.map(t => ({
       id: t.id,
       date: t.date,
@@ -43,6 +42,13 @@ export default async function handler(req: any, res: any) {
           ${t.id}, ${t.date}, ${t.dueDate}, ${t.description}, ${t.store}, ${t.category}, ${t.status}, ${t.value}, ${t.shippingValue || 0}, ${t.type}, ${t.method}, 
           ${t.client}, ${t.clientId}, ${t.vendorId}, ${JSON.stringify(t.items)}, ${t.installments || null}, ${t.authNumber || null}, ${t.transactionSku || null}
         )
+        ON CONFLICT (id) DO UPDATE SET
+          client = EXCLUDED.client,
+          client_id = EXCLUDED.client_id,
+          vendor_id = EXCLUDED.vendor_id,
+          status = EXCLUDED.status,
+          value = EXCLUDED.value,
+          items = EXCLUDED.items
       `;
       return res.status(200).json({ success: true });
     } catch (e: any) {

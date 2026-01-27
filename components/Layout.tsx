@@ -18,12 +18,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [isFinancialOpen, setIsFinancialOpen] = useState(false);
   const [isOSOpen, setIsOSOpen] = useState(false);
 
-  // ESTADO DO MODO CLARO (Ativo = Light Mode / Inativo = Dark Mode)
   const [isLightMode, setIsLightMode] = useState(() => {
     return localStorage.getItem('theme') === 'light';
   });
 
-  // Efeito para aplicar a classe no HTML
   useEffect(() => {
     const html = document.documentElement;
     if (isLightMode) {
@@ -42,7 +40,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   useEffect(() => {
     if (location.pathname.includes('estoque')) setIsStockOpen(true);
-    if (location.pathname.includes('pdv') || location.pathname.includes('clientes') || location.pathname.includes('relatorios') || location.pathname.includes('caixa')) {
+    if (location.pathname.includes('pdv') || location.pathname.includes('clientes') || location.pathname.includes('relatorios') || location.pathname.includes('caixa') || location.pathname.includes('documentos')) {
       setIsVendasOpen(true);
       if (location.pathname.includes('relatorios')) setIsReportsOpen(true);
     }
@@ -57,12 +55,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   }, [currentUser, establishments]);
 
   if (!currentUser) return null;
-
   if (isPDV) return <div className="h-screen w-full overflow-hidden">{children}</div>;
 
   const hasVendasAccess = perms.cashControl || perms.pdv || perms.customers || perms.reports;
-  const hasEstoqueAccess = perms.inventory || perms.balance;
-  const hasFinancialGroupAccess = perms.incomes || perms.expenses || perms.cardManagement || perms.financial;
 
   return (
     <div className="flex h-screen overflow-hidden bg-background-light dark:bg-background-dark font-display transition-colors duration-300">
@@ -85,16 +80,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <nav className="flex flex-col gap-1">
             {perms.dashboard && <SidebarItem to="/" icon="dashboard" label="Dashboard" />}
             
-            {perms.serviceOrders && (
-              <div className="flex flex-col">
-                <button onClick={() => setIsOSOpen(!isOSOpen)} className="flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
-                  <div className="flex items-center gap-3"><span className="material-symbols-outlined text-xl">build</span><span className="text-xs font-black uppercase tracking-widest">Serviços</span></div>
-                  <span className={`material-symbols-outlined text-sm transition-transform ${isOSOpen ? 'rotate-180' : ''}`}>expand_more</span>
-                </button>
-                {isOSOpen && <div className="flex flex-col ml-9 mt-1 border-l dark:border-slate-800 gap-1"><SidebarSubItem to="/servicos?tab=list" label="Gerenciar OS" /><SidebarSubItem to="/servicos?tab=catalog" label="Catálogo" /></div>}
-              </div>
-            )}
-
             {hasVendasAccess && (
                <div className="flex flex-col">
                 <button onClick={() => setIsVendasOpen(!isVendasOpen)} className="flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
@@ -105,32 +90,20 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   <div className="flex flex-col ml-9 mt-1 border-l dark:border-slate-800 gap-1">
                     {perms.cashControl && <SidebarSubItem to="/caixa" label="Controle de Caixa" />}
                     {perms.pdv && <SidebarSubItem to="/pdv" label="Frente de Caixa" />}
+                    <SidebarSubItem to="/documentos" label="Documentos de Venda" />
                     {perms.customers && <SidebarSubItem to="/clientes" label="Clientes" />}
-                    
                     {perms.reports && (
                       <div className="flex flex-col mt-1">
-                         <button 
-                          onClick={() => setIsReportsOpen(!isReportsOpen)}
-                          className="flex items-center justify-between px-4 py-2 rounded-lg text-slate-400 hover:text-primary transition-all group"
-                         >
+                         <button onClick={() => setIsReportsOpen(!isReportsOpen)} className="flex items-center justify-between px-4 py-2 rounded-lg text-slate-400 hover:text-primary transition-all group">
                            <span className="text-[10px] font-black uppercase tracking-widest">Relatórios</span>
                            <span className={`material-symbols-outlined text-sm transition-transform ${isReportsOpen ? 'rotate-180' : ''}`}>expand_more</span>
                          </button>
-                         
                          {isReportsOpen && (
                            <div className="flex flex-col ml-3 border-l border-slate-100 dark:border-slate-800 mt-1 gap-0.5 animate-in slide-in-from-top-1">
                               <SidebarSubItem to="/relatorios?type=evolucao" label="Evolução de Vendas" small />
                               <SidebarSubItem to="/relatorios?type=por_unidade" label="Vendas por Unidade" small />
-                              <SidebarSubItem to="/relatorios?type=entrega_futura" label="Entrega Futura" small />
-                              <SidebarSubItem to="/relatorios?type=por_ano" label="Por Ano" small />
-                              <SidebarSubItem to="/relatorios?type=por_cliente" label="Por Cliente" small />
-                              <SidebarSubItem to="/relatorios?type=por_vendas" label="Por Vendas" small />
                               <SidebarSubItem to="/relatorios?type=por_vendedor" label="Por Vendedor" small />
-                              <SidebarSubItem to="/relatorios?type=ticket_vendedor" label="Ticket Médio por Vendedor" small />
-                              <SidebarSubItem to="/relatorios?type=ticket_mes_ano" label="Ticket Médio por Mês/Ano" small />
                               <SidebarSubItem to="/relatorios?type=por_produto" label="Por Produto" small />
-                              <SidebarSubItem to="/relatorios?type=margem_bruta" label="Por Produto com Margem Bruta" small />
-                              <SidebarSubItem to="/relatorios?type=por_servico" label="Por Serviço" small />
                            </div>
                          )}
                       </div>
@@ -140,7 +113,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </div>
             )}
 
-            {hasEstoqueAccess && (
+            {perms.inventory && (
               <div className="flex flex-col">
                 <button onClick={() => setIsStockOpen(!isStockOpen)} className="flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
                   <div className="flex items-center gap-3"><span className="material-symbols-outlined text-xl">inventory_2</span><span className="text-xs font-black uppercase tracking-widest">Estoque</span></div>
@@ -148,14 +121,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 </button>
                 {isStockOpen && (
                   <div className="flex flex-col ml-9 mt-1 border-l dark:border-slate-800 gap-1">
-                    {perms.inventory && <SidebarSubItem to="/estoque" label="Produtos" />}
-                    {perms.balance && <SidebarSubItem to="/balanco" label="Balanço" />}
+                    <SidebarSubItem to="/estoque" label="Produtos" />
+                    <SidebarSubItem to="/balanco" label="Balanço" />
                   </div>
                 )}
               </div>
             )}
 
-            {hasFinancialGroupAccess && (
+            {perms.financial && (
               <div className="flex flex-col">
                 <button onClick={() => setIsFinancialOpen(!isFinancialOpen)} className="flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
                   <div className="flex items-center gap-3"><span className="material-symbols-outlined text-xl">account_balance</span><span className="text-xs font-black uppercase tracking-widest">Financeiro</span></div>
@@ -163,15 +136,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 </button>
                 {isFinancialOpen && (
                   <div className="flex flex-col ml-9 mt-1 border-l dark:border-slate-800 gap-1">
-                    {perms.incomes && <SidebarSubItem to="/entradas" label="Receitas" />}
-                    {perms.expenses && <SidebarSubItem to="/saidas" label="Despesas" />}
-                    {perms.cardManagement && <SidebarSubItem to="/cartoes" label="Cartões" />}
-                    {perms.financial && <SidebarSubItem to="/dre" label="DRE" />}
+                    <SidebarSubItem to="/entradas" label="Receitas" />
+                    <SidebarSubItem to="/saidas" label="Despesas" />
+                    <SidebarSubItem to="/dre" label="DRE" />
                   </div>
                 )}
               </div>
             )}
-
+            
             {perms.settings && <SidebarItem to="/config" icon="settings" label="Configurações" />}
           </nav>
         </div>
@@ -187,28 +159,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       <main className="flex-1 flex flex-col overflow-hidden">
         <header className="h-16 flex-shrink-0 border-b dark:border-slate-800 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md flex items-center justify-between px-8">
-           {/* Lado Esquerdo Header (Pode ser usado para Breadcrumbs no futuro) */}
            <div></div>
-
-           {/* Lado Direito Header: Unidade e Toggle Theme */}
            <div className="flex items-center gap-6">
               <div className="flex items-center gap-2">
                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Modo Claro:</span>
-                 {/* INTERRUPTOR DE TEMA (Ativo = Claro) */}
-                 <button 
-                   onClick={() => setIsLightMode(!isLightMode)}
-                   className={`w-14 h-7 rounded-full relative transition-all duration-500 shadow-inner flex items-center ${isLightMode ? 'bg-amber-400' : 'bg-slate-700'}`}
-                 >
+                 <button onClick={() => setIsLightMode(!isLightMode)} className={`w-14 h-7 rounded-full relative transition-all duration-500 shadow-inner flex items-center ${isLightMode ? 'bg-amber-400' : 'bg-slate-700'}`}>
                     <div className={`absolute top-1 size-5 rounded-full bg-white shadow-md flex items-center justify-center transition-all duration-500 transform ${isLightMode ? 'left-8 rotate-0' : 'left-1 rotate-180'}`}>
-                       <span className={`material-symbols-outlined text-[14px] ${isLightMode ? 'text-amber-500' : 'text-slate-400'}`}>
-                          {isLightMode ? 'light_mode' : 'dark_mode'}
-                       </span>
+                       <span className={`material-symbols-outlined text-[14px] ${isLightMode ? 'text-amber-500' : 'text-slate-400'}`}>{isLightMode ? 'light_mode' : 'dark_mode'}</span>
                     </div>
                  </button>
               </div>
-
               <div className="h-6 w-px bg-slate-200 dark:bg-slate-800"></div>
-
               <div className="flex items-center gap-4">
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Unidade:</span>
                 <span className="text-xs font-black text-primary uppercase">{currentStoreName}</span>
