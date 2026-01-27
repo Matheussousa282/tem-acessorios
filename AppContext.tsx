@@ -169,6 +169,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (user && user.active) {
       setCurrentUser(user);
       localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+      // Força refresh imediato após login para carregar as sessões abertas
+      await refreshData();
       return true;
     }
     return false;
