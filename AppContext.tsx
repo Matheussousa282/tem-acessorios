@@ -58,7 +58,7 @@ interface AppContextType {
   deleteCardOperator: (id: string) => Promise<void>;
   saveCardBrand: (b: CardBrand) => Promise<void>;
   deleteCardBrand: (id: string) => Promise<void>;
-  processSale: (items: CartItem[], total: number, method: string, clientId?: string, vendorId?: string, shippingValue?: number, cardDetails?: any) => Promise<void>;
+  processSale: (items: CartItem[], total: number, method: string, clientId?: string, vendorId?: string, shippingValue?: number, cardDetails?: { installments?: number; authNumber?: string; transactionSku?: string; cardOperatorId?: string; cardBrandId?: string }) => Promise<void>;
   updateStock: (productId: string, quantity: number) => Promise<void>;
   bulkUpdateStock: (adjustments: Record<string, number>) => Promise<void>;
   refreshData: () => Promise<void>;
@@ -175,19 +175,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const addProduct = async (p: Product) => { 
-    await fetch('/api/products', { 
+    const res = await fetch('/api/products', { 
       method: 'POST', 
       headers: {'Content-Type': 'application/json'}, 
       body: JSON.stringify(p)
     }); 
+    if (!res.ok) {
+       const err = await res.json().catch(() => ({ error: 'Falha no servidor' }));
+       throw new Error(err.error || 'Erro ao salvar produto');
+    }
     await refreshData(); 
   };
 
-  const addTransaction = async (t: Transaction) => { 
-    await fetch('/api/transactions', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(t)}); 
-    await refreshData(); 
-  };
-  
+  const addTransaction = async (t: Transaction) => { await fetch('/api/transactions', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(t)}); await refreshData(); };
   const addCustomer = async (c: Customer) => { await fetch('/api/customers', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(c)}); await refreshData(); };
   const addUser = async (u: User) => { await fetch('/api/users', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(u)}); await refreshData(); };
   const addEstablishment = async (e: Establishment) => { await fetch('/api/establishments', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(e)}); await refreshData(); };
@@ -231,7 +231,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       clientId,
       client: client?.name || 'Consumidor Final',
       vendorId,
-      cashierId: currentUser?.id,
       items,
       ...cardDetails
     };
