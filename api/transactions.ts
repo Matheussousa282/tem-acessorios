@@ -26,7 +26,7 @@ export default async function handler(req: any, res: any) {
       items: t.items,
       installments: t.installments,
       authNumber: t.auth_number,
-      transactionSku: t.transaction_sku
+      transaction_sku: t.transaction_sku
     }));
     return res.status(200).json(mapped);
   }
@@ -50,7 +50,8 @@ export default async function handler(req: any, res: any) {
           cashier_id = EXCLUDED.cashier_id,
           status = EXCLUDED.status,
           value = EXCLUDED.value,
-          items = EXCLUDED.items
+          items = EXCLUDED.items,
+          method = EXCLUDED.method
       `;
       return res.status(200).json({ success: true });
     } catch (e: any) {
