@@ -4,7 +4,7 @@ import { useApp } from '../AppContext';
 import { Transaction, UserRole, Customer, User } from '../types';
 
 const SalesInquiry: React.FC = () => {
-  const { transactions, users, customers, currentUser, establishments, addTransaction, cashSessions } = useApp();
+  const { transactions, users, customers, currentUser, establishments, addTransaction, cardOperators, cardBrands } = useApp();
   
   // Estados de Filtro e Seleção
   const [filter, setFilter] = useState('');
@@ -13,6 +13,7 @@ const SalesInquiry: React.FC = () => {
   
   // Estado para o Modal Detalhado
   const [viewingDetail, setViewingDetail] = useState<Transaction | null>(null);
+  const [activeDetailTab, setActiveDetailTab] = useState<'ITENS' | 'PAGAMENTO' | 'DEVOLUCOES'>('ITENS');
 
   // Estados de Edição
   const [showVendorModal, setShowVendorModal] = useState(false);
@@ -71,13 +72,14 @@ const SalesInquiry: React.FC = () => {
     }
   };
 
-  // Helpers para buscar informações do banco
-  const getStoreData = (storeName: string) => {
-    return establishments.find(e => e.name === storeName) || { name: storeName, cnpj: '---' };
-  };
-
   const getUserData = (userId?: string) => {
     return users.find(u => u.id === userId);
+  };
+
+  const getCardInfo = (opId?: string, brId?: string) => {
+    const op = cardOperators.find(o => o.id === opId);
+    const br = cardBrands.find(b => b.id === brId);
+    return { operator: op?.name || '---', brand: br?.name || '---' };
   };
 
   return (
@@ -128,7 +130,7 @@ const SalesInquiry: React.FC = () => {
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {sales.map(s => (
-              <tr key={s.id} onClick={() => setViewingDetail(s)} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 divide-x divide-slate-100 dark:divide-slate-800 transition-colors cursor-pointer group">
+              <tr key={s.id} onClick={() => { setViewingDetail(s); setActiveDetailTab('ITENS'); }} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 divide-x divide-slate-100 dark:divide-slate-800 transition-colors cursor-pointer group">
                 <td className="px-3 py-1.5 text-center">
                    <div className="size-2.5 bg-blue-600 rounded-full mx-auto"></div>
                 </td>
@@ -190,62 +192,132 @@ const SalesInquiry: React.FC = () => {
                     <div className="col-span-2"><DetailField label="DATA EMISSÃO:" value={`${viewingDetail.date} 10:00`} borderHighlight /></div>
                  </div>
 
+                 {/* Linha de Operadores Redesenhada - Sem Representante */}
                  <div className="grid grid-cols-12 gap-2">
-                    <div className="col-span-3"><DetailField label="REPRESENTANTE:" value="000275 - ALAGOAS" /></div>
-                    {/* Vendedor, Caixa e Operador - Dados Reais */}
-                    <div className="col-span-3"><DetailField label="VENDEDOR:" value={getUserData(viewingDetail.vendorId)?.name || 'NÃO INF.'} borderHighlight /></div>
-                    {/* Aqui trazemos o nome do operador que passou a venda */}
-                    <div className="col-span-3"><DetailField label="CAIXA:" value={getUserData(viewingDetail.cashierId)?.name || viewingDetail.method || 'SISTEMA'} borderHighlight /></div>
-                    <div className="col-span-3"><DetailField label="OPERADOR:" value={getUserData(viewingDetail.cashierId)?.name || 'SISTEMA'} borderHighlight /></div>
+                    <div className="col-span-4"><DetailField label="VENDEDOR:" value={getUserData(viewingDetail.vendorId)?.name || 'NÃO INF.'} borderHighlight /></div>
+                    <div className="col-span-4"><DetailField label="CAIXA:" value={getUserData(viewingDetail.cashierId)?.name || viewingDetail.method || 'SISTEMA'} borderHighlight /></div>
+                    <div className="col-span-4"><DetailField label="OPERADOR:" value={getUserData(viewingDetail.cashierId)?.name || 'SISTEMA'} borderHighlight /></div>
                  </div>
 
+                 {/* Barra de Abas Azul */}
                  <div className="bg-primary text-white flex items-center px-4 py-1.5 gap-8 mt-2">
-                    <button className="text-[10px] font-black border-b-2 border-white pb-0.5 uppercase">ITENS <span className="opacity-50 text-[8px] ml-1">ALT+1</span></button>
-                    <button className="text-[10px] font-black opacity-70 uppercase">FORMAS DE PAGAMENTO <span className="opacity-50 text-[8px] ml-1">ALT+2</span></button>
-                    <button className="text-[10px] font-black opacity-70 uppercase">DEVOLUÇÕES <span className="opacity-50 text-[8px] ml-1">ALT+3</span></button>
+                    <button 
+                      onClick={() => setActiveDetailTab('ITENS')}
+                      className={`text-[10px] font-black pb-0.5 uppercase transition-all ${activeDetailTab === 'ITENS' ? 'border-b-2 border-white' : 'opacity-70'}`}
+                    >
+                      ITENS <span className="opacity-50 text-[8px] ml-1">ALT+1</span>
+                    </button>
+                    <button 
+                      onClick={() => setActiveDetailTab('PAGAMENTO')}
+                      className={`text-[10px] font-black pb-0.5 uppercase transition-all ${activeDetailTab === 'PAGAMENTO' ? 'border-b-2 border-white' : 'opacity-70'}`}
+                    >
+                      FORMAS DE PAGAMENTO <span className="opacity-50 text-[8px] ml-1">ALT+2</span>
+                    </button>
+                    <button 
+                      onClick={() => setActiveDetailTab('DEVOLUCOES')}
+                      className={`text-[10px] font-black pb-0.5 uppercase transition-all ${activeDetailTab === 'DEVOLUCOES' ? 'border-b-2 border-white' : 'opacity-70'}`}
+                    >
+                      DEVOLUÇÕES <span className="opacity-50 text-[8px] ml-1">ALT+3</span>
+                    </button>
                  </div>
 
+                 {/* Conteúdo Dinâmico das Abas */}
                  <div className="bg-white border border-slate-300 flex flex-col min-h-[300px]">
-                    <div className="overflow-auto flex-1">
-                       <table className="w-full text-left border-collapse">
-                          <thead className="bg-primary text-white sticky top-0">
-                             <tr className="divide-x divide-white/20">
-                                <th className="px-2 py-1 w-10 text-center"><span className="material-symbols-outlined text-xs">settings</span></th>
-                                <th className="px-2 py-1 w-16">Opções</th>
-                                <th className="px-2 py-1 w-20">ID</th>
-                                <th className="px-2 py-1 w-10 text-center">Est.</th>
-                                <th className="px-2 py-1 w-10">Seq.</th>
-                                <th className="px-2 py-1 w-16">CFOP</th>
-                                <th className="px-2 py-1 w-16">Operação</th>
-                                <th className="px-2 py-1 w-32">Família</th>
-                                <th className="px-2 py-1">Produto</th>
-                                <th className="px-2 py-1 w-20 text-right">Qtd.</th>
-                                <th className="px-2 py-1 w-24 text-right">Vr. Unitário</th>
-                                <th className="px-2 py-1 w-24 text-right">Vr. Total</th>
-                             </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100 text-[10px]">
-                             {viewingDetail.items?.map((item, idx) => (
-                               <tr key={idx} className="hover:bg-slate-50 divide-x divide-slate-100">
-                                  <td className="px-2 py-1 text-center"><span className="size-1.5 bg-blue-600 rounded-full inline-block"></span></td>
-                                  <td className="px-2 py-1 text-center"><button className="bg-slate-100 border border-slate-200 px-1 rounded"><span className="material-symbols-outlined text-[12px]">list</span></button></td>
-                                  <td className="px-2 py-1 text-slate-400">{item.id.slice(-6)}</td>
-                                  <td className="px-2 py-1 text-center"><span className="material-symbols-outlined text-emerald-500 text-[14px]">check</span></td>
-                                  <td className="px-2 py-1 text-center">{(idx + 1).toString().padStart(3, '0')}</td>
-                                  <td className="px-2 py-1 text-blue-600 font-bold">5.102</td>
-                                  <td className="px-2 py-1 text-blue-600 font-bold">V27</td>
-                                  <td className="px-2 py-1 text-slate-400 uppercase">{item.category}</td>
-                                  <td className="px-2 py-1">
-                                     <span className="text-blue-600 font-black">{item.sku}</span> - <span className="uppercase">{item.name}</span>
-                                  </td>
-                                  <td className="px-2 py-1 text-right font-black tabular-nums">{item.quantity.toFixed(2)} KT</td>
-                                  <td className="px-2 py-1 text-right tabular-nums">R$ {item.salePrice.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
-                                  <td className="px-2 py-1 text-right font-black tabular-nums">R$ {(item.quantity * item.salePrice).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
-                               </tr>
-                             ))}
-                          </tbody>
-                       </table>
-                    </div>
+                    {activeDetailTab === 'ITENS' && (
+                       <div className="overflow-auto flex-1">
+                          <table className="w-full text-left border-collapse">
+                             <thead className="bg-primary text-white sticky top-0">
+                                <tr className="divide-x divide-white/10">
+                                   <th className="px-2 py-1 w-10 text-center"><span className="material-symbols-outlined text-xs">settings</span></th>
+                                   <th className="px-2 py-1 w-16">Opções</th>
+                                   <th className="px-2 py-1 w-20">ID</th>
+                                   <th className="px-2 py-1 w-10 text-center">Est.</th>
+                                   <th className="px-2 py-1 w-10">Seq.</th>
+                                   <th className="px-2 py-1 w-16">CFOP</th>
+                                   <th className="px-2 py-1 w-16">Operação</th>
+                                   <th className="px-2 py-1 w-32">Família</th>
+                                   <th className="px-2 py-1">Produto</th>
+                                   <th className="px-2 py-1 w-20 text-right">Qtd.</th>
+                                   <th className="px-2 py-1 w-24 text-right">Vr. Unitário</th>
+                                   <th className="px-2 py-1 w-24 text-right">Vr. Total</th>
+                                </tr>
+                             </thead>
+                             <tbody className="divide-y divide-slate-100 text-[10px]">
+                                {viewingDetail.items?.map((item, idx) => (
+                                  <tr key={idx} className="hover:bg-slate-50 divide-x divide-slate-100">
+                                     <td className="px-2 py-1 text-center"><span className="size-1.5 bg-blue-600 rounded-full inline-block"></span></td>
+                                     <td className="px-2 py-1 text-center"><button className="bg-slate-100 border border-slate-200 px-1 rounded"><span className="material-symbols-outlined text-[12px]">list</span></button></td>
+                                     <td className="px-2 py-1 text-slate-400">{item.id.slice(-6)}</td>
+                                     <td className="px-2 py-1 text-center"><span className="material-symbols-outlined text-emerald-500 text-[14px]">check</span></td>
+                                     <td className="px-2 py-1 text-center">{(idx + 1).toString().padStart(3, '0')}</td>
+                                     <td className="px-2 py-1 text-blue-600 font-bold">5.102</td>
+                                     <td className="px-2 py-1 text-blue-600 font-bold">V27</td>
+                                     <td className="px-2 py-1 text-slate-400 uppercase">{item.category}</td>
+                                     <td className="px-2 py-1">
+                                        <span className="text-blue-600 font-black">{item.sku}</span> - <span className="uppercase">{item.name}</span>
+                                     </td>
+                                     <td className="px-2 py-1 text-right font-black tabular-nums">{item.quantity.toFixed(2)} KT</td>
+                                     <td className="px-2 py-1 text-right tabular-nums">R$ {item.salePrice.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                                     <td className="px-2 py-1 text-right font-black tabular-nums">R$ {(item.quantity * item.salePrice).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                                  </tr>
+                                ))}
+                             </tbody>
+                          </table>
+                       </div>
+                    )}
+
+                    {activeDetailTab === 'PAGAMENTO' && (
+                       <div className="p-8 space-y-6">
+                          <h4 className="text-xs font-black text-primary border-b border-slate-100 pb-2">RESUMO DO FINANCEIRO</h4>
+                          <div className="grid grid-cols-3 gap-6">
+                             <div className="bg-slate-50 p-4 rounded border">
+                                <p className="text-[9px] text-slate-400">MEIO DE PAGAMENTO</p>
+                                <p className="text-sm font-black text-slate-800">{viewingDetail.method || 'DINHEIRO'}</p>
+                             </div>
+                             <div className="bg-slate-50 p-4 rounded border">
+                                <p className="text-[9px] text-slate-400">VALOR TOTAL PAGO</p>
+                                <p className="text-sm font-black text-emerald-600">R$ {viewingDetail.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                             </div>
+                             <div className="bg-slate-50 p-4 rounded border">
+                                <p className="text-[9px] text-slate-400">STATUS DA TRANSAÇÃO</p>
+                                <p className="text-sm font-black text-blue-600">{viewingDetail.status}</p>
+                             </div>
+                          </div>
+
+                          {(viewingDetail.method === 'Credito' || viewingDetail.method === 'Debito') && (
+                             <div className="space-y-4">
+                                <h4 className="text-[10px] font-black text-slate-400">DETALHES DO CARTÃO</h4>
+                                <div className="grid grid-cols-4 gap-4">
+                                   <div className="bg-white p-3 rounded border">
+                                      <p className="text-[8px] text-slate-400">OPERADORA</p>
+                                      <p className="text-[10px] font-bold">{getCardInfo(viewingDetail.cardOperatorId, viewingDetail.cardBrandId).operator}</p>
+                                   </div>
+                                   <div className="bg-white p-3 rounded border">
+                                      <p className="text-[8px] text-slate-400">BANDEIRA</p>
+                                      <p className="text-[10px] font-bold">{getCardInfo(viewingDetail.cardOperatorId, viewingDetail.cardBrandId).brand}</p>
+                                   </div>
+                                   <div className="bg-white p-3 rounded border">
+                                      <p className="text-[8px] text-slate-400">Nº AUTORIZAÇÃO / NSU</p>
+                                      <p className="text-[10px] font-bold">{viewingDetail.authNumber || viewingDetail.transactionSku || '---'}</p>
+                                   </div>
+                                   <div className="bg-white p-3 rounded border">
+                                      <p className="text-[8px] text-slate-400">PARCELAMENTO</p>
+                                      <p className="text-[10px] font-bold">{viewingDetail.installments || 1}X</p>
+                                   </div>
+                                </div>
+                             </div>
+                          )}
+                       </div>
+                    )}
+
+                    {activeDetailTab === 'DEVOLUCOES' && (
+                       <div className="flex-1 flex flex-col items-center justify-center p-20 opacity-30 text-center">
+                          <span className="material-symbols-outlined text-6xl mb-4">history</span>
+                          <p className="font-black text-sm uppercase">Nenhuma Devolução Vinculada</p>
+                          <p className="text-[10px] mt-1">ESTE DOCUMENTO NÃO POSSUI REGISTROS DE ESTORNO OU TROCA.</p>
+                       </div>
+                    )}
+
                     <div className="bg-slate-400 p-1 flex justify-between items-center text-slate-900 font-black text-[11px]">
                        <span>TOTAL</span>
                        <div className="flex gap-10 pr-2">
@@ -259,7 +331,7 @@ const SalesInquiry: React.FC = () => {
         </div>
       )}
 
-      {/* MODAIS DE EDIÇÃO (MANTIDOS) */}
+      {/* MODAIS DE EDIÇÃO */}
       {showVendorModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
            <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl border overflow-hidden">
