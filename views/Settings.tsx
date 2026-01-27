@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { UserRole, User, Establishment, RolePermissions } from '../types';
-import { useApp } from '../AppContext';
+import { useApp, INITIAL_PERMS } from '../AppContext';
 
 const Settings: React.FC = () => {
   const { 
@@ -32,13 +32,28 @@ const Settings: React.FC = () => {
     name: '', cnpj: '', location: '', hasStockAccess: true, active: true
   });
 
+  // Lista definitiva de chaves de permissão para garantir que todas apareçam na UI
+  const ALL_PERM_KEYS: (keyof RolePermissions)[] = [
+    'dashboard', 'pdv', 'cashControl', 'customers', 'reports', 
+    'inventory', 'balance', 'incomes', 'expenses', 
+    'financial', 'settings', 'serviceOrders', 'cardManagement'
+  ];
+
   useEffect(() => {
     setLocalConfig(systemConfig);
   }, [systemConfig]);
 
   useEffect(() => {
     if (rolePermissions[selectedRolePerm]) {
-      setLocalPerms({ ...rolePermissions[selectedRolePerm] });
+      // Garante que o objeto local tenha todas as chaves, mesmo que falte no DB
+      const current = rolePermissions[selectedRolePerm] as any;
+      const merged: any = {};
+      ALL_PERM_KEYS.forEach(key => {
+        merged[key] = current[key] ?? INITIAL_PERMS[selectedRolePerm][key] ?? false;
+      });
+      setLocalPerms(merged);
+    } else {
+      setLocalPerms({ ...INITIAL_PERMS[selectedRolePerm] });
     }
   }, [selectedRolePerm, rolePermissions]);
 
@@ -230,19 +245,19 @@ const Settings: React.FC = () => {
 
                 {localPerms && (
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {Object.keys(localPerms).map((key) => (
+                      {ALL_PERM_KEYS.map((key) => (
                          <div key={key} className="flex items-center justify-between p-5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-700">
                             <div className="flex items-center gap-3">
-                               <div className={`size-8 rounded-lg flex items-center justify-center ${localPerms[key as keyof RolePermissions] ? 'bg-primary text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-400'}`}>
+                               <div className={`size-8 rounded-lg flex items-center justify-center ${localPerms[key] ? 'bg-primary text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-400'}`}>
                                   <span className="material-symbols-outlined text-sm">{getIconForModule(key)}</span>
                                </div>
                                <span className="text-[11px] font-black uppercase text-slate-600 dark:text-slate-300">{getLabelForModule(key)}</span>
                             </div>
                             <button 
-                              onClick={() => togglePerm(key as keyof RolePermissions)}
-                              className={`w-12 h-6 rounded-full relative transition-all ${localPerms[key as keyof RolePermissions] ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`}
+                              onClick={() => togglePerm(key)}
+                              className={`w-12 h-6 rounded-full relative transition-all ${localPerms[key] ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`}
                             >
-                               <div className={`absolute top-1 size-4 bg-white rounded-full shadow-sm transition-all ${localPerms[key as keyof RolePermissions] ? 'right-1' : 'left-1'}`}></div>
+                               <div className={`absolute top-1 size-4 bg-white rounded-full shadow-sm transition-all ${localPerms[key] ? 'right-1' : 'left-1'}`}></div>
                             </button>
                          </div>
                       ))}
