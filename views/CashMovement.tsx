@@ -11,27 +11,22 @@ const CashMovement: React.FC = () => {
   
   const isAdmin = currentUser?.role === UserRole.ADMIN;
   
-  // Controle de Visão (Lista ou Detalhe)
   const [viewingSession, setViewingSession] = useState<CashSession | null>(null);
   const [activeTab, setActiveTab] = useState<'lançamentos' | 'auditoria'>('lançamentos');
 
-  // Modais
   const [showOpeningModal, setShowOpeningModal] = useState(false);
   const [showEntryModal, setShowEntryModal] = useState<{show: boolean, type: 'INCOME' | 'EXPENSE' | 'TRANSFER'}>({show: false, type: 'INCOME'});
   
-  // Campos de Formulário
   const [openingValue, setOpeningValue] = useState(0);
   const [selectedRegister, setSelectedRegister] = useState('');
   const [entryForm, setEntryForm] = useState({ description: '', value: 0, category: 'Ajuste Manual' });
 
   const currentStore = establishments.find(e => e.id === currentUser?.storeId);
 
-  // Sincroniza dados ao entrar na tela
   useEffect(() => {
     refreshData();
   }, []);
 
-  // Efeito para buscar o saldo do último caixa fechado ao abrir o modal de abertura
   useEffect(() => {
     if (showOpeningModal) {
       const lastClosed = [...cashSessions]
@@ -60,18 +55,12 @@ const CashMovement: React.FC = () => {
     });
   }, [cashSessions, filter, isAdmin, currentUser]);
 
-  // CÁLCULO DO MOVIMENTO (O MOTOR DO RELATÓRIO)
   const sessionData = useMemo(() => {
     if (!viewingSession) return null;
 
-    // Normalização da data do caixa (DD/MM/YYYY para YYYY-MM-DD)
     const sessionDateParts = viewingSession.openingTime?.split(' ')[0].split('/');
     const sessionDateFormatted = sessionDateParts ? `${sessionDateParts[2]}-${sessionDateParts[1]}-${sessionDateParts[0]}` : '';
 
-    // 1. Filtrar Vendas: 
-    // - Deve ser da mesma Loja
-    // - Deve ser do mesmo Operador que abriu o caixa
-    // - Deve ser da mesma data da abertura
     const sessionVendas = transactions.filter(t => 
       t.store === viewingSession.storeName && 
       t.cashierId === viewingSession.openingOperatorId &&
@@ -80,27 +69,43 @@ const CashMovement: React.FC = () => {
       t.date === sessionDateFormatted
     );
 
-    // 2. Lançamentos Manuais da Sessão
     const sessionManualEntries = cashEntries.filter(e => e.sessionId === viewingSession.id);
 
-    // 3. Resumo por Forma de Pagamento (Idêntico à Imagem)
+    // Mapeamento de códigos conforme imagem
+    const methodCodes: Record<string, string> = {
+      'DINHEIRO': '0001 - DINHEIRO',
+      'PIX': '0139 - PIX SANTANDER',
+      'DEBITO': '0119 - GETNET DEBITO',
+      'CREDITO': '0174 - TEF EL - CRED GETNET',
+    };
+
     const resumoPagamentos: Record<string, number> = {};
     sessionVendas.forEach(v => {
-       const method = v.method?.toUpperCase() || 'DINHEIRO';
-       resumoPagamentos[method] = (resumoPagamentos[method] || 0) + v.value;
+       const rawMethod = v.method?.toUpperCase() || 'DINHEIRO';
+       const methodLabel = methodCodes[rawMethod] || `0999 - ${rawMethod}`;
+       resumoPagamentos[methodLabel] = (resumoPagamentos[methodLabel] || 0) + v.value;
     });
 
-    // 4. Consolidação Financeira
+    const totalVendasBruto = sessionVendas.reduce((acc, t) => acc + t.value, 0);
+    
+    // ENTRADAS EM DINHEIRO (O que afeta o saldo físico)
+    const vendasEmDinheiro = sessionVendas
+      .filter(v => v.method?.toUpperCase() === 'DINHEIRO')
+      .reduce((acc, v) => acc + v.value, 0);
+    
+    const entradasManuaisDinheiro = sessionManualEntries
+      .filter(e => e.type === 'INCOME')
+      .reduce((acc, e) => acc + e.value, 0);
+
+    const saídasDinheiro = sessionManualEntries
+      .filter(e => e.type === 'EXPENSE')
+      .reduce((acc, e) => acc + e.value, 0);
+
     const saldoAnterior = viewingSession.openingValue || 0;
-    const totalVendas = sessionVendas.reduce((acc, t) => acc + t.value, 0);
-    const totalEntradasManuais = sessionManualEntries.filter(e => e.type === 'INCOME').reduce((acc, e) => acc + e.value, 0);
-    const totalSaidasManuais = sessionManualEntries.filter(e => e.type === 'EXPENSE').reduce((acc, e) => acc + e.value, 0);
+    const totalEntradasCaixa = vendasEmDinheiro + entradasManuaisDinheiro;
+    const totalSaidasCaixa = saídasDinheiro;
+    const saldoFinalCaixa = saldoAnterior + totalEntradasCaixa - totalSaidasCaixa;
 
-    const totalEntradas = totalVendas + totalEntradasManuais;
-    const totalSaidas = totalSaidasManuais;
-    const saldoFinal = saldoAnterior + totalEntradas - totalSaidas;
-
-    // Histórico detalhado para a tabela da UI
     const allRecords = [
       ...sessionVendas.map(v => ({
         id: v.id,
@@ -124,7 +129,16 @@ const CashMovement: React.FC = () => {
       }))
     ].sort((a, b) => b.id.localeCompare(a.id));
 
-    return { allRecords, saldoAnterior, totalEntradas, totalSaidas, saldoFinal, resumoPagamentos, totalVendas };
+    return { 
+      allRecords, 
+      saldoAnterior, 
+      totalEntradasCaixa, 
+      totalSaidasCaixa, 
+      saldoFinalCaixa, 
+      resumoPagamentos, 
+      totalVendasBruto,
+      vendasEmDinheiro
+    };
   }, [viewingSession, transactions, cashEntries]);
 
   const handleOpenCash = async (e: React.FormEvent) => {
@@ -168,14 +182,14 @@ const CashMovement: React.FC = () => {
 
   const handleCloseCash = async () => {
     if (!viewingSession || !sessionData) return;
-    if (confirm(`DESEJA REALMENTE FECHAR ESTE CAIXA?\nSaldo Final: R$ ${sessionData.saldoFinal.toLocaleString('pt-BR')}`)) {
+    if (confirm(`DESEJA REALMENTE FECHAR ESTE CAIXA?\nSaldo Final em Dinheiro: R$ ${sessionData.saldoFinalCaixa.toLocaleString('pt-BR')}`)) {
       const closedSession: CashSession = {
         ...viewingSession,
         status: CashSessionStatus.CLOSED,
         closingTime: new Date().toLocaleString('pt-BR'),
         closingOperatorId: currentUser?.id,
         closingOperatorName: currentUser?.name,
-        closingValue: sessionData.saldoFinal
+        closingValue: sessionData.saldoFinalCaixa
       };
       await saveCashSession(closedSession);
       setViewingSession(null);
@@ -187,31 +201,31 @@ const CashMovement: React.FC = () => {
     return (
       <div className="p-6 space-y-6 animate-in slide-in-from-right-10 duration-500 pb-20">
         
-        {/* RELATÓRIO DE IMPRESSÃO (ESTILO EXATO DA IMAGEM) */}
-        <div id="cash-report-print" className="hidden print:block bg-white text-black font-sans p-6 text-[10px]">
-           <div className="border-b-2 border-slate-400 pb-2 mb-4 bg-slate-100 p-2">
-              <h1 className="font-black uppercase text-[12px] mb-1">Dados do Movimento</h1>
+        {/* RELATÓRIO DE IMPRESSÃO (FUTURO PDF/PAPEL) */}
+        <div id="cash-report-print" className="hidden print:block bg-white text-black font-sans p-6 text-[10px] leading-tight">
+           <div className="border-b border-slate-300 pb-2 mb-4">
+              <h1 className="font-black uppercase text-[11px] mb-1">DADOS DO MOVIMENTO</h1>
               <div className="grid grid-cols-2 gap-x-12">
                  <div>
                     <p className="font-bold">DATA/HORA ABERTURA: <span className="font-normal">{viewingSession.openingTime}</span></p>
                     <p className="font-bold">OPERADOR: <span className="font-normal">{viewingSession.openingOperatorName?.toUpperCase()}</span></p>
                  </div>
                  <div>
-                    <p className="font-bold">DATA/HORA FECHAMENTO: <span className="font-normal">{viewingSession.closingTime || 'EM ABERTO'}</span></p>
+                    <p className="font-bold">DATA/HORA FECHAMENTO: <span className="font-normal">{viewingSession.closingTime || '---'}</span></p>
                     <p className="font-bold">OPERADOR: <span className="font-normal">{viewingSession.closingOperatorName?.toUpperCase() || '---'}</span></p>
                  </div>
               </div>
            </div>
 
-           <div className="bg-[#136dec] text-white p-2 text-center font-black uppercase mb-4 text-[11px] print:bg-slate-300 print:text-black">
-              CAIXA: {viewingSession.id.slice(-4)} - {viewingSession.registerName?.split(' - ')[1]?.toUpperCase() || viewingSession.registerName?.toUpperCase()}
+           <div className="bg-[#136dec] text-white p-2 text-center font-black uppercase mb-4 text-[10px] print:bg-slate-500 print:text-white">
+              CAIXA: {viewingSession.id.slice(-4)} - {viewingSession.openingOperatorName?.toUpperCase()}
            </div>
 
            <div className="grid grid-cols-2 gap-1 mb-4">
               <table className="w-full border-collapse">
-                 <thead className="bg-[#136dec] text-white print:bg-slate-200 print:text-black"><tr><th colSpan={3} className="p-1 uppercase text-center border border-slate-400">Aberturas</th></tr></thead>
+                 <thead className="bg-[#136dec] text-white print:bg-slate-300 print:text-black"><tr><th colSpan={3} className="p-1 uppercase text-center border border-slate-400">Aberturas</th></tr></thead>
                  <tbody>
-                    <tr className="text-[8px] font-black uppercase bg-slate-100 border border-slate-400">
+                    <tr className="text-[7px] font-black uppercase bg-slate-100 border border-slate-400">
                        <td className="p-1 border-r border-slate-400">ID</td><td className="p-1 border-r border-slate-400">DATA/HORA</td><td className="p-1">OPERADOR</td>
                     </tr>
                     <tr className="border border-slate-400">
@@ -222,9 +236,9 @@ const CashMovement: React.FC = () => {
                  </tbody>
               </table>
               <table className="w-full border-collapse">
-                 <thead className="bg-[#136dec] text-white print:bg-slate-200 print:text-black"><tr><th colSpan={3} className="p-1 uppercase text-center border border-slate-400">Fechamentos</th></tr></thead>
+                 <thead className="bg-[#136dec] text-white print:bg-slate-300 print:text-black"><tr><th colSpan={3} className="p-1 uppercase text-center border border-slate-400">Fechamentos</th></tr></thead>
                  <tbody>
-                    <tr className="text-[8px] font-black uppercase bg-slate-100 border border-slate-400">
+                    <tr className="text-[7px] font-black uppercase bg-slate-100 border border-slate-400">
                        <td className="p-1 border-r border-slate-400">ID</td><td className="p-1 border-r border-slate-400">DATA/HORA</td><td className="p-1">OPERADOR</td>
                     </tr>
                     {viewingSession.status === CashSessionStatus.CLOSED && (
@@ -238,36 +252,36 @@ const CashMovement: React.FC = () => {
               </table>
            </div>
 
-           <div className="bg-[#136dec] text-white p-1 text-center font-black uppercase mb-1 print:bg-slate-200 print:text-black">
-              Lançamentos do Dia
+           <div className="bg-[#136dec] text-white p-1 text-center font-black uppercase mb-1 print:bg-slate-400 print:text-white">
+              LANÇAMENTOS DO DIA
            </div>
 
            <div className="grid grid-cols-2 gap-1 mb-4">
               <table className="w-full border-collapse border border-slate-400">
-                 <thead className="bg-[#136dec] text-white print:bg-slate-100 print:text-black"><tr><th colSpan={2} className="p-1 uppercase border border-slate-400">Entradas</th></tr></thead>
+                 <thead className="bg-[#136dec] text-white print:bg-slate-300 print:text-black"><tr><th colSpan={2} className="p-1 uppercase border border-slate-400">Entradas</th></tr></thead>
                  <tbody>
-                    <tr className="text-[8px] font-black uppercase bg-slate-50 border-b border-slate-400"><td className="p-1 border-r border-slate-400">CLASSIFICAÇÃO</td><td className="p-1 text-right">VALOR</td></tr>
-                    <tr className="border-b border-slate-400"><td className="p-1 border-r border-slate-400 uppercase">001.015 - VENDAS PDV</td><td className="p-1 text-right tabular-nums">R$ {sessionData?.totalVendas.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
-                    <tr className="font-black"><td className="p-1 border-r border-slate-400">TOTAIS</td><td className="p-1 text-right">R$ {sessionData?.totalEntradas.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
+                    <tr className="text-[7px] font-black uppercase bg-slate-100 border-b border-slate-400"><td className="p-1 border-r border-slate-400">CLASSIFICAÇÃO</td><td className="p-1 text-right">VALOR</td></tr>
+                    <tr className="border-b border-slate-400"><td className="p-1 border-r border-slate-400 uppercase">001.015 - VENDAS (DINHEIRO)</td><td className="p-1 text-right tabular-nums">R$ {sessionData?.vendasEmDinheiro.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
+                    <tr className="font-black"><td className="p-1 border-r border-slate-400">TOTAIS</td><td className="p-1 text-right">R$ {sessionData?.totalEntradasCaixa.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
                  </tbody>
               </table>
               <table className="w-full border-collapse border border-slate-400">
-                 <thead className="bg-[#136dec] text-white print:bg-slate-100 print:text-black"><tr><th colSpan={2} className="p-1 uppercase border border-slate-400">Saídas</th></tr></thead>
+                 <thead className="bg-[#136dec] text-white print:bg-slate-300 print:text-black"><tr><th colSpan={2} className="p-1 uppercase border border-slate-400">Saídas</th></tr></thead>
                  <tbody>
-                    <tr className="text-[8px] font-black uppercase bg-slate-50 border-b border-slate-400"><td className="p-1 border-r border-slate-400">CLASSIFICAÇÃO</td><td className="p-1 text-right">VALOR</td></tr>
-                    <tr className="border-b border-slate-400"><td className="p-1 border-r border-slate-400 uppercase">004.001 - SANGRIAS / PAGOS</td><td className="p-1 text-right tabular-nums">R$ {sessionData?.totalSaidas.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
-                    <tr className="font-black"><td className="p-1 border-r border-slate-400">TOTAIS</td><td className="p-1 text-right">R$ {sessionData?.totalSaidas.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
+                    <tr className="text-[7px] font-black uppercase bg-slate-100 border-b border-slate-400"><td className="p-1 border-r border-slate-400">CLASSIFICAÇÃO</td><td className="p-1 text-right">VALOR</td></tr>
+                    <tr className="border-b border-slate-400"><td className="p-1 border-r border-slate-400 uppercase">004.001 - SANGRIAS / PAGOS</td><td className="p-1 text-right tabular-nums">R$ {sessionData?.totalSaidasCaixa.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
+                    <tr className="font-black"><td className="p-1 border-r border-slate-400">TOTAIS</td><td className="p-1 text-right">R$ {sessionData?.totalSaidasCaixa.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
                  </tbody>
               </table>
            </div>
 
-           <div className="bg-[#136dec] text-white p-1 text-center font-black uppercase mb-1 print:bg-slate-200 print:text-black">
-              Resumo das Vendas do Dia
+           <div className="bg-[#136dec] text-white p-1 text-center font-black uppercase mb-1 print:bg-slate-400 print:text-white">
+              RESUMO DAS VENDAS DO DIA
            </div>
            <table className="w-full border-collapse border border-slate-400 mb-4">
               <thead className="bg-slate-100"><tr className="border-b border-slate-400"><th className="p-1 text-left uppercase border-r border-slate-400">Forma de Pagamento</th><th className="p-1 text-right uppercase">Valor</th></tr></thead>
               <tbody>
-                 {Object.entries(sessionData?.resumoPagamentos || {}).map(([method, val], idx) => (
+                 {Object.entries(sessionData?.resumoPagamentos || {}).sort().map(([method, val], idx) => (
                    <tr key={method} className={`border-b border-slate-400 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
                       <td className="p-1 uppercase font-bold border-r border-slate-400">{method}</td>
                       <td className="p-1 text-right tabular-nums">R$ {val.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
@@ -275,22 +289,22 @@ const CashMovement: React.FC = () => {
                  ))}
                  <tr className="font-black bg-slate-100 border-t border-slate-400">
                     <td className="p-1 uppercase border-r border-slate-400">TOTAIS</td>
-                    <td className="p-1 text-right tabular-nums">R$ {sessionData?.totalVendas.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                    <td className="p-1 text-right tabular-nums">R$ {sessionData?.totalVendasBruto.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                  </tr>
               </tbody>
            </table>
 
-           <div className="bg-[#136dec] text-white p-1 text-center font-black uppercase mb-1 print:bg-slate-200 print:text-black">
-              Outras Operações
+           <div className="bg-[#136dec] text-white p-1 text-center font-black uppercase mb-2 print:bg-slate-400 print:text-white">
+              OUTRAS OPERAÇÕES
            </div>
-           <div className="space-y-0.5">
-              <div className="bg-black text-white p-1 flex justify-between font-black uppercase text-[9px] print:bg-slate-800"><span>Saldo Anterior:</span><span>R$ {sessionData?.saldoAnterior.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
-              <div className="bg-black text-white p-1 flex justify-between font-black uppercase text-[9px] print:bg-slate-800"><span>Total Entradas:</span><span>R$ {sessionData?.totalEntradas.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
-              <div className="bg-black text-white p-1 flex justify-between font-black uppercase text-[9px] print:bg-slate-800"><span>Total Saídas:</span><span>R$ {sessionData?.totalSaidas.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
-              <div className="bg-black text-white p-2 flex justify-between font-black uppercase text-[11px] border-t-2 border-amber-500 mt-1 print:bg-black"><span>Saldo Final do Dia:</span><span>R$ {sessionData?.saldoFinal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
+           <div className="space-y-1">
+              <div className="bg-black text-white p-1.5 flex justify-between font-black uppercase text-[9px] print:bg-black print:text-white"><span>SALDO ANTERIOR:</span><span>R$ {sessionData?.saldoAnterior.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
+              <div className="bg-black text-white p-1.5 flex justify-between font-black uppercase text-[9px] print:bg-black print:text-white"><span>TOTAL ENTRADAS:</span><span>R$ {sessionData?.totalEntradasCaixa.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
+              <div className="bg-black text-white p-1.5 flex justify-between font-black uppercase text-[9px] print:bg-black print:text-white"><span>TOTAL SAÍDAS:</span><span>R$ {sessionData?.totalSaidasCaixa.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
+              <div className="bg-black text-white p-2 flex justify-between font-black uppercase text-[11px] border-t border-amber-500 mt-1 print:bg-black print:text-white"><span>SALDO FINAL DO DIA:</span><span>R$ {sessionData?.saldoFinalCaixa.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
            </div>
            
-           <p className="mt-8 text-center opacity-40 text-[7px] uppercase font-black">Tem Acessórios ERP - Relatório Gerencial de Fechamento</p>
+           <p className="mt-8 text-center opacity-40 text-[7px] uppercase font-black">TEM ACESSÓRIOS ERP - RELATÓRIO DE CONFERÊNCIA DE MOVIMENTO</p>
         </div>
 
         {/* HEADER DETALHE (TELA) */}
@@ -368,9 +382,6 @@ const CashMovement: React.FC = () => {
                              <td className="px-4 py-2.5 text-slate-500 uppercase truncate max-w-[250px]">{record.description}</td>
                           </tr>
                         ))}
-                        {sessionData?.allRecords.length === 0 && (
-                          <tr><td colSpan={8} className="py-20 text-center opacity-20 uppercase font-black tracking-widest">Nenhuma movimentação localizada</td></tr>
-                        )}
                      </tbody>
                   </table>
                </div>
@@ -382,19 +393,7 @@ const CashMovement: React.FC = () => {
                       <h4 className="text-[10px] font-black uppercase text-slate-400 mb-4 tracking-widest">Informações de Abertura</h4>
                       <p className="text-sm font-bold uppercase">Operador: {viewingSession.openingOperatorName}</p>
                       <p className="text-sm font-bold uppercase">Data/Hora: {viewingSession.openingTime}</p>
-                      <p className="text-sm font-black text-primary mt-2">Valor Inicial: R$ {viewingSession.openingValue?.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
-                   </div>
-                   <div className="p-6 bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-100">
-                      <h4 className="text-[10px] font-black uppercase text-slate-400 mb-4 tracking-widest">Informações de Fechamento</h4>
-                      {viewingSession.status === CashSessionStatus.CLOSED ? (
-                        <>
-                          <p className="text-sm font-bold uppercase">Conferente: {viewingSession.closingOperatorName}</p>
-                          <p className="text-sm font-bold uppercase">Data/Hora: {viewingSession.closingTime}</p>
-                          <p className="text-sm font-black text-emerald-600 mt-2">Saldo Final: R$ {viewingSession.closingValue?.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
-                        </>
-                      ) : (
-                        <p className="text-xs font-black uppercase text-rose-500 opacity-50 flex items-center gap-2"><span className="material-symbols-outlined text-sm animate-pulse">lock_open</span> Movimentação em aberto</p>
-                      )}
+                      <p className="text-sm font-black text-primary mt-2">Valor Inicial (Espécie): R$ {viewingSession.openingValue?.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
                    </div>
                 </div>
              </div>
@@ -409,15 +408,15 @@ const CashMovement: React.FC = () => {
            </div>
            <div className="bg-black text-white p-3 rounded-lg flex flex-col items-center">
               <span className="text-[10px] font-black uppercase text-amber-500">Total Entradas:</span>
-              <span className="text-lg font-black tabular-nums">R$ {sessionData?.totalEntradas.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+              <span className="text-lg font-black tabular-nums">R$ {sessionData?.totalEntradasCaixa.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
            </div>
            <div className="bg-black text-white p-3 rounded-lg flex flex-col items-center">
               <span className="text-[10px] font-black uppercase text-amber-500">Total Saídas:</span>
-              <span className="text-lg font-black tabular-nums">R$ {sessionData?.totalSaidas.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+              <span className="text-lg font-black tabular-nums">R$ {sessionData?.totalSaidasCaixa.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
            </div>
            <div className="bg-black text-white p-3 rounded-lg flex flex-col items-center border-l-4 border-amber-500">
-              <span className="text-[10px] font-black uppercase text-amber-500">Saldo Final do Dia:</span>
-              <span className="text-lg font-black tabular-nums">R$ {sessionData?.saldoFinal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+              <span className="text-[10px] font-black uppercase text-amber-500">Saldo em Dinheiro:</span>
+              <span className="text-lg font-black tabular-nums">R$ {sessionData?.saldoFinalCaixa.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
            </div>
         </div>
 
@@ -447,7 +446,6 @@ const CashMovement: React.FC = () => {
     );
   }
 
-  // LISTA DE SESSÕES (TELA INICIAL)
   return (
     <div className="p-8 space-y-8 animate-in fade-in duration-500 pb-24">
       
@@ -462,7 +460,6 @@ const CashMovement: React.FC = () => {
         <div className="flex gap-2">
            <button onClick={() => setShowOpeningModal(true)} className="px-4 py-2 bg-emerald-500 text-white rounded-lg text-[10px] font-black uppercase flex items-center gap-2 shadow-lg shadow-emerald-500/20 hover:scale-105 transition-all"><span className="material-symbols-outlined text-sm">check_circle</span> Realizar Abertura</button>
            <button className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-500 rounded-lg text-[10px] font-black uppercase flex items-center gap-2">Histórico</button>
-           <button className="px-4 py-2 bg-primary text-white rounded-lg text-[10px] font-black uppercase flex items-center gap-2 shadow-lg shadow-primary/20">Arquivos</button>
            <button onClick={() => window.history.back()} className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 rounded-lg text-[10px] font-black uppercase">Voltar</button>
         </div>
       </div>
@@ -489,7 +486,7 @@ const CashMovement: React.FC = () => {
                      <th className="px-4 py-3 uppercase">Terminal / Operador de Caixa</th>
                      <th className="px-4 py-3 uppercase">Abertura</th>
                      <th className="px-4 py-3 uppercase">Fechamento</th>
-                     <th className="px-4 py-3 uppercase">Operador Fechamento</th>
+                     <th className="px-4 py-3 uppercase">Status</th>
                      <th className="px-4 py-3 text-right uppercase">Ação</th>
                   </tr>
                </thead>
@@ -497,34 +494,22 @@ const CashMovement: React.FC = () => {
                   {filteredSessions.map(session => (
                     <tr key={session.id} onClick={() => setViewingSession(session)} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer group">
                        <td className="px-4 py-3 text-center">
-                          <span className={`size-2.5 rounded-full inline-block ${session.status === CashSessionStatus.OPEN ? 'bg-emerald-500 animate-pulse' : session.status === CashSessionStatus.CLOSED ? 'bg-blue-500' : 'bg-rose-500'}`}></span>
+                          <span className={`size-2.5 rounded-full inline-block ${session.status === CashSessionStatus.OPEN ? 'bg-emerald-500 animate-pulse' : 'bg-blue-500'}`}></span>
                        </td>
                        <td className="px-4 py-3 font-mono text-slate-400">{session.id}</td>
                        <td className="px-4 py-3 uppercase text-slate-900 dark:text-white group-hover:text-primary transition-colors">{session.registerName}</td>
                        <td className="px-4 py-3 text-slate-400">{session.openingTime || '--:--'}</td>
                        <td className="px-4 py-3 text-slate-400">{session.closingTime || '--:--'}</td>
-                       <td className="px-4 py-3 uppercase text-slate-400">{session.closingOperatorName || '---'}</td>
+                       <td className="px-4 py-3 uppercase">
+                          <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${session.status === CashSessionStatus.OPEN ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600'}`}>{session.status}</span>
+                       </td>
                        <td className="px-4 py-3 text-right">
                           <button className="text-primary hover:underline uppercase text-[9px] font-black">Visualizar</button>
                        </td>
                     </tr>
                   ))}
-                  {filteredSessions.length === 0 && (
-                    <tr>
-                      <td colSpan={7} className="px-4 py-10 text-center opacity-30 font-black uppercase text-[10px] tracking-widest">Nenhuma movimentação para o filtro atual</td>
-                    </tr>
-                  )}
                </tbody>
             </table>
-         </div>
-      </div>
-
-      <div className="flex gap-4">
-         <div className="bg-white dark:bg-slate-900 px-4 py-2 border border-slate-200 dark:border-slate-800 rounded-lg text-[9px] font-black uppercase">Registros: {filteredSessions.length}</div>
-         <div className="bg-white dark:bg-slate-900 px-4 py-2 border border-slate-200 dark:border-slate-800 rounded-lg flex gap-4 text-[9px] font-black uppercase">
-            <span>Status:</span>
-            <div className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-emerald-500"></span> Aberto</div>
-            <div className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-blue-500"></span> Finalizado</div>
          </div>
       </div>
 
@@ -553,7 +538,6 @@ const CashMovement: React.FC = () => {
                  </div>
                  <div className="space-y-1">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Fundo de Troco Inicial (R$)</label>
-                    <p className="text-[8px] text-slate-400 uppercase px-2 mb-1 font-bold">Saldo automático do último fechamento</p>
                     <input autoFocus type="number" step="0.01" required value={openingValue} onChange={e => setOpeningValue(parseFloat(e.target.value) || 0)} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-6 text-xl font-black text-emerald-600" placeholder="0,00" />
                  </div>
                  <button type="submit" disabled={availableCashiers.length === 0} className="w-full h-14 bg-primary text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-xl disabled:opacity-30">Confirmar Abertura</button>
@@ -576,7 +560,7 @@ const CashMovement: React.FC = () => {
             background: white !important;
             color: black !important;
           }
-          @page { size: auto; margin: 10mm; }
+          @page { size: auto; margin: 5mm; }
         }
       `}</style>
     </div>
