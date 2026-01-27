@@ -19,11 +19,9 @@ const Settings: React.FC = () => {
   const [showUserModal, setShowUserModal] = useState(false);
   const [showStoreModal, setShowStoreModal] = useState(false);
   
-  // Estados para permissões
   const [selectedRolePerm, setSelectedRolePerm] = useState<UserRole>(UserRole.MANAGER);
   const [localPerms, setLocalPerms] = useState<RolePermissions | null>(null);
 
-  // Estados para formulários
   const [userForm, setUserForm] = useState<Partial<User>>({ name: '', email: '', role: UserRole.VENDOR, storeId: 'matriz', active: true, password: '123456' });
   const [storeForm, setStoreForm] = useState<Partial<Establishment>>({ name: '', cnpj: '', location: '', active: true, hasStockAccess: true });
 
@@ -70,20 +68,19 @@ const Settings: React.FC = () => {
   return (
     <div className="p-8 space-y-8 animate-in fade-in duration-500 pb-20">
       <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-black text-slate-900 dark:text-white uppercase">Ajustes do Sistema</h1>
+        <h1 className="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Ajustes do Sistema</h1>
         <p className="text-slate-500 text-sm font-bold uppercase tracking-tight">Identidade, Equipe e Acessos.</p>
       </div>
 
-      <div className="flex border-b overflow-x-auto no-scrollbar gap-2">
-        <TabButton active={activeTab === 'general'} onClick={() => setActiveTab('general'} icon="palette" label="Identidade" />
-        <TabButton active={activeTab === 'users'} onClick={() => setActiveTab('users'} icon="badge" label="Colaboradores" />
-        <TabButton active={activeTab === 'stores'} onClick={() => setActiveTab('stores'} icon="store" label="Unidades" />
-        {isAdmin && <TabButton active={activeTab === 'permissions'} onClick={() => setActiveTab('permissions'} icon="shield_person" label="Permissões" />}
-        {isAdmin && <TabButton active={activeTab === 'db'} onClick={() => setActiveTab('db'} icon="dns" label="Infraestrutura" />}
+      <div className="flex border-b overflow-x-auto no-scrollbar gap-2 shadow-sm">
+        <TabButton active={activeTab === 'general'} onClick={() => setActiveTab('general')} icon="palette" label="Identidade" />
+        <TabButton active={activeTab === 'users'} onClick={() => setActiveTab('users')} icon="badge" label="Colaboradores" />
+        <TabButton active={activeTab === 'stores'} onClick={() => setActiveTab('stores')} icon="store" label="Unidades" />
+        {isAdmin && <TabButton active={activeTab === 'permissions'} onClick={() => setActiveTab('permissions')} icon="shield_person" label="Permissões" />}
+        {isAdmin && <TabButton active={activeTab === 'db'} onClick={() => setActiveTab('db')} icon="dns" label="Infraestrutura" />}
       </div>
 
       <div className="mt-6">
-        {/* ABA: COLABORADORES */}
         {activeTab === 'users' && (
           <div className="space-y-6">
             <div className="flex justify-end">
@@ -94,7 +91,7 @@ const Settings: React.FC = () => {
                   <thead className="bg-slate-50 dark:bg-slate-800/50">
                     <tr className="border-b"><th className="px-8 py-4 text-[10px] font-black uppercase text-slate-400">Nome</th><th className="px-8 py-4 text-[10px] font-black uppercase text-slate-400">Perfil</th><th className="px-8 py-4 text-[10px] font-black uppercase text-slate-400">Loja</th><th className="px-8 py-4 text-[10px] font-black uppercase text-slate-400 text-right">Ações</th></tr>
                   </thead>
-                  <tbody className="divide-y">
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {users.map(u => (
                       <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/20">
                         <td className="px-8 py-4 font-black uppercase text-xs">{u.name}</td>
@@ -112,7 +109,6 @@ const Settings: React.FC = () => {
           </div>
         )}
 
-        {/* ABA: UNIDADES */}
         {activeTab === 'stores' && (
           <div className="space-y-6">
             <div className="flex justify-end">
@@ -123,7 +119,7 @@ const Settings: React.FC = () => {
                   <thead className="bg-slate-50 dark:bg-slate-800/50">
                     <tr className="border-b"><th className="px-8 py-4 text-[10px] font-black uppercase text-slate-400">Nome da Unidade</th><th className="px-8 py-4 text-[10px] font-black uppercase text-slate-400">Localização</th><th className="px-8 py-4 text-[10px] font-black uppercase text-slate-400 text-right">Ações</th></tr>
                   </thead>
-                  <tbody className="divide-y">
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {establishments.map(e => (
                       <tr key={e.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/20">
                         <td className="px-8 py-4 font-black uppercase text-xs">{e.name}</td>
@@ -162,15 +158,15 @@ const Settings: React.FC = () => {
                     </div>
                  ))}
               </div>
-              <button onClick={handleSavePermissions} disabled={isSaving} className="w-full h-16 bg-primary text-white rounded-2xl font-black text-xs uppercase shadow-xl flex items-center justify-center gap-2">Salvar Configuração</button>
+              <button onClick={handleSavePermissions} disabled={isSaving} className="w-full h-16 bg-primary text-white rounded-2xl font-black text-xs uppercase shadow-xl flex items-center justify-center gap-2 transition-transform active:scale-95">Salvar Configuração de Acesso</button>
            </div>
         )}
 
         {activeTab === 'general' && (
-           <div className="max-w-4xl bg-white dark:bg-slate-900 p-10 rounded-[3rem] border shadow-sm">
+           <div className="max-w-4xl bg-white dark:bg-slate-900 p-10 rounded-[3rem] border shadow-sm animate-in fade-in">
               <div className="flex items-center gap-10">
                  <div onClick={() => logoInputRef.current?.click()} className="size-32 bg-slate-50 dark:bg-slate-800 rounded-3xl border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden cursor-pointer group">
-                    {localConfig.logoUrl ? <img src={localConfig.logoUrl} className="size-full object-contain" /> : <span className="material-symbols-outlined text-4xl text-slate-300">image</span>}
+                    {localConfig.logoUrl ? <img src={localConfig.logoUrl} className="size-full object-contain" /> : <span className="material-symbols-outlined text-4xl text-slate-300 group-hover:scale-110 transition-transform">image</span>}
                  </div>
                  <div className="flex-1 space-y-4">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Nome Comercial</label>
@@ -180,48 +176,47 @@ const Settings: React.FC = () => {
                     }} />
                  </div>
               </div>
-              <button onClick={() => updateConfig(localConfig)} className="w-full h-16 bg-primary text-white rounded-2xl font-black text-xs uppercase shadow-xl mt-10">Atualizar Identidade</button>
+              <button onClick={() => updateConfig(localConfig)} className="w-full h-16 bg-primary text-white rounded-2xl font-black text-xs uppercase shadow-xl mt-10 hover:scale-[1.02] transition-all">Atualizar Identidade</button>
            </div>
         )}
 
         {activeTab === 'db' && isAdmin && (
-           <div className="max-w-4xl bg-slate-900 p-12 rounded-[3rem] text-white shadow-2xl relative overflow-hidden">
+           <div className="max-w-4xl bg-slate-900 p-12 rounded-[3rem] text-white shadow-2xl relative overflow-hidden animate-in zoom-in-95">
               <div className="absolute top-0 right-0 size-64 bg-primary/10 blur-[100px] rounded-full"></div>
-              <h2 className="text-3xl font-black uppercase">Manutenção Neon</h2>
-              <button onClick={async () => { await fetch('/api/init-db'); await refreshData(); alert('Banco sincronizado!'); }} className="px-10 py-5 bg-primary text-white rounded-2xl font-black text-xs uppercase mt-8 shadow-xl">Sincronizar Estrutura</button>
+              <h2 className="text-3xl font-black uppercase tracking-tighter">Manutenção Neon</h2>
+              <p className="text-slate-400 mt-4 uppercase text-xs font-bold leading-relaxed">Força a sincronização das tabelas e colunas do banco de dados.</p>
+              <button onClick={async () => { await fetch('/api/init-db'); await refreshData(); alert('Banco sincronizado!'); }} className="px-10 py-5 bg-primary text-white rounded-2xl font-black text-xs uppercase mt-8 shadow-xl hover:scale-105 transition-all">Sincronizar Estrutura</button>
            </div>
         )}
       </div>
 
-      {/* MODAL USUÁRIO */}
       {showUserModal && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
-           <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden border">
               <div className="p-6 bg-primary text-white flex justify-between items-center"><h3 className="font-black uppercase tracking-tight">Dados do Colaborador</h3><button onClick={() => setShowUserModal(false)} className="material-symbols-outlined">close</button></div>
               <form onSubmit={handleSaveUser} className="p-8 space-y-4">
-                 <div className="space-y-1"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Nome Completo</label><input required value={userForm.name} onChange={e => setUserForm({...userForm, name: e.target.value})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 border-none font-bold uppercase text-xs" /></div>
+                 <div className="space-y-1"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Nome Completo</label><input required value={userForm.name} onChange={e => setUserForm({...userForm, name: e.target.value})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 border-none font-bold uppercase text-xs focus:ring-2 focus:ring-primary" /></div>
                  <div className="space-y-1"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">E-mail / Login</label><input required value={userForm.email} onChange={e => setUserForm({...userForm, email: e.target.value})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 border-none font-bold text-xs" /></div>
                  <div className="space-y-1"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Senha Provisória</label><input required value={userForm.password} onChange={e => setUserForm({...userForm, password: e.target.value})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 border-none font-bold text-xs" /></div>
                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Perfil de Acesso</label><select value={userForm.role} onChange={e => setUserForm({...userForm, role: e.target.value as UserRole})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 border-none font-bold uppercase text-[10px]">{Object.values(UserRole).map(r => <option key={r} value={r}>{r}</option>)}</select></div>
                     <div className="space-y-1"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Unidade Alocada</label><select value={userForm.storeId} onChange={e => setUserForm({...userForm, storeId: e.target.value})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 border-none font-bold uppercase text-[10px]">{establishments.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}</select></div>
                  </div>
-                 <button type="submit" className="w-full h-14 bg-primary text-white rounded-2xl font-black text-xs uppercase shadow-xl mt-4">Salvar Colaborador</button>
+                 <button type="submit" className="w-full h-14 bg-primary text-white rounded-2xl font-black text-xs uppercase shadow-xl mt-4 hover:bg-blue-600 transition-all">Salvar Colaborador</button>
               </form>
            </div>
         </div>
       )}
 
-      {/* MODAL ESTABELECIMENTO */}
       {showStoreModal && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
-           <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden border">
               <div className="p-6 bg-primary text-white flex justify-between items-center"><h3 className="font-black uppercase tracking-tight">Dados da Unidade</h3><button onClick={() => setShowStoreModal(false)} className="material-symbols-outlined">close</button></div>
               <form onSubmit={handleSaveStore} className="p-8 space-y-4">
-                 <div className="space-y-1"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Nome da Loja / Filial</label><input required value={storeForm.name} onChange={e => setStoreForm({...storeForm, name: e.target.value})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 border-none font-bold uppercase text-xs" /></div>
+                 <div className="space-y-1"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Nome da Loja / Filial</label><input required value={storeForm.name} onChange={e => setStoreForm({...storeForm, name: e.target.value})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 border-none font-bold uppercase text-xs focus:ring-2 focus:ring-primary" /></div>
                  <div className="space-y-1"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Endereço Completo / Cidade</label><input required value={storeForm.location} onChange={e => setStoreForm({...storeForm, location: e.target.value})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 border-none font-bold uppercase text-xs" /></div>
                  <div className="space-y-1"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">CNPJ</label><input value={storeForm.cnpj} onChange={e => setStoreForm({...storeForm, cnpj: e.target.value})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 border-none font-bold uppercase text-xs" /></div>
-                 <button type="submit" className="w-full h-14 bg-primary text-white rounded-2xl font-black text-xs uppercase shadow-xl mt-4">Salvar Unidade</button>
+                 <button type="submit" className="w-full h-14 bg-primary text-white rounded-2xl font-black text-xs uppercase shadow-xl mt-4 hover:bg-blue-600 transition-all">Salvar Unidade</button>
               </form>
            </div>
         </div>
@@ -232,7 +227,7 @@ const Settings: React.FC = () => {
 
 const getLabelForModule = (key: string) => {
   const labels: Record<string, string> = {
-    dashboard: 'Dashboard', pdv: 'Frente de Caixa (PDV)', cashControl: 'Controle de Caixa', customers: 'Gestão de Clientes', reports: 'Relatórios de Venda', inventory: 'Produtos', balance: 'Balanço de Estoque', incomes: 'Receitas', expenses: 'Despesas', financial: 'DRE / Resultado', settings: 'Configurações', serviceOrders: 'Ordens de Serviço', cardManagement: 'Cartões'
+    dashboard: 'Dashboard Analítico', pdv: 'Frente de Caixa (PDV)', cashControl: 'Controle de Caixa', customers: 'Gestão de Clientes', reports: 'Relatórios de Venda', inventory: 'Produtos / Catálogo', balance: 'Balanço de Estoque', incomes: 'Controle de Receitas', expenses: 'Controle de Despesas', financial: 'DRE / Resultado', settings: 'Configurações Sistema', serviceOrders: 'Ordens de Serviço (OS)', cardManagement: 'Gestão de Cartões'
   };
   return labels[key] || key;
 };
@@ -245,7 +240,7 @@ const getIconForModule = (key: string) => {
 };
 
 const TabButton: React.FC<{ active: boolean; onClick: () => void; icon: string; label: string }> = ({ active, onClick, icon, label }) => (
-  <button onClick={onClick} className={`flex items-center gap-2 px-6 py-4 border-b-2 transition-all whitespace-nowrap ${active ? 'border-primary text-primary font-black' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+  <button onClick={onClick} className={`flex items-center gap-2 px-6 py-4 border-b-2 transition-all whitespace-nowrap ${active ? 'border-primary text-primary font-black scale-105' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
     <span className="material-symbols-outlined text-lg">{icon}</span>
     <span className="text-xs uppercase font-bold tracking-widest">{label}</span>
   </button>
