@@ -50,105 +50,79 @@ const SalesInquiry: React.FC = () => {
     setShowVendorModal(false);
     setSelectedTransaction(null);
     if(viewingDetail?.id === selectedTransaction.id) {
-       const updated = { ...selectedTransaction, vendorId };
-       setViewingDetail(updated);
+       setViewingDetail({ ...selectedTransaction, vendorId });
     }
   };
 
   const handleUpdateCustomer = async (customerId: string) => {
     if (!selectedTransaction) return;
     const customer = customers.find(c => c.id === customerId);
-    const updatedTx = {
+    const updated = {
       ...selectedTransaction,
       clientId: customerId,
       client: customer?.name || 'Consumidor Final'
     };
-    await addTransaction(updatedTx);
+    await addTransaction(updated);
     setShowCustomerModal(false);
     setSelectedTransaction(null);
     if(viewingDetail?.id === selectedTransaction.id) {
-       setViewingDetail(updatedTx);
+       setViewingDetail(updated);
     }
-  };
-
-  // Helpers para buscar informações do banco
-  const getStoreData = (storeName: string) => {
-    return establishments.find(e => e.name === storeName) || { name: storeName, cnpj: '---' };
   };
 
   const getUserData = (userId?: string) => {
     return users.find(u => u.id === userId);
   };
 
-  const handlePrintDocument = (t: Transaction) => {
-    setSelectedTransaction(t);
+  const handlePrint = (t: Transaction) => {
     setViewingDetail(t);
-    setTimeout(() => window.print(), 100);
+    setTimeout(() => window.print(), 200);
   };
 
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-background-dark font-sans text-[11px] uppercase font-bold">
       
-      {/* ESPELHO DE IMPRESSÃO (Oculto em tela, visível apenas no papel) */}
-      <div id="print-document-area" className="hidden print:block p-8 bg-white text-black font-sans text-[10px]">
+      {/* ESPELHO DE IMPRESSÃO (Oculto em tela) */}
+      <div id="print-area" className="hidden print:block p-8 bg-white text-black font-sans text-[10px]">
          {viewingDetail && (
            <div className="space-y-6">
               <div className="flex justify-between border-b-2 border-black pb-4">
                  <div>
-                    <h1 className="text-xl font-black">DETALHE DO DOCUMENTO FISCAL (NFC-E)</h1>
+                    <h1 className="text-xl font-black">DETALHE DO DOCUMENTO FISCAL</h1>
                     <p>UNIDADE: {viewingDetail.store}</p>
                  </div>
                  <div className="text-right">
-                    <p className="font-bold">ID: {viewingDetail.id}</p>
-                    <p>EMISSÃO: {viewingDetail.date} 10:00</p>
+                    <p className="font-bold">DOC: {viewingDetail.id.split('-')[1] || viewingDetail.id}</p>
+                    <p>DATA: {viewingDetail.date} 10:00</p>
                  </div>
               </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                 <div className="border p-2"><p className="font-black text-[8px] uppercase">Cliente</p><p className="font-bold uppercase">{viewingDetail.client || 'CONSUMIDOR FINAL'}</p></div>
-                 <div className="border p-2"><p className="font-black text-[8px] uppercase">Vendedor</p><p className="font-bold uppercase">{getUserData(viewingDetail.vendorId)?.name || 'NÃO INFORMADO'}</p></div>
+              <div className="grid grid-cols-2 gap-4 border p-4">
+                 <div><p className="font-black text-[8px]">CLIENTE:</p><p>{viewingDetail.client || 'CONSUMIDOR FINAL'}</p></div>
+                 <div><p className="font-black text-[8px]">VENDEDOR:</p><p>{getUserData(viewingDetail.vendorId)?.name || 'BALCÃO'}</p></div>
               </div>
-
-              <table className="w-full border-collapse mt-4">
-                 <thead>
-                    <tr className="border-b-2 border-black text-left">
-                       <th className="py-1">SEQ</th>
-                       <th className="py-1">CÓDIGO</th>
-                       <th className="py-1">PRODUTO</th>
-                       <th className="py-1 text-right">QTD</th>
-                       <th className="py-1 text-right">UNIT</th>
-                       <th className="py-1 text-right">TOTAL</th>
-                    </tr>
-                 </thead>
-                 <tbody className="divide-y divide-gray-300">
+              <table className="w-full text-left mt-4 border-collapse">
+                 <thead><tr className="border-b-2 border-black"><th>PRODUTO</th><th className="text-right">QTD</th><th className="text-right">UNIT</th><th className="text-right">TOTAL</th></tr></thead>
+                 <tbody>
                     {viewingDetail.items?.map((item, i) => (
-                      <tr key={i}>
-                         <td className="py-1">{(i+1).toString().padStart(3, '0')}</td>
-                         <td className="py-1">{item.sku}</td>
-                         <td className="py-1 uppercase">{item.name}</td>
-                         <td className="py-1 text-right">{item.quantity.toFixed(2)}</td>
-                         <td className="py-1 text-right">R$ {item.salePrice.toLocaleString('pt-BR')}</td>
-                         <td className="py-1 text-right">R$ {(item.quantity * item.salePrice).toLocaleString('pt-BR')}</td>
+                      <tr key={i} className="border-b">
+                         <td className="py-2">{item.sku} - {item.name}</td>
+                         <td className="py-2 text-right">{item.quantity}</td>
+                         <td className="py-2 text-right">R$ {item.salePrice.toLocaleString('pt-BR')}</td>
+                         <td className="py-2 text-right">R$ {(item.quantity * item.salePrice).toLocaleString('pt-BR')}</td>
                       </tr>
                     ))}
                  </tbody>
                  <tfoot>
-                    <tr className="border-t-2 border-black font-black text-lg">
-                       <td colSpan={5} className="py-2 text-right">VALOR TOTAL DO DOCUMENTO:</td>
-                       <td className="py-2 text-right">R$ {viewingDetail.value.toLocaleString('pt-BR')}</td>
+                    <tr className="font-black text-lg">
+                       <td colSpan={3} className="pt-4 text-right">TOTAL DO DOCUMENTO:</td>
+                       <td className="pt-4 text-right">R$ {viewingDetail.value.toLocaleString('pt-BR')}</td>
                     </tr>
                  </tfoot>
               </table>
-
-              <div className="mt-8 grid grid-cols-2 gap-4 text-[8px] uppercase opacity-50">
-                 <div>OPERADOR: {getUserData(viewingDetail.cashierId)?.name || 'SISTEMA'}</div>
-                 <div className="text-right">GERADO EM: {new Date().toLocaleString()}</div>
-              </div>
            </div>
          )}
       </div>
 
-      {/* UI NORMAL (Oculta na impressão) */}
       <div className="print:hidden h-full flex flex-col">
         {/* HEADER AZUL PREMIUM */}
         <header className="bg-primary p-4 flex items-center justify-between text-white shadow-lg shrink-0">
@@ -166,18 +140,18 @@ const SalesInquiry: React.FC = () => {
           </div>
         </header>
 
-        {/* BARRA DE FILTROS */}
+        {/* FILTROS */}
         <div className="p-4 flex gap-2 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
           <button className="px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 flex items-center gap-2 text-slate-600">
               Filtro <span className="material-symbols-outlined text-sm">arrow_drop_down</span>
           </button>
           <div className="flex-1 max-w-xs relative ml-2">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">search</span>
-              <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="PESQUISAR DOCUMENTO OU CLIENTE..." className="w-full h-9 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded pl-10 text-[10px] outline-none focus:ring-1 focus:ring-primary/30" />
+              <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="PESQUISAR DOCUMENTO OU CLIENTE..." className="w-full h-9 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded pl-10 text-[10px] outline-none" />
           </div>
         </div>
 
-        {/* TABELA DE DOCUMENTOS */}
+        {/* TABELA */}
         <div className="flex-1 overflow-auto bg-white dark:bg-slate-900">
           <table className="w-full text-left border-collapse min-w-[1200px]">
             <thead className="bg-primary text-white sticky top-0 z-20">
@@ -195,18 +169,15 @@ const SalesInquiry: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {sales.map(s => (
-                <tr key={s.id} onClick={() => setViewingDetail(s)} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 divide-x divide-slate-100 dark:divide-slate-800 transition-colors cursor-pointer group">
-                  <td className="px-3 py-1.5 text-center">
-                    <div className="size-2.5 bg-blue-600 rounded-full mx-auto"></div>
-                  </td>
-                  <td className="px-3 py-1.5 relative" onClick={(e) => e.stopPropagation()}>
-                    <button onClick={() => setShowOptionsId(showOptionsId === s.id ? null : s.id)} className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-2 py-0.5 hover:bg-primary hover:text-white transition-all flex items-center justify-center">
+                <tr key={s.id} onClick={() => setViewingDetail(s)} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 divide-x transition-colors cursor-pointer">
+                  <td className="px-3 py-1.5 text-center"><div className="size-2.5 bg-blue-600 rounded-full mx-auto"></div></td>
+                  <td className="px-3 py-1.5 relative" onClick={e => e.stopPropagation()}>
+                    <button onClick={() => setShowOptionsId(showOptionsId === s.id ? null : s.id)} className="bg-slate-100 dark:bg-slate-800 border rounded px-2 py-0.5 hover:bg-primary hover:text-white transition-all">
                         <span className="material-symbols-outlined text-sm">list</span>
                     </button>
                     {showOptionsId === s.id && (
-                      <div className="absolute left-full top-0 ml-1 z-50 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-slate-700 rounded-lg py-2 w-56 text-[10px]">
-                          <p className="px-4 py-1 text-[9px] text-slate-400 font-black border-b mb-1 uppercase">Ações Disponíveis</p>
-                          <button onClick={() => { handlePrintDocument(s); setShowOptionsId(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"><span className="material-symbols-outlined text-sm">print</span> 01 - Imprimir</button>
+                      <div className="absolute left-full top-0 ml-1 z-50 bg-white dark:bg-slate-800 shadow-2xl border rounded-lg py-2 w-56 text-[10px]">
+                          <button onClick={() => { handlePrint(s); setShowOptionsId(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"><span className="material-symbols-outlined text-sm">print</span> 01 - Imprimir</button>
                           <button onClick={() => { setSelectedTransaction(s); setShowCustomerModal(true); setShowOptionsId(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"><span className="material-symbols-outlined text-sm">person_edit</span> 05 - Alterar Cliente</button>
                           <button onClick={() => { setSelectedTransaction(s); setShowVendorModal(true); setShowOptionsId(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"><span className="material-symbols-outlined text-sm">badge</span> 06 - Alterar Vendedor</button>
                       </div>
@@ -216,7 +187,7 @@ const SalesInquiry: React.FC = () => {
                   <td className="px-3 py-1.5 text-primary">{s.store}</td>
                   <td className="px-3 py-1.5 text-primary">{getUserData(s.vendorId)?.name.split(' ')[0] || '---'}</td>
                   <td className="px-3 py-1.5 text-slate-500">{s.date} 10:00</td>
-                  <td className="px-3 py-1.5"><span className="truncate max-w-[200px] uppercase">{s.client || 'Consumidor Final'}</span></td>
+                  <td className="px-3 py-1.5 uppercase truncate max-w-[200px]">{s.client || 'Consumidor Final'}</td>
                   <td className="px-3 py-1.5 text-right font-black tabular-nums">{s.items?.reduce((acc, i) => acc + i.quantity, 0).toFixed(2)}</td>
                   <td className="px-3 py-1.5 text-right font-black text-slate-900 dark:text-white tabular-nums">R$ {s.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                 </tr>
@@ -225,7 +196,7 @@ const SalesInquiry: React.FC = () => {
           </table>
         </div>
 
-        {/* RODAPÉ DE TOTAIS GERAL */}
+        {/* RODAPÉ */}
         <footer className="bg-slate-400 p-2 flex justify-between items-center text-slate-900 font-black shrink-0">
           <div className="flex items-center gap-4"><span className="text-[12px]">TOTAL GERAL PESQUISA</span></div>
           <div className="flex gap-10 pr-4">
@@ -235,93 +206,53 @@ const SalesInquiry: React.FC = () => {
         </footer>
       </div>
 
-      {/* MODAL DETALHE DO DOCUMENTO (Oculto na Impressão) */}
+      {/* MODAL DETALHADO */}
       {viewingDetail && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 p-4 animate-in fade-in print:hidden">
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 p-4 print:hidden animate-in fade-in">
            <div className="bg-slate-100 w-full max-w-[1200px] h-[90vh] rounded shadow-2xl flex flex-col overflow-hidden text-slate-700">
               <div className="bg-white p-3 border-b border-slate-300 flex items-center justify-between">
-                 <h2 className="text-sm font-bold flex items-center gap-2">
-                    Informações Gerais do Documento <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-[10px]">NFC</span>
-                 </h2>
+                 <h2 className="text-sm font-bold flex items-center gap-2">Informações Gerais do Documento <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-[10px]">NFC</span></h2>
                  <div className="flex items-center gap-2">
-                    <button onClick={() => handlePrintDocument(viewingDetail)} className="size-8 hover:bg-primary hover:text-white flex items-center justify-center rounded transition-all"><span className="material-symbols-outlined">print</span></button>
+                    <button onClick={() => window.print()} className="size-8 hover:bg-primary hover:text-white flex items-center justify-center rounded transition-all"><span className="material-symbols-outlined">print</span></button>
                     <button onClick={() => setViewingDetail(null)} className="size-8 hover:bg-rose-500 hover:text-white flex items-center justify-center rounded transition-all"><span className="material-symbols-outlined">close</span></button>
                  </div>
               </div>
-
               <div className="p-4 space-y-4 overflow-y-auto">
                  <div className="grid grid-cols-12 gap-2">
                     <div className="col-span-2"><DetailField label="ID:" value={viewingDetail.id.slice(-6)} /></div>
                     <div className="col-span-10"><DetailField label="LOJA:" value={viewingDetail.store} borderHighlight /></div>
                  </div>
-
                  <div className="grid grid-cols-12 gap-2">
                     <div className="col-span-10"><DetailField label="CLIENTE:" value={viewingDetail.client || 'Consumidor Final'} borderHighlight /></div>
                     <div className="col-span-2"><DetailField label="DATA EMISSÃO:" value={`${viewingDetail.date} 10:00`} borderHighlight /></div>
                  </div>
-
                  <div className="grid grid-cols-12 gap-2">
                     <div className="col-span-3"><DetailField label="REPRESENTANTE:" value="000275 - ALAGOAS" /></div>
-                    <div className="col-span-3"><DetailField label="VENDEDOR:" value={getUserData(viewingDetail.vendorId)?.name || 'NÃO INF.'} borderHighlight /></div>
-                    {/* Campos Caixa e Operador preenchidos com o colaborador que operou o PDV */}
-                    <div className="col-span-3"><DetailField label="CAIXA:" value={getUserData(viewingDetail.cashierId)?.name || 'CAIXA PDV 01'} borderHighlight /></div>
+                    <div className="col-span-3"><DetailField label="VENDEDOR:" value={getUserData(viewingDetail.vendorId)?.name || 'BALCÃO'} borderHighlight /></div>
+                    {/* MOSTRANDO O OPERADOR REAL QUE PASSOU A VENDA */}
+                    <div className="col-span-3"><DetailField label="CAIXA:" value={getUserData(viewingDetail.cashierId)?.name || 'SISTEMA'} borderHighlight /></div>
                     <div className="col-span-3"><DetailField label="OPERADOR:" value={getUserData(viewingDetail.cashierId)?.name || 'SISTEMA'} borderHighlight /></div>
                  </div>
-
                  <div className="bg-primary text-white flex items-center px-4 py-1.5 gap-8 mt-2">
-                    <button className="text-[10px] font-black border-b-2 border-white pb-0.5 uppercase">ITENS <span className="opacity-50 text-[8px] ml-1">ALT+1</span></button>
-                    <button className="text-[10px] font-black opacity-70 uppercase">FORMAS DE PAGAMENTO <span className="opacity-50 text-[8px] ml-1">ALT+2</span></button>
-                    <button className="text-[10px] font-black opacity-70 uppercase">DEVOLUÇÕES <span className="opacity-50 text-[8px] ml-1">ALT+3</span></button>
+                    <button className="text-[10px] font-black border-b-2 border-white pb-0.5">ITENS</button>
+                    <button className="text-[10px] font-black opacity-70">PAGAMENTO</button>
                  </div>
-
-                 <div className="bg-white border border-slate-300 flex flex-col min-h-[300px]">
-                    <div className="overflow-auto flex-1">
-                       <table className="w-full text-left border-collapse">
-                          <thead className="bg-primary text-white sticky top-0">
-                             <tr className="divide-x divide-white/20">
-                                <th className="px-2 py-1 w-10 text-center"><span className="material-symbols-outlined text-xs">settings</span></th>
-                                <th className="px-2 py-1 w-16">Opções</th>
-                                <th className="px-2 py-1 w-20">ID</th>
-                                <th className="px-2 py-1 w-10 text-center">Est.</th>
-                                <th className="px-2 py-1 w-10">Seq.</th>
-                                <th className="px-2 py-1 w-16">CFOP</th>
-                                <th className="px-2 py-1 w-16">Operação</th>
-                                <th className="px-2 py-1 w-32">Família</th>
-                                <th className="px-2 py-1">Produto</th>
-                                <th className="px-2 py-1 w-20 text-right">Qtd.</th>
-                                <th className="px-2 py-1 w-24 text-right">Vr. Unitário</th>
-                                <th className="px-2 py-1 w-24 text-right">Vr. Total</th>
-                             </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100 text-[10px]">
-                             {viewingDetail.items?.map((item, idx) => (
-                               <tr key={idx} className="hover:bg-slate-50 divide-x divide-slate-100">
-                                  <td className="px-2 py-1 text-center"><span className="size-1.5 bg-blue-600 rounded-full inline-block"></span></td>
-                                  <td className="px-2 py-1 text-center"><button className="bg-slate-100 border border-slate-200 px-1 rounded"><span className="material-symbols-outlined text-[12px]">list</span></button></td>
-                                  <td className="px-2 py-1 text-slate-400">{item.id.slice(-6)}</td>
-                                  <td className="px-2 py-1 text-center"><span className="material-symbols-outlined text-emerald-500 text-[14px]">check</span></td>
-                                  <td className="px-2 py-1 text-center">{(idx + 1).toString().padStart(3, '0')}</td>
-                                  <td className="px-2 py-1 text-blue-600 font-bold">5.102</td>
-                                  <td className="px-2 py-1 text-blue-600 font-bold">V27</td>
-                                  <td className="px-2 py-1 text-slate-400 uppercase">{item.category}</td>
-                                  <td className="px-2 py-1">
-                                     <span className="text-blue-600 font-black">{item.sku}</span> - <span className="uppercase">{item.name}</span>
-                                  </td>
-                                  <td className="px-2 py-1 text-right font-black tabular-nums">{item.quantity.toFixed(2)} KT</td>
-                                  <td className="px-2 py-1 text-right tabular-nums">R$ {item.salePrice.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
-                                  <td className="px-2 py-1 text-right font-black tabular-nums">R$ {(item.quantity * item.salePrice).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
-                               </tr>
-                             ))}
-                          </tbody>
-                       </table>
-                    </div>
-                    <div className="bg-slate-400 p-1 flex justify-between items-center text-slate-900 font-black text-[11px]">
-                       <span>TOTAL</span>
-                       <div className="flex gap-10 pr-2">
-                          <span>{viewingDetail.items?.reduce((acc, i) => acc + i.quantity, 0).toFixed(2).replace('.', ',')}</span>
-                          <span>R$ {viewingDetail.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                       </div>
-                    </div>
+                 <div className="bg-white border border-slate-300 flex-1 min-h-[300px]">
+                    <table className="w-full text-left text-[10px] border-collapse">
+                       <thead className="bg-primary text-white sticky top-0"><tr><th className="px-2 py-1">ID</th><th className="px-2 py-1">SKU</th><th>PRODUTO</th><th className="text-right">QTD</th><th className="text-right">VR. UNIT</th><th className="text-right">VR. TOTAL</th></tr></thead>
+                       <tbody className="divide-y">
+                          {viewingDetail.items?.map((item, idx) => (
+                            <tr key={idx} className="hover:bg-slate-50">
+                               <td className="px-2 py-1 text-slate-400">{item.id.slice(-6)}</td>
+                               <td className="px-2 py-1 font-bold">{item.sku}</td>
+                               <td className="px-2 py-1 uppercase">{item.name}</td>
+                               <td className="px-2 py-1 text-right font-black">{item.quantity}</td>
+                               <td className="px-2 py-1 text-right">R$ {item.salePrice.toLocaleString('pt-BR')}</td>
+                               <td className="px-2 py-1 text-right font-black">R$ {(item.quantity * item.salePrice).toLocaleString('pt-BR')}</td>
+                            </tr>
+                          ))}
+                       </tbody>
+                    </table>
                  </div>
               </div>
            </div>
@@ -362,17 +293,14 @@ const SalesInquiry: React.FC = () => {
       )}
 
       <style>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 20px; }
-
         @media print {
           body * { visibility: hidden !important; }
           #root { display: block !important; }
-          aside, header, main, nav, footer, .fixed, .backdrop-blur { display: none !important; opacity: 0 !important; }
-          #print-document-area, #print-document-area * { visibility: visible !important; display: block !important; }
-          #print-document-area { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 20px; background: white; }
+          #print-area, #print-area * { visibility: visible !important; display: block !important; }
+          #print-area { position: absolute !important; left: 0; top: 0; width: 100%; margin: 0; padding: 20px; background: white; color: black; }
+          aside, header, footer, .fixed, .backdrop-blur, .print\\:hidden { display: none !important; opacity: 0 !important; }
           table { width: 100% !important; border-collapse: collapse !important; }
-          th, td { border-bottom: 1px solid #ddd !important; padding: 4px !important; }
+          th, td { border-bottom: 1px solid #000 !important; padding: 4px !important; }
           @page { size: A4; margin: 10mm; }
         }
       `}</style>

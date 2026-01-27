@@ -58,7 +58,7 @@ interface AppContextType {
   deleteCardOperator: (id: string) => Promise<void>;
   saveCardBrand: (b: CardBrand) => Promise<void>;
   deleteCardBrand: (id: string) => Promise<void>;
-  processSale: (items: CartItem[], total: number, method: string, clientId?: string, vendorId?: string, shippingValue?: number, cardDetails?: { installments?: number; authNumber?: string; transactionSku?: string; cardOperatorId?: string; cardBrandId?: string }) => Promise<void>;
+  processSale: (items: CartItem[], total: number, method: string, clientId?: string, vendorId?: string, shippingValue?: number, cardDetails?: any) => Promise<void>;
   updateStock: (productId: string, quantity: number) => Promise<void>;
   bulkUpdateStock: (adjustments: Record<string, number>) => Promise<void>;
   refreshData: () => Promise<void>;
@@ -66,6 +66,7 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+// GARANTINDO QUE O CAIXA TENHA AS PERMISSÕES NECESSÁRIAS
 export const INITIAL_PERMS: Record<string, RolePermissions> = {
   [UserRole.ADMIN]: { dashboard: true, pdv: true, cashControl: true, customers: true, reports: true, inventory: true, balance: true, incomes: true, expenses: true, financial: true, settings: true, serviceOrders: true, cardManagement: true },
   [UserRole.MANAGER]: { dashboard: true, pdv: true, cashControl: true, customers: true, reports: true, inventory: true, balance: true, incomes: true, expenses: true, financial: true, settings: false, serviceOrders: true, cardManagement: true },
@@ -180,10 +181,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       headers: {'Content-Type': 'application/json'}, 
       body: JSON.stringify(p)
     }); 
-    if (!res.ok) {
-       const err = await res.json().catch(() => ({ error: 'Falha no servidor' }));
-       throw new Error(err.error || 'Erro ao salvar produto');
-    }
     await refreshData(); 
   };
 
@@ -231,7 +228,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       clientId,
       client: client?.name || 'Consumidor Final',
       vendorId,
-      cashierId: currentUser?.id, // Captura quem operou a venda
+      cashierId: currentUser?.id, // CAPTURA QUEM ESTAVA LOGADO NO CAIXA
       items,
       ...cardDetails
     };
