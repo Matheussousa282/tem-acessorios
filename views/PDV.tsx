@@ -136,10 +136,10 @@ const PDV: React.FC = () => {
   const handleFinalizeSale = async () => {
     if (cart.length === 0 || isFinalizing) return;
     
-    const isCard = (paymentMethod === 'Credito' || paymentMethod === 'Debito');
-    if (isCard) {
+    const isCardOrPixMaq = (paymentMethod === 'Credito' || paymentMethod === 'Debito' || paymentMethod === 'Pix Maquineta');
+    if (isCardOrPixMaq) {
        if (!selectedOperatorId || !selectedBrandId) {
-          alert("Selecione a Operadora e a Bandeira do cartão!");
+          alert("Selecione a Operadora e a Bandeira!");
           return;
        }
     }
@@ -152,7 +152,7 @@ const PDV: React.FC = () => {
       const operator = cardOperators.find(o => o.id === selectedOperatorId);
       const brand = cardBrands.find(b => b.id === selectedBrandId);
       
-      const cardDetails = isCard ? {
+      const cardDetails = isCardOrPixMaq ? {
         installments: cardInstallments,
         authNumber: cardAuthNumber,
         transactionSku: cardNsu,
@@ -598,7 +598,7 @@ const PDV: React.FC = () => {
 
       {showCheckout && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 print:hidden">
-           <div className={`bg-white dark:bg-slate-900 w-full rounded-[3.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 transition-all duration-500 ${(paymentMethod === 'Credito' || paymentMethod === 'Debito') ? 'max-w-4xl' : 'max-w-lg'}`}>
+           <div className={`bg-white dark:bg-slate-900 w-full rounded-[3.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 transition-all duration-500 ${(paymentMethod === 'Credito' || paymentMethod === 'Debito' || paymentMethod === 'Pix Maquineta') ? 'max-w-4xl' : 'max-w-lg'}`}>
               <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
                  <div><h3 className="text-2xl font-black uppercase tracking-tight">Finalização</h3><p className="text-[10px] font-black text-slate-400 uppercase">Selecione o meio de pagamento</p></div>
                  <button onClick={() => setShowCheckout(false)} className="size-12 bg-white dark:bg-slate-900 rounded-2xl flex items-center justify-center transition-all hover:bg-rose-500 hover:text-white shadow-sm"><span className="material-symbols-outlined">close</span></button>
@@ -607,10 +607,48 @@ const PDV: React.FC = () => {
                  <div className="flex-1 space-y-6">
                     <div className="grid grid-cols-2 gap-3">
                        {['Dinheiro', 'Pix', 'Debito', 'Credito'].map(m => (
-                         <button key={m} onClick={() => setPaymentMethod(m)} className={`p-6 rounded-[2rem] border-2 transition-all flex flex-col items-center gap-3 ${paymentMethod === m ? 'border-primary bg-primary/5 text-primary shadow-lg' : 'border-slate-100 dark:border-slate-800 text-slate-400 hover:border-primary/40'}`}>
-                           <span className="material-symbols-outlined text-3xl">{m === 'Dinheiro' ? 'payments' : m === 'Pix' ? 'qr_code_2' : 'credit_card'}</span>
-                           <span className="text-[11px] font-black uppercase tracking-widest">{m}</span>
-                         </button>
+                         <div key={m} className="relative group">
+                            <button 
+                              onClick={() => {
+                                if (m !== 'Pix') setPaymentMethod(m);
+                                else setPaymentMethod('Pix Online');
+                              }} 
+                              className={`w-full p-6 rounded-[2rem] border-2 transition-all flex flex-col items-center gap-3 ${
+                                (m === 'Dinheiro' && paymentMethod === 'Dinheiro') ||
+                                (m === 'Debito' && paymentMethod === 'Debito') ||
+                                (m === 'Credito' && paymentMethod === 'Credito') ||
+                                (m === 'Pix' && (paymentMethod === 'Pix Online' || paymentMethod === 'Pix Maquineta'))
+                                ? 'border-primary bg-primary/5 text-primary shadow-lg' 
+                                : 'border-slate-100 dark:border-slate-800 text-slate-400 hover:border-primary/40'
+                              }`}
+                            >
+                              <span className="material-symbols-outlined text-3xl">{m === 'Dinheiro' ? 'payments' : m === 'Pix' ? 'qr_code_2' : 'credit_card'}</span>
+                              <span className="text-[11px] font-black uppercase tracking-widest">{m}</span>
+                              {m === 'Pix' && (
+                                <div className="absolute top-1 right-1">
+                                  <span className="material-symbols-outlined text-xs animate-bounce opacity-50">expand_more</span>
+                                </div>
+                              )}
+                            </button>
+                            
+                            {/* SUB-MENU PIX */}
+                            {m === 'Pix' && (paymentMethod === 'Pix Online' || paymentMethod === 'Pix Maquineta') && (
+                              <div className="mt-2 grid grid-cols-2 gap-2 animate-in slide-in-from-top-2 duration-300">
+                                <button 
+                                  onClick={() => setPaymentMethod('Pix Online')}
+                                  className={`py-2 rounded-xl text-[8px] font-black uppercase border transition-all ${paymentMethod === 'Pix Online' ? 'bg-primary text-white border-primary shadow' : 'bg-white dark:bg-slate-800 text-slate-400 border-slate-100 dark:border-slate-700'}`}
+                                >
+                                  ONLINE
+                                </button>
+                                <button 
+                                  onClick={() => setPaymentMethod('Pix Maquineta')}
+                                  className={`py-2 rounded-xl text-[8px] font-black uppercase border transition-all ${paymentMethod === 'Pix Maquineta' ? 'bg-primary text-white border-primary shadow' : 'bg-white dark:bg-slate-800 text-slate-400 border-slate-100 dark:border-slate-700'}`}
+                                >
+                                  MAQUINETA
+                                </button>
+                              </div>
+                            )}
+                         </div>
                        ))}
                     </div>
                     <div className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl space-y-2">
@@ -620,12 +658,12 @@ const PDV: React.FC = () => {
                     </div>
                     <button disabled={isFinalizing} onClick={handleFinalizeSale} className="w-full h-20 bg-emerald-500 hover:bg-emerald-600 text-white rounded-[2rem] font-black text-sm uppercase shadow-2xl shadow-emerald-500/20 transition-all active:scale-95 flex items-center justify-center gap-4">{isFinalizing ? <span className="material-symbols-outlined animate-spin">sync</span> : null}{isFinalizing ? 'Processando...' : 'CONFIRMAR E FINALIZAR VENDA'}</button>
                  </div>
-                 {(paymentMethod === 'Credito' || paymentMethod === 'Debito') && (
+                 {(paymentMethod === 'Credito' || paymentMethod === 'Debito' || paymentMethod === 'Pix Maquineta') && (
                     <div className="flex-1 bg-slate-50 dark:bg-slate-800/40 p-8 rounded-[3rem] border border-slate-200 dark:border-slate-700 space-y-6 animate-in slide-in-from-right-10">
-                       <h4 className="text-[10px] font-black text-primary uppercase tracking-widest border-b border-primary/10 pb-4">Detalhes da Transação TEF/POS</h4>
+                       <h4 className="text-[10px] font-black text-primary uppercase tracking-widest border-b border-primary/10 pb-4">Detalhes da Transação {paymentMethod === 'Pix Maquineta' ? 'PIX' : 'CARTÃO'}</h4>
                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-1.5"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-2">Operadora (Adquirente)</label><select value={selectedOperatorId} onChange={e => { setSelectedOperatorId(e.target.value); setSelectedBrandId(''); }} className="w-full h-12 bg-white dark:bg-slate-800 border-none rounded-xl px-4 text-[10px] font-black uppercase shadow-sm"><option value="">Selecione...</option>{cardOperators.map(op => <option key={op.id} value={op.id}>{op.name}</option>)}</select></div>
-                          <div className="space-y-1.5"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-2">Bandeira</label><select value={selectedBrandId} onChange={e => setSelectedBrandId(e.target.value)} className="w-full h-12 bg-white dark:bg-slate-800 border-none rounded-xl px-4 text-[10px] font-black uppercase shadow-sm"><option value="">Selecione...</option>{filteredBrands.map(br => <option key={br.id} value={br.id}>{br.name}</option>)}</select></div>
+                          <div className="space-y-1.5"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-2">Operadora / Banco</label><select value={selectedOperatorId} onChange={e => { setSelectedOperatorId(e.target.value); setSelectedBrandId(''); }} className="w-full h-12 bg-white dark:bg-slate-800 border-none rounded-xl px-4 text-[10px] font-black uppercase shadow-sm"><option value="">Selecione...</option>{cardOperators.map(op => <option key={op.id} value={op.id}>{op.name}</option>)}</select></div>
+                          <div className="space-y-1.5"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-2">{paymentMethod === 'Pix Maquineta' ? 'Canal' : 'Bandeira'}</label><select value={selectedBrandId} onChange={e => setSelectedBrandId(e.target.value)} className="w-full h-12 bg-white dark:bg-slate-800 border-none rounded-xl px-4 text-[10px] font-black uppercase shadow-sm"><option value="">Selecione...</option>{filteredBrands.map(br => <option key={br.id} value={br.id}>{br.name}</option>)}</select></div>
                        </div>
                        <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-1.5"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-2">NSU / Comprovante</label><input value={cardNsu} onChange={e => setCardNsu(e.target.value)} placeholder="000000" className="w-full h-12 bg-white dark:bg-slate-800 border-none rounded-xl px-4 text-[10px] font-black uppercase shadow-sm" /></div>
