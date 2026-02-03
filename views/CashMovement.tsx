@@ -200,7 +200,7 @@ const CashMovement: React.FC = () => {
 
   if (viewingSession) {
     return (
-      <div className="p-6 space-y-6 animate-in slide-in-from-right-10 duration-500 pb-20 print:p-0">
+      <div className="p-6 space-y-6 animate-in slide-in-from-right-10 duration-500 pb-20">
         
         {/* RELATÓRIO DE IMPRESSÃO (ESTILO CUPOM ANALÍTICO) */}
         <div id="cash-report-print" className="hidden print:block bg-white text-black font-sans p-6 text-[10px] leading-tight w-full">
@@ -291,7 +291,7 @@ const CashMovement: React.FC = () => {
            <p className="mt-8 text-center opacity-40 text-[7px] uppercase font-black">TEM ACESSÓRIOS ERP - SISTEMA DE GESTÃO - {new Date().toLocaleString()}</p>
         </div>
 
-        {/* HEADER DETALHE (TELA - PRINT:HIDDEN) */}
+        {/* HEADER DETALHE (TELA) */}
         <div className="flex justify-between items-start bg-slate-50 dark:bg-slate-900/40 p-4 rounded-xl border border-slate-200 dark:border-slate-800 print:hidden">
            <div className="space-y-4">
               <h2 className="text-xl font-black text-slate-800 dark:text-white uppercase flex items-center gap-2">
@@ -312,7 +312,7 @@ const CashMovement: React.FC = () => {
            </div>
         </div>
 
-        {/* CORPO DO DETALHE (TELA - PRINT:HIDDEN) */}
+        {/* CORPO DO DETALHE (TELA) */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm flex flex-col min-h-[500px] print:hidden">
            <div className="flex border-b border-slate-100 dark:border-slate-800 p-2 gap-1 bg-slate-50/50">
               <button onClick={() => setActiveTab('lançamentos')} className={`px-6 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${activeTab === 'lançamentos' ? 'bg-primary text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>Detalhamento de Vendas e Lançamentos</button>
@@ -380,7 +380,7 @@ const CashMovement: React.FC = () => {
            )}
         </div>
 
-        {/* RODAPÉ DE RESUMO (TELA - PRINT:HIDDEN) */}
+        {/* RODAPÉ DE RESUMO (TELA) */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 print:hidden">
            <div className="bg-slate-900 text-white p-4 rounded-2xl flex flex-col items-center shadow-lg">
               <span className="text-[10px] font-black uppercase text-slate-400">Saldo Anterior:</span>
@@ -402,32 +402,44 @@ const CashMovement: React.FC = () => {
 
         <style>{`
           @media print {
-            /* 1. Esconde absolutamente tudo que é UI do sistema */
+            /* 1. Ocultar TUDO por padrão */
             body * { visibility: hidden !important; }
-            #root, #root * { visibility: hidden !important; }
-            aside, header, nav, footer, .print\\:hidden { display: none !important; }
             
-            /* 2. Força o container do relatório a aparecer no topo */
+            /* 2. Reseta o display do root e containers pais para não ocuparem espaço */
+            #root, #root > div, main, .flex-1 { 
+              visibility: hidden !important;
+              display: block !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              height: auto !important;
+              overflow: visible !important;
+            }
+
+            /* 3. Oculta explicitamente Sidebar, Header e botões de interface */
+            aside, header, nav, footer, .print\\:hidden, button { 
+              display: none !important; 
+            }
+
+            /* 4. Torna o relatório visível e o força para o topo da página */
             #cash-report-print, #cash-report-print * { 
               visibility: visible !important; 
               display: block !important; 
             }
-            
+
             #cash-report-print {
-              position: fixed !important;
+              position: absolute !important;
               left: 0 !important;
               top: 0 !important;
-              width: 100vw !important;
-              height: 100vh !important;
+              width: 100% !important;
+              margin: 0 !important;
+              padding: 15mm !important;
               background: white !important;
               color: black !important;
-              margin: 0 !important;
-              padding: 10mm !important;
-              z-index: 99999 !important;
               border: none !important;
+              box-shadow: none !important;
             }
 
-            /* 3. Garante que as tabelas ocupem a largura total e fiquem legíveis */
+            /* Ajustes finos de tabela para impressão */
             #cash-report-print table { 
               width: 100% !important; 
               border: 1px solid #333 !important; 
@@ -441,9 +453,13 @@ const CashMovement: React.FC = () => {
             }
             #cash-report-print th { background-color: #f0f0f0 !important; }
 
-            /* 4. Reseta cores de fundo para economizar tinta e manter contraste */
-            #cash-report-print .bg-black { background-color: #000 !important; color: #fff !important; -webkit-print-color-adjust: exact; }
-            #cash-report-print .bg-slate-900 { background-color: #222 !important; color: #fff !important; -webkit-print-color-adjust: exact; }
+            /* Manter as barras pretas de totalizadores */
+            #cash-report-print .bg-black { 
+              background-color: #000 !important; 
+              color: #fff !important; 
+              -webkit-print-color-adjust: exact; 
+              print-color-adjust: exact;
+            }
 
             @page { 
               size: A4 portrait; 
