@@ -20,7 +20,7 @@ const SalesInquiry: React.FC = () => {
   const [showVendorModal, setShowVendorModal] = useState(false);
   const [showCustomerModal, setShowCustomerModal] = useState(false);
 
-  const isAdmin = currentUser?.role === UserRole.ADMIN;
+  const isAdmin = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.MANAGER;
   const currentStore = establishments.find(e => e.id === currentUser?.storeId);
 
   // Filtragem das Vendas
@@ -59,22 +59,38 @@ const SalesInquiry: React.FC = () => {
 
   const handleReprint = (sale: Transaction) => {
      setSelectedTransaction(sale);
-     setTimeout(() => window.print(), 100);
+     setTimeout(() => {
+       window.print();
+       // Limpa seleção após impressão para evitar conflitos visuais
+       setTimeout(() => setSelectedTransaction(null), 500);
+     }, 100);
   };
 
   const handleUpdateVendor = async (vendorId: string) => {
     if (!selectedTransaction) return;
-    await addTransaction({ ...selectedTransaction, vendorId });
-    setShowVendorModal(false);
-    setSelectedTransaction(null);
+    try {
+      await addTransaction({ ...selectedTransaction, vendorId });
+      setShowVendorModal(false);
+      setSelectedTransaction(null);
+    } catch (e) {
+      alert("Erro ao atualizar vendedor.");
+    }
   };
 
   const handleUpdateCustomer = async (customerId: string) => {
     if (!selectedTransaction) return;
     const customer = customers.find(c => c.id === customerId);
-    await addTransaction({ ...selectedTransaction, clientId: customerId, client: customer?.name || 'Consumidor Final' });
-    setShowCustomerModal(false);
-    setSelectedTransaction(null);
+    try {
+      await addTransaction({ 
+        ...selectedTransaction, 
+        clientId: customerId, 
+        client: customer?.name || 'Consumidor Final' 
+      });
+      setShowCustomerModal(false);
+      setSelectedTransaction(null);
+    } catch (e) {
+      alert("Erro ao atualizar cliente.");
+    }
   };
 
   return (
@@ -210,6 +226,75 @@ const SalesInquiry: React.FC = () => {
                           {(viewingDetail.cardOperatorId) && (<div className="grid grid-cols-4 gap-4"><div className="bg-white p-3 rounded border"><p className="text-[8px] text-slate-400">OPERADORA</p><p className="text-[10px] font-bold">{getCardInfo(viewingDetail.cardOperatorId, viewingDetail.cardBrandId).operator}</p></div><div className="bg-white p-3 rounded border"><p className="text-[8px] text-slate-400">BANDEIRA</p><p className="text-[10px] font-bold">{getCardInfo(viewingDetail.cardOperatorId, viewingDetail.cardBrandId).brand}</p></div><div className="bg-white p-3 rounded border"><p className="text-[8px] text-slate-400">NSU / AUTH</p><p className="text-[10px] font-bold">{viewingDetail.transactionSku || viewingDetail.authNumber || '---'}</p></div></div>)}
                        </div>
                     )}
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL ALTERAR VENDEDOR */}
+      {showVendorModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-in fade-in">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+              <div className="p-6 bg-primary text-white flex justify-between items-center font-black">
+                 <h3 className="text-lg uppercase">Alterar Vendedor</h3>
+                 <button onClick={() => setShowVendorModal(false)}><span className="material-symbols-outlined">close</span></button>
+              </div>
+              <div className="p-8 space-y-4">
+                 <p className="text-[10px] text-slate-400 font-black uppercase mb-4 tracking-widest px-2">Selecione o novo vendedor para o documento {selectedTransaction?.id.slice(-6)}:</p>
+                 <div className="space-y-2 max-h-96 overflow-y-auto custom-scrollbar pr-2">
+                    {users.filter(u => u.active && (isAdmin || u.storeId === currentUser?.storeId)).map(v => (
+                       <button 
+                         key={v.id} 
+                         onClick={() => handleUpdateVendor(v.id)}
+                         className={`w-full p-4 rounded-2xl flex items-center justify-between group transition-all ${selectedTransaction?.vendorId === v.id ? 'bg-primary text-white' : 'bg-slate-50 dark:bg-slate-800 hover:bg-primary/10'}`}
+                       >
+                          <span className={`text-xs font-black uppercase ${selectedTransaction?.vendorId === v.id ? 'text-white' : 'text-slate-700 dark:text-slate-200'}`}>{v.name}</span>
+                          <span className="material-symbols-outlined opacity-0 group-hover:opacity-100 transition-opacity">check_circle</span>
+                       </button>
+                    ))}
+                    <button 
+                      onClick={() => handleUpdateVendor('')}
+                      className="w-full p-4 rounded-2xl bg-slate-100 dark:bg-slate-700 text-slate-400 text-xs font-black uppercase hover:bg-rose-500 hover:text-white transition-all text-center"
+                    >
+                       Limpar Vendedor (Balcão)
+                    </button>
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL ALTERAR CLIENTE */}
+      {showCustomerModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-in fade-in">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+              <div className="p-6 bg-primary text-white flex justify-between items-center font-black">
+                 <h3 className="text-lg uppercase">Alterar Cliente</h3>
+                 <button onClick={() => setShowCustomerModal(false)}><span className="material-symbols-outlined">close</span></button>
+              </div>
+              <div className="p-8 space-y-4">
+                 <div className="relative mb-6">
+                    <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+                    <input autoFocus placeholder="BUSCAR CLIENTE PELO NOME..." className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl pl-12 pr-6 text-xs font-black uppercase outline-none focus:ring-2 focus:ring-primary/20" />
+                 </div>
+                 <div className="space-y-2 max-h-96 overflow-y-auto custom-scrollbar pr-2">
+                    {customers.map(c => (
+                       <button 
+                         key={c.id} 
+                         onClick={() => handleUpdateCustomer(c.id)}
+                         className={`w-full p-5 rounded-2xl flex flex-col text-left group transition-all ${selectedTransaction?.clientId === c.id ? 'bg-primary text-white' : 'bg-slate-50 dark:bg-slate-800 hover:bg-primary/10'}`}
+                       >
+                          <span className={`text-sm font-black uppercase ${selectedTransaction?.clientId === c.id ? 'text-white' : 'text-slate-800 dark:text-slate-200'}`}>{c.name}</span>
+                          <span className={`text-[10px] font-bold ${selectedTransaction?.clientId === c.id ? 'text-white/60' : 'text-slate-400'}`}>{c.cpfCnpj || 'DOCUMENTO NÃO CADASTRADO'}</span>
+                       </button>
+                    ))}
+                    <button 
+                      onClick={() => handleUpdateCustomer('')}
+                      className="w-full p-4 rounded-2xl bg-slate-100 dark:bg-slate-700 text-slate-400 text-xs font-black uppercase hover:bg-rose-500 hover:text-white transition-all text-center"
+                    >
+                       Consumidor Final (Sem Cadastro)
+                    </button>
                  </div>
               </div>
            </div>
