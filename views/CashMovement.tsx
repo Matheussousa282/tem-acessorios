@@ -202,7 +202,7 @@ const CashMovement: React.FC = () => {
     return (
       <div className="p-6 space-y-6 animate-in slide-in-from-right-10 duration-500 pb-20">
         
-        {/* RELATÓRIO DE IMPRESSÃO (DETALHADO) */}
+        {/* RELATÓRIO DE IMPRESSÃO (DETALHADO E ANALÍTICO) */}
         <div id="cash-report-print" className="hidden print:block bg-white text-black font-sans p-6 text-[10px] leading-tight">
            <div className="border-b border-slate-300 pb-2 mb-4">
               <h1 className="font-black uppercase text-[11px] mb-1">DADOS DO MOVIMENTO DE CAIXA</h1>
@@ -508,11 +508,32 @@ const CashMovement: React.FC = () => {
 
       <style>{`
         @media print {
+          /* Esconde absolutamente tudo da UI */
           body * { visibility: hidden !important; }
-          #root { display: none !important; }
-          #cash-report-print, #cash-report-print * { visibility: visible !important; }
-          #cash-report-print { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; display: block !important; background: white !important; color: black !important; }
-          @page { size: auto; margin: 10mm; }
+          /* Garante que o root não mate o render */
+          #root { display: block !important; }
+          /* Esconde menus específicos se ainda estiverem visíveis */
+          aside, header, footer, nav, .print\\:hidden, div[class*="fixed"], div[class*="backdrop-blur"] { 
+            display: none !important; 
+            opacity: 0 !important;
+          }
+          /* Mostra apenas a área do relatório e seus filhos */
+          #cash-report-print, #cash-report-print * { 
+            visibility: visible !important; 
+            display: block !important;
+          }
+          /* Posiciona o relatório no topo para a impressora térmica ou PDF */
+          #cash-report-print { 
+            position: absolute !important; 
+            left: 0 !important; 
+            top: 0 !important; 
+            width: 100% !important; 
+            background: white !important; 
+            color: black !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          @page { size: auto; margin: 0mm; }
         }
       `}</style>
     </div>
