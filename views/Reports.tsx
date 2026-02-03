@@ -147,23 +147,23 @@ const Reports: React.FC = () => {
   };
 
   return (
-    <div className="p-8 space-y-8 animate-in fade-in duration-500 bg-[#0f172a] min-h-screen text-slate-100 print:bg-white print:text-black print:p-4">
+    <div className="p-8 space-y-8 animate-in fade-in duration-500 bg-[#0f172a] min-h-screen text-slate-100 print:bg-white print:text-black print:p-0">
       
       {/* HEADER DINÂMICO COM HUB TOGGLE */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 print:hidden">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 print:block">
         <div className="flex items-center gap-4">
-          <button onClick={() => setShowHub(!showHub)} className="size-14 bg-white/10 hover:bg-primary text-white rounded-2xl flex items-center justify-center transition-all shadow-xl">
+          <button onClick={() => setShowHub(!showHub)} className="size-14 bg-white/10 hover:bg-primary text-white rounded-2xl flex items-center justify-center transition-all shadow-xl print:hidden">
              <span className="material-symbols-outlined text-3xl">{showHub ? 'close' : 'apps'}</span>
           </button>
           <div>
-            <h2 className="text-4xl font-black uppercase tracking-tighter text-white">
+            <h2 className="text-4xl font-black uppercase tracking-tighter text-white print:text-black print:text-2xl">
               {reportOptions.find(o => o.id === reportType)?.label || 'Relatórios de Gestão'}
             </h2>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Inteligência Comercial e Performance</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest print:text-slate-600">Inteligência Comercial e Performance • {new Date().toLocaleDateString()}</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 bg-slate-900/80 p-2 rounded-2xl border border-slate-800 shadow-2xl">
+        <div className="flex items-center gap-2 bg-slate-900/80 p-2 rounded-2xl border border-slate-800 shadow-2xl print:hidden">
            <div className="flex items-center px-4 border-r border-slate-800">
               <span className="material-symbols-outlined text-slate-500 mr-2 text-sm">calendar_month</span>
               <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-transparent border-none text-[10px] font-black text-white uppercase focus:ring-0" />
@@ -209,44 +209,44 @@ const Reports: React.FC = () => {
       </div>
 
       {/* TABELA DE RESULTADOS */}
-      <div className="bg-[#1e293b] rounded-[2.5rem] border border-slate-800 overflow-hidden shadow-2xl print:border-none">
+      <div className="bg-[#1e293b] rounded-[2.5rem] border border-slate-800 overflow-hidden shadow-2xl print:bg-white print:border-slate-200 print:shadow-none print:rounded-none">
          <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="bg-slate-800 border-b border-slate-700">
+                <tr className="bg-slate-800 border-b border-slate-700 print:bg-slate-100 print:border-slate-300">
                   {getHeaders().map((h, i) => (
-                    <th key={i} className={`px-8 py-5 text-[10px] font-black uppercase text-slate-400 tracking-widest ${i === 5 ? 'text-right' : ''}`}>
+                    <th key={i} className={`px-8 py-5 text-[10px] font-black uppercase text-slate-400 tracking-widest print:text-slate-700 ${i === 5 ? 'text-right' : ''}`}>
                       {h}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/50">
+              <tbody className="divide-y divide-slate-800/50 print:divide-slate-200">
                 {displayData.map((row: any, idx: number) => (
-                  <tr key={idx} className="hover:bg-slate-800/40 uppercase text-[10px] font-bold transition-colors">
-                    <td className="px-8 py-4 text-slate-500 whitespace-nowrap">{row.col1}</td>
-                    <td className="px-8 py-4 text-primary whitespace-nowrap">{row.col2}</td>
-                    <td className="px-8 py-4 text-white truncate max-w-[300px]">{row.col3}</td>
-                    <td className="px-8 py-4 text-slate-400">{row.col4}</td>
+                  <tr key={idx} className="hover:bg-slate-800/40 uppercase text-[10px] font-bold transition-colors print:hover:bg-transparent">
+                    <td className="px-8 py-4 text-slate-500 whitespace-nowrap print:text-slate-600">{row.col1}</td>
+                    <td className="px-8 py-4 text-primary whitespace-nowrap print:text-black">{row.col2}</td>
+                    <td className="px-8 py-4 text-white truncate max-w-[300px] print:text-black">{row.col3}</td>
+                    <td className="px-8 py-4 text-slate-400 print:text-slate-700">{row.col4}</td>
                     <td className="px-8 py-4">
                        <span className={`px-3 py-1 rounded-lg ${row.profit && row.profit > 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-slate-700 text-slate-400'}`}>
                           {row.col5}
                        </span>
                     </td>
-                    <td className="px-8 py-4 text-right font-black text-white tabular-nums">
+                    <td className="px-8 py-4 text-right font-black text-white tabular-nums print:text-black">
                       R$ {row.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
                     </td>
                   </tr>
                 ))}
                 {displayData.length === 0 && (
-                  <tr><td colSpan={6} className="px-8 py-32 text-center opacity-20 font-black tracking-[0.5em] text-sm">NENHUM REGISTRO ANALÍTICO LOCALIZADO</td></tr>
+                  <tr><td colSpan={6} className="px-8 py-32 text-center opacity-20 font-black tracking-[0.5em] text-sm print:opacity-100 print:text-slate-300">NENHUM REGISTRO ANALÍTICO LOCALIZADO</td></tr>
                 )}
               </tbody>
               {displayData.length > 0 && (
-                <tfoot className="bg-slate-800/30 border-t border-slate-700">
+                <tfoot className="bg-slate-800/30 border-t border-slate-700 print:bg-slate-50 print:border-slate-300">
                    <tr>
-                      <td colSpan={5} className="px-8 py-8 text-[11px] font-black uppercase text-slate-400 text-right tracking-widest">SUBTOTAL CONSOLIDADO:</td>
-                      <td className="px-8 py-8 text-right text-2xl font-black text-primary tabular-nums">R$ {totalRevenue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                      <td colSpan={5} className="px-8 py-8 text-[11px] font-black uppercase text-slate-400 text-right tracking-widest print:text-slate-600">SUBTOTAL CONSOLIDADO:</td>
+                      <td className="px-8 py-8 text-right text-2xl font-black text-primary tabular-nums print:text-black">R$ {totalRevenue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                    </tr>
                 </tfoot>
               )}
@@ -256,14 +256,77 @@ const Reports: React.FC = () => {
 
       <style>{`
         @media print {
-          body { background: white !important; color: black !important; }
-          .print\\:hidden { display: none !important; }
-          .bg-[#1e293b], .bg-[#0f172a] { background: white !important; border: 1px solid #ddd !important; }
-          .text-white, .text-slate-100 { color: black !important; }
-          table { border-collapse: collapse !important; width: 100% !important; }
-          th, td { border-bottom: 1px solid #eee !important; color: black !important; padding: 10px !important; }
-          @page { size: A4 landscape; margin: 10mm; }
+          /* OCULTA TODOS OS ELEMENTOS DA UI GLOBAL */
+          aside, header, footer, .print\\:hidden, button, nav { 
+            display: none !important; 
+          }
+          
+          /* RESET DO CONTAINER PRINCIPAL */
+          main { 
+            margin: 0 !important; 
+            padding: 0 !important; 
+            display: block !important; 
+          }
+          
+          #root { 
+            display: block !important; 
+            width: 100% !important; 
+          }
+          
+          body { 
+            background: white !important; 
+            color: black !important; 
+            margin: 0 !important; 
+            padding: 20px !important;
+          }
+
+          /* CONVERSÃO DE CORES DARK PARA PRINT */
+          .bg-\\[\\#0f172a\\], .bg-\\[\\#1e293b\\], .bg-slate-900, .bg-slate-800 { 
+            background: white !important; 
+            border: 1px solid #eee !important;
+            color: black !important;
+          }
+
+          .text-white, .text-slate-100, .text-slate-400, .text-primary { 
+            color: black !important; 
+          }
+
+          /* ESTILO DA TABELA */
+          table { 
+            border-collapse: collapse !important; 
+            width: 100% !important; 
+            margin-top: 20px;
+          }
+          
+          th { 
+            background-color: #f8fafc !important;
+            color: #475569 !important;
+            border-bottom: 2px solid #e2e8f0 !important;
+          }
+          
+          td { 
+            border-bottom: 1px solid #f1f5f9 !important; 
+            color: black !important; 
+            padding: 10px !important; 
+          }
+          
+          tfoot td {
+            border-top: 2px solid black !important;
+          }
+
+          /* AJUSTE DOS CARDS DE MÉTRICA */
+          div[class*="MetricCard"], .MetricCard {
+            border: 1px solid #ddd !important;
+            box-shadow: none !important;
+            background: #fff !important;
+          }
+
+          @page { 
+            size: A4 landscape; 
+            margin: 10mm; 
+          }
         }
+        
         ::-webkit-scrollbar { width: 5px; height: 5px; }
         ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
       `}</style>
@@ -272,13 +335,13 @@ const Reports: React.FC = () => {
 };
 
 const MetricCard = ({ title, value, icon, color }: any) => (
-  <div className="bg-[#1e293b] p-6 rounded-[2rem] border border-slate-800 flex items-center gap-6 hover:border-primary/40 transition-all shadow-lg group">
-     <div className={`size-14 rounded-2xl bg-slate-900 flex items-center justify-center ${color} shadow-inner group-hover:scale-110 transition-transform`}>
+  <div className="bg-[#1e293b] p-6 rounded-[2rem] border border-slate-800 flex items-center gap-6 hover:border-primary/40 transition-all shadow-lg group print:bg-white print:border-slate-200 print:shadow-none">
+     <div className={`size-14 rounded-2xl bg-slate-900 flex items-center justify-center ${color} shadow-inner group-hover:scale-110 transition-transform print:bg-slate-100 print:text-black`}>
         <span className="material-symbols-outlined text-3xl">{icon}</span>
      </div>
      <div>
-        <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">{title}</p>
-        <p className="text-2xl font-black text-white tabular-nums tracking-tighter">{value}</p>
+        <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 print:text-slate-600">{title}</p>
+        <p className="text-2xl font-black text-white tabular-nums tracking-tighter print:text-black">{value}</p>
      </div>
   </div>
 );
