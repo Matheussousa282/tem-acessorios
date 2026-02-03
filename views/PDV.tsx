@@ -70,7 +70,6 @@ const PDV: React.FC = () => {
   const [tempItemPrice, setTempItemPrice] = useState(0);
 
   const [returnSearchTerm, setReturnSearchTerm] = useState('');
-  const [selectedReturnSale, setSelectedReturnSale] = useState<Transaction | null>(null);
 
   const [activeCustomerTab, setActiveCustomerTab] = useState<'basic' | 'address'>('basic');
   const initialCustomerForm: Omit<Customer, 'id'> = { 
@@ -97,6 +96,20 @@ const PDV: React.FC = () => {
       return matchesSearch && matchesCategory;
     });
   }, [search, category, products]);
+
+  const inquiryResults = useMemo(() => {
+    if (!priceInquirySearch) return [];
+    return products.filter(p => 
+      p.name.toLowerCase().includes(priceInquirySearch.toLowerCase()) || 
+      p.sku.toLowerCase().includes(priceInquirySearch.toLowerCase()) || 
+      p.barcode?.includes(priceInquirySearch)
+    ).slice(0, 5);
+  }, [priceInquirySearch, products]);
+
+  const cancelCandidate = useMemo(() => {
+    if (!cancelSearchId) return null;
+    return transactions.find(t => t.id === cancelSearchId || t.id.endsWith(cancelSearchId));
+  }, [cancelSearchId, transactions]);
 
   const vendors = useMemo(() => {
     return users.filter(u => (u.role === UserRole.VENDOR || u.role === UserRole.ADMIN || u.role === UserRole.MANAGER) && (isAdmin || u.storeId === currentUser?.storeId));
@@ -221,16 +234,6 @@ const PDV: React.FC = () => {
     setShowOSModal(false);
     setSuccessType('OS');
     setShowSuccessModal(true);
-  };
-
-  const handleSaveCustomer = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const newId = `c-${Date.now()}`;
-    await addCustomer({ ...customerForm, id: newId });
-    setSelectedCustomerId(newId);
-    setShowCustomerModal(false);
-    setCustomerForm(initialCustomerForm);
-    setActiveCustomerTab('basic');
   };
 
   const processSaleCancellation = async (sale: Transaction) => {
@@ -455,7 +458,116 @@ const PDV: React.FC = () => {
         </aside>
       </main>
 
-      {/* MODAIS: Edição Item, Desconto Global e Checkout */}
+      {/* MODAL: Consulta de Preço */}
+      {showPriceInquiry && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 animate-in fade-in">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+              <div className="p-8 bg-slate-900 text-white flex justify-between items-center">
+                 <div><h3 className="text-2xl font-black uppercase tracking-tight">CONSULTA DE PREÇO</h3><p className="text-[10px] font-bold text-slate-400 uppercase mt-1">Busca rápida de valores e estoque</p></div>
+                 <button onClick={() => { setPriceInquirySearch(''); setShowPriceInquiry(false); }} className="material-symbols-outlined text-4xl">close</button>
+              </div>
+              <div className="p-10 space-y-8">
+                 <div className="relative">
+                    <span className="material-symbols-outlined absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 text-3xl">search</span>
+                    <input autoFocus value={priceInquirySearch} onChange={e => setPriceInquirySearch(e.target.value)} placeholder="NOME DO PRODUTO OU SKU..." className="w-full h-20 bg-slate-50 dark:bg-slate-800 border-none rounded-[1.5rem] pl-20 pr-6 text-2xl font-black text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-primary/10 transition-all uppercase" />
+                 </div>
+                 <div className="space-y-4">
+                    {inquiryResults.map(p => (
+                       <div key={p.id} className="flex items-center gap-6 p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 animate-in slide-in-from-bottom-2">
+                          <img src={p.image} className="size-20 rounded-2xl object-cover" />
+                          <div className="flex-1">
+                             <h4 className="text-lg font-black uppercase text-slate-900 dark:text-white leading-tight">{p.name}</h4>
+                             <p className="text-xs font-bold text-slate-400 mt-1 uppercase">SKU: {p.sku} | ESTOQUE: {p.stock} UN</p>
+                          </div>
+                          <div className="text-right">
+                             <p className="text-[10px] font-black text-slate-400 uppercase">Preço Venda</p>
+                             <p className="text-4xl font-black text-primary tabular-nums">R$ {p.salePrice.toLocaleString('pt-BR')}</p>
+                          </div>
+                       </div>
+                    ))}
+                    {priceInquirySearch && inquiryResults.length === 0 && (
+                       <div className="py-20 text-center opacity-30 uppercase font-black">Nenhum produto localizado</div>
+                    )}
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL: Cancelamento */}
+      {showCancelModal && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 animate-in fade-in">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+              <div className="p-8 bg-rose-600 text-white flex justify-between items-center">
+                 <div><h3 className="text-2xl font-black uppercase tracking-tight">CANCELAR DOCUMENTO</h3><p className="text-[10px] font-bold text-white/70 uppercase mt-1">Busca por número de venda</p></div>
+                 <button onClick={() => setShowCancelModal(false)} className="material-symbols-outlined text-4xl">close</button>
+              </div>
+              <div className="p-10 space-y-8">
+                 <input autoFocus value={cancelSearchId} onChange={e => setCancelSearchId(e.target.value)} placeholder="DIGITE O ID DA VENDA (Ex: SALE-1234)" className="w-full h-16 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-xl font-black text-rose-600 placeholder:text-rose-200 outline-none focus:ring-4 focus:ring-rose-500/10 transition-all uppercase" />
+                 
+                 {cancelCandidate ? (
+                    <div className="space-y-6 animate-in zoom-in-95">
+                       <div className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 space-y-4">
+                          <div className="flex justify-between items-start">
+                             <div><p className="text-[10px] font-black text-slate-400 uppercase">Documento</p><p className="text-lg font-black">{cancelCandidate.id}</p></div>
+                             <div className="text-right"><p className="text-[10px] font-black text-slate-400 uppercase">Data</p><p className="text-lg font-black">{cancelCandidate.date}</p></div>
+                          </div>
+                          <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
+                             <p className="text-[10px] font-black text-slate-400 uppercase mb-2">Itens do Documento</p>
+                             <div className="space-y-2 max-h-40 overflow-y-auto">
+                                {cancelCandidate.items?.map((it, i) => (
+                                   <div key={i} className="flex justify-between text-xs font-bold uppercase"><span className="truncate">{it.name}</span><span>{it.quantity} UN</span></div>
+                                ))}
+                             </div>
+                          </div>
+                          <div className="border-t border-slate-200 dark:border-slate-700 pt-4 flex justify-between items-center">
+                             <span className="text-sm font-black uppercase">Valor Estorno</span>
+                             <span className="text-2xl font-black text-rose-600">R$ {cancelCandidate.value.toLocaleString('pt-BR')}</span>
+                          </div>
+                       </div>
+                       <button onClick={() => processSaleCancellation(cancelCandidate)} className="w-full h-20 bg-rose-600 text-white rounded-[2rem] font-black text-sm uppercase shadow-2xl shadow-rose-500/20 transition-all active:scale-95 flex items-center justify-center gap-4">CONFIRMAR ESTORNO INTEGRAL</button>
+                    </div>
+                 ) : cancelSearchId && (
+                    <div className="py-10 text-center opacity-30 uppercase font-black">Venda não localizada no sistema</div>
+                 )}
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL: Trocas (Simples) */}
+      {showReturnsModal && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 animate-in fade-in">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+              <div className="p-8 bg-amber-500 text-white flex justify-between items-center">
+                 <div><h3 className="text-2xl font-black uppercase tracking-tight">CENTRAL DE TROCAS</h3><p className="text-[10px] font-bold text-white/70 uppercase mt-1">Busca por cliente ou documento</p></div>
+                 <button onClick={() => setShowReturnsModal(false)} className="material-symbols-outlined text-4xl">close</button>
+              </div>
+              <div className="p-10 space-y-6">
+                 <input autoFocus value={returnSearchTerm} onChange={e => setReturnSearchTerm(e.target.value)} placeholder="PESQUISAR CLIENTE OU NÚMERO DO DOCUMENTO..." className="w-full h-16 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-lg font-black text-amber-600 placeholder:text-amber-200 outline-none focus:ring-4 focus:ring-amber-500/10 transition-all uppercase" />
+                 <div className="space-y-3 max-h-96 overflow-y-auto custom-scrollbar">
+                    {transactions.filter(t => (t.id.includes(returnSearchTerm) || t.client?.includes(returnSearchTerm)) && t.type === 'INCOME').slice(0, 10).map(t => (
+                       <div key={t.id} className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 flex justify-between items-center group hover:border-amber-500 transition-all cursor-pointer" onClick={() => processSaleCancellation(t)}>
+                          <div className="flex-1">
+                             <div className="flex items-center gap-3"><span className="text-lg font-black uppercase">{t.client || 'CONSUMIDOR FINAL'}</span><span className="text-[9px] font-black bg-slate-200 px-2 py-0.5 rounded text-slate-500">{t.id}</span></div>
+                             <p className="text-xs font-bold text-slate-400 uppercase mt-1">{t.date} • {t.items?.length} ITENS • PAGTO: {t.method}</p>
+                          </div>
+                          <div className="text-right flex items-center gap-6">
+                             <p className="text-xl font-black text-slate-900 dark:text-white tabular-nums">R$ {t.value.toLocaleString('pt-BR')}</p>
+                             <button className="px-6 py-2.5 bg-amber-500 text-white rounded-xl text-[10px] font-black uppercase shadow-lg group-hover:scale-105 transition-all">Iniciar Devolução</button>
+                          </div>
+                       </div>
+                    ))}
+                    {returnSearchTerm && transactions.filter(t => (t.id.includes(returnSearchTerm) || t.client?.includes(returnSearchTerm))).length === 0 && (
+                       <div className="py-20 text-center opacity-30 uppercase font-black">Nenhuma venda encontrada para os critérios informados</div>
+                    )}
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* MODAIS EXISTENTES: Edição Item, Desconto Global e Checkout */}
       {editingItem && (
         <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 animate-in fade-in">
            <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
