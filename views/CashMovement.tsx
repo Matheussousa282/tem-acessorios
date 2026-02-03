@@ -200,10 +200,10 @@ const CashMovement: React.FC = () => {
 
   if (viewingSession) {
     return (
-      <div className="p-6 space-y-6 animate-in slide-in-from-right-10 duration-500 pb-20">
+      <div className="p-6 space-y-6 animate-in slide-in-from-right-10 duration-500 pb-20 print:p-0">
         
-        {/* RELATÓRIO DE IMPRESSÃO (DETALHADO E ANALÍTICO) */}
-        <div id="cash-report-print" className="hidden print:block bg-white text-black font-sans p-6 text-[10px] leading-tight">
+        {/* RELATÓRIO DE IMPRESSÃO (ESTILO CUPOM ANALÍTICO) */}
+        <div id="cash-report-print" className="hidden print:block bg-white text-black font-sans p-6 text-[10px] leading-tight w-full">
            <div className="border-b border-slate-300 pb-2 mb-4">
               <h1 className="font-black uppercase text-[11px] mb-1">DADOS DO MOVIMENTO DE CAIXA</h1>
               <div className="grid grid-cols-2 gap-x-12">
@@ -218,11 +218,11 @@ const CashMovement: React.FC = () => {
               </div>
            </div>
 
-           <div className="bg-[#136dec] text-white p-2 text-center font-black uppercase mb-4 text-[10px] print:bg-slate-300 print:text-black">
+           <div className="bg-[#136dec] text-white p-2 text-center font-black uppercase mb-4 text-[10px] print:bg-slate-100 print:text-black print:border print:border-slate-300">
               CAIXA: {viewingSession.id.slice(-4)} - {viewingSession.openingOperatorName?.toUpperCase()}
            </div>
 
-           <div className="bg-[#136dec] text-white p-1 text-center font-black uppercase mb-1 print:bg-slate-200 print:text-black">
+           <div className="bg-[#136dec] text-white p-1 text-center font-black uppercase mb-1 print:bg-slate-50 print:text-black print:border-x print:border-t print:border-slate-200">
               LANÇAMENTOS DO DIA (VALORES EM ESPÉCIE / GAVETA)
            </div>
 
@@ -250,7 +250,7 @@ const CashMovement: React.FC = () => {
               </table>
            </div>
 
-           <div className="bg-[#136dec] text-white p-1 text-center font-black uppercase mb-1 print:bg-slate-200 print:text-black">
+           <div className="bg-[#136dec] text-white p-1 text-center font-black uppercase mb-1 print:bg-slate-50 print:text-black print:border-x print:border-t print:border-slate-200">
               RESUMO POR MEIO DE PAGAMENTO (CARTÕES / OUTROS)
            </div>
            <table className="w-full border-collapse border border-slate-400 mb-4">
@@ -267,7 +267,7 @@ const CashMovement: React.FC = () => {
               </tbody>
            </table>
 
-           <div className="bg-[#136dec] text-white p-1 text-center font-black uppercase mb-1 print:bg-slate-200 print:text-black">
+           <div className="bg-[#136dec] text-white p-1 text-center font-black uppercase mb-1 print:bg-slate-50 print:text-black print:border-x print:border-t print:border-slate-200">
               LISTAGEM ANALÍTICA DAS VENDAS
            </div>
            <table className="w-full border-collapse border border-slate-400 mb-4">
@@ -285,13 +285,13 @@ const CashMovement: React.FC = () => {
            </table>
 
            <div className="space-y-1">
-              <div className="bg-black text-white p-2 flex justify-between font-black uppercase text-[11px] border-t border-amber-500 mt-1 print:bg-black print:text-white"><span>VALOR TOTAL FATURADO (TODOS MEIOS):</span><span>R$ {Number(sessionData?.totalVendasBruto || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
+              <div className="bg-black text-white p-2 flex justify-between font-black uppercase text-[11px] border-t border-amber-500 mt-1 print:bg-slate-900 print:text-white"><span>VALOR TOTAL FATURADO (TODOS MEIOS):</span><span>R$ {Number(sessionData?.totalVendasBruto || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
            </div>
            
            <p className="mt-8 text-center opacity-40 text-[7px] uppercase font-black">TEM ACESSÓRIOS ERP - SISTEMA DE GESTÃO - {new Date().toLocaleString()}</p>
         </div>
 
-        {/* HEADER DETALHE (TELA) */}
+        {/* HEADER DETALHE (TELA - PRINT:HIDDEN) */}
         <div className="flex justify-between items-start bg-slate-50 dark:bg-slate-900/40 p-4 rounded-xl border border-slate-200 dark:border-slate-800 print:hidden">
            <div className="space-y-4">
               <h2 className="text-xl font-black text-slate-800 dark:text-white uppercase flex items-center gap-2">
@@ -312,7 +312,7 @@ const CashMovement: React.FC = () => {
            </div>
         </div>
 
-        {/* CORPO DO DETALHE (TELA) */}
+        {/* CORPO DO DETALHE (TELA - PRINT:HIDDEN) */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm flex flex-col min-h-[500px] print:hidden">
            <div className="flex border-b border-slate-100 dark:border-slate-800 p-2 gap-1 bg-slate-50/50">
               <button onClick={() => setActiveTab('lançamentos')} className={`px-6 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${activeTab === 'lançamentos' ? 'bg-primary text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>Detalhamento de Vendas e Lançamentos</button>
@@ -380,7 +380,7 @@ const CashMovement: React.FC = () => {
            )}
         </div>
 
-        {/* RODAPÉ DE RESUMO (TELA) */}
+        {/* RODAPÉ DE RESUMO (TELA - PRINT:HIDDEN) */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 print:hidden">
            <div className="bg-slate-900 text-white p-4 rounded-2xl flex flex-col items-center shadow-lg">
               <span className="text-[10px] font-black uppercase text-slate-400">Saldo Anterior:</span>
@@ -400,67 +400,55 @@ const CashMovement: React.FC = () => {
            </div>
         </div>
 
-        {/* MODAL LANÇAMENTO MANUAL (TELA) */}
-        {showEntryModal.show && (
-           <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-300 print:hidden">
-              <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95">
-                 <div className={`p-6 text-white flex justify-between items-center ${showEntryModal.type === 'INCOME' ? 'bg-emerald-500' : showEntryModal.type === 'EXPENSE' ? 'bg-rose-500' : 'bg-blue-500'}`}>
-                    <h3 className="font-black uppercase tracking-tight">Lançamento de {showEntryModal.type === 'INCOME' ? 'Entrada' : showEntryModal.type === 'EXPENSE' ? 'Saída' : 'Transferência'}</h3>
-                    <button onClick={() => setShowEntryModal({...showEntryModal, show: false})}><span className="material-symbols-outlined">close</span></button>
-                 </div>
-                 <form onSubmit={handleAddEntry} className="p-8 space-y-4">
-                    <div className="space-y-1">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Valor Bruto (R$)</label>
-                       <input autoFocus type="number" step="0.01" required value={entryForm.value} onChange={e => setEntryForm({...entryForm, value: parseFloat(e.target.value) || 0})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-6 text-xl font-black text-primary" placeholder="0,00" />
-                    </div>
-                    <div className="space-y-1">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Motivo / Histórico</label>
-                       <textarea required rows={3} value={entryForm.description} onChange={e => setEntryForm({...entryForm, description: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-xl p-4 text-xs font-bold uppercase" placeholder="Descreva o motivo..." />
-                    </div>
-                    <button type="submit" className={`w-full h-14 text-white rounded-xl font-black text-xs uppercase shadow-xl mt-4 ${showEntryModal.type === 'INCOME' ? 'bg-emerald-500' : showEntryModal.type === 'EXPENSE' ? 'bg-rose-500' : 'bg-blue-500'}`}>Confirmar Lançamento</button>
-                 </form>
-              </div>
-           </div>
-        )}
-
         <style>{`
           @media print {
-            /* Garante que o corpo do documento de impressão seja visível e o resto oculto */
+            /* 1. Esconde absolutamente tudo que é UI do sistema */
             body * { visibility: hidden !important; }
             #root, #root * { visibility: hidden !important; }
+            aside, header, nav, footer, .print\\:hidden { display: none !important; }
             
-            /* Remove restrições de overflow do layout principal para permitir impressão multi-página */
-            #root, main, .flex-1 { 
-              overflow: visible !important; 
-              height: auto !important; 
-              display: block !important; 
-            }
-
-            /* Força a visibilidade apenas do bloco de relatório */
+            /* 2. Força o container do relatório a aparecer no topo */
             #cash-report-print, #cash-report-print * { 
               visibility: visible !important; 
               display: block !important; 
             }
-
-            /* Posicionamento absoluto no topo da página de impressão */
+            
             #cash-report-print {
-              position: absolute !important;
+              position: fixed !important;
               left: 0 !important;
               top: 0 !important;
-              width: 100% !important;
+              width: 100vw !important;
+              height: 100vh !important;
               background: white !important;
               color: black !important;
               margin: 0 !important;
               padding: 10mm !important;
+              z-index: 99999 !important;
               border: none !important;
             }
 
-            /* Remove cores escuras de fundo das tabelas na impressão para legibilidade */
-            #cash-report-print table { border: 1px solid #333 !important; }
-            #cash-report-print th { background-color: #f0f0f0 !important; color: black !important; }
-            #cash-report-print .bg-[#136dec] { background-color: #e0e0e0 !important; color: black !important; border: 1px solid #ccc !important; }
+            /* 3. Garante que as tabelas ocupem a largura total e fiquem legíveis */
+            #cash-report-print table { 
+              width: 100% !important; 
+              border: 1px solid #333 !important; 
+              border-collapse: collapse !important;
+              margin-bottom: 5mm !important;
+            }
+            #cash-report-print th, #cash-report-print td { 
+              border: 0.5pt solid #ccc !important;
+              padding: 1.5mm !important;
+              color: black !important;
+            }
+            #cash-report-print th { background-color: #f0f0f0 !important; }
 
-            @page { size: auto; margin: 0mm; }
+            /* 4. Reseta cores de fundo para economizar tinta e manter contraste */
+            #cash-report-print .bg-black { background-color: #000 !important; color: #fff !important; -webkit-print-color-adjust: exact; }
+            #cash-report-print .bg-slate-900 { background-color: #222 !important; color: #fff !important; -webkit-print-color-adjust: exact; }
+
+            @page { 
+              size: A4 portrait; 
+              margin: 0; 
+            }
           }
         `}</style>
       </div>
@@ -535,7 +523,7 @@ const CashMovement: React.FC = () => {
                  </div>
                  <div className="space-y-1">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Selecionar Operador do Terminal</label>
-                    <select required value={selectedRegister} onChange={e => setSelectedRegister(e.target.value)} className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-xs font-black uppercase"><option value="">Selecione o Operador...</option>{availableCashiers.map((u, idx) => (<option key={u.id} value={`Caixa {idx + 1} - {u.name}`}>Caixa {idx + 1} - {u.name}</option>))}</select>
+                    <select required value={selectedRegister} onChange={e => setSelectedRegister(e.target.value)} className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-xs font-black uppercase"><option value="">Selecione o Operador...</option>{availableCashiers.map((u, idx) => (<option key={u.id} value={`Caixa ${idx + 1} - ${u.name}`}>Caixa {idx + 1} - {u.name}</option>))}</select>
                  </div>
                  <div className="space-y-1">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Fundo de Troco Inicial (R$)</label>
