@@ -5,7 +5,7 @@ import { CashSession, CashSessionStatus, UserRole } from '../types';
 import { useNavigate } from 'react-router-dom';
 
 const CashMovement: React.FC = () => {
-  const { cashSessions, cashEntries, transactions, establishments, currentUser, saveCashSession, addCashEntry, users, refreshData } = useApp();
+  const { cashSessions, cashEntries, transactions, establishments, currentUser, saveCashSession, addCashEntry, users, refreshData, cardOperators, cardBrands } = useApp();
   const navigate = useNavigate();
   const [filter, setFilter] = useState('');
   
@@ -75,18 +75,17 @@ const CashMovement: React.FC = () => {
 
     const sessionManualEntries = cashEntries.filter(e => e.sessionId === viewingSession.id);
 
-    const methodCodes: Record<string, string> = {
-      'DINHEIRO': '0001 - DINHEIRO',
-      'PIX': '0139 - PIX SANTANDER',
-      'DEBITO': '0119 - GETNET DEBITO',
-      'CREDITO': '0174 - TEF EL - CRED GETNET',
-    };
-
-    const resumoPagamentos: Record<string, number> = {};
+    // Resumo por Operadora/Bandeira para Cartões
+    const resumoCartoes: Record<string, { count: number, value: number }> = {};
     sessionVendas.forEach(v => {
-       const rawMethod = v.method?.toUpperCase() || 'DINHEIRO';
-       const methodLabel = methodCodes[rawMethod] || `0999 - ${rawMethod}`;
-       resumoPagamentos[methodLabel] = (resumoPagamentos[methodLabel] || 0) + v.value;
+       if (v.method === 'Credito' || v.method === 'Debito') {
+          const op = cardOperators.find(o => o.id === v.cardOperatorId)?.name || 'OUTRA';
+          const br = cardBrands.find(b => b.id === v.cardBrandId)?.name || 'OUTRA';
+          const key = `${v.method}: ${op} / ${br}`;
+          if (!resumoCartoes[key]) resumoCartoes[key] = { count: 0, value: 0 };
+          resumoCartoes[key].count += 1;
+          resumoCartoes[key].value += v.value;
+       }
     });
 
     const totalVendasBruto = sessionVendas.reduce((acc, t) => acc + t.value, 0);
@@ -110,7 +109,9 @@ const CashMovement: React.FC = () => {
         method: v.method,
         cat: 'VENDA',
         client: v.client || 'Consumidor Final',
-        installments: v.installments || 1
+        installments: v.installments || 1,
+        operator: cardOperators.find(o => o.id === v.cardOperatorId)?.name || '',
+        brand: cardBrands.find(b => b.id === v.cardBrandId)?.name || ''
       })),
       ...sessionManualEntries.map(e => ({
         id: e.id,
@@ -122,7 +123,9 @@ const CashMovement: React.FC = () => {
         method: e.method || 'CAIXA',
         cat: e.category,
         client: 'SISTEMA',
-        installments: 1
+        installments: 1,
+        operator: '',
+        brand: ''
       }))
     ].sort((a, b) => b.id.localeCompare(a.id));
 
@@ -132,12 +135,12 @@ const CashMovement: React.FC = () => {
       totalEntradasCaixa, 
       totalSaidasCaixa, 
       saldoFinalCaixa, 
-      resumoPagamentos, 
+      resumoCartoes, 
       totalVendasBruto,
       vendasEmDinheiro,
       vendasDetalhadas: sessionVendas
     };
-  }, [viewingSession, transactions, cashEntries]);
+  }, [viewingSession, transactions, cashEntries, cardOperators, cardBrands]);
 
   const handleOpenCash = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -199,10 +202,10 @@ const CashMovement: React.FC = () => {
     return (
       <div className="p-6 space-y-6 animate-in slide-in-from-right-10 duration-500 pb-20">
         
-        {/* RELATÓRIO DE IMPRESSÃO (ESTILO EXATO DA IMAGEM) */}
+        {/* RELATÓRIO DE IMPRESSÃO (DETALHADO) */}
         <div id="cash-report-print" className="hidden print:block bg-white text-black font-sans p-6 text-[10px] leading-tight">
            <div className="border-b border-slate-300 pb-2 mb-4">
-              <h1 className="font-black uppercase text-[11px] mb-1">DADOS DO MOVIMENTO</h1>
+              <h1 className="font-black uppercase text-[11px] mb-1">DADOS DO MOVIMENTO DE CAIXA</h1>
               <div className="grid grid-cols-2 gap-x-12">
                  <div>
                     <p className="font-bold">DATA/HORA ABERTURA: <span className="font-normal">{viewingSession.openingTime}</span></p>
@@ -219,102 +222,86 @@ const CashMovement: React.FC = () => {
               CAIXA: {viewingSession.id.slice(-4)} - {viewingSession.openingOperatorName?.toUpperCase()}
            </div>
 
+           <div className="bg-[#136dec] text-white p-1 text-center font-black uppercase mb-1 print:bg-slate-200 print:text-black">
+              LANÇAMENTOS DO DIA (VALORES EM ESPÉCIE / GAVETA)
+           </div>
+
            <div className="grid grid-cols-2 gap-1 mb-4">
-              <table className="w-full border-collapse">
-                 <thead className="bg-[#136dec] text-white print:bg-slate-200 print:text-black"><tr><th colSpan={3} className="p-1 uppercase text-center border border-slate-400">Aberturas</th></tr></thead>
+              <table className="w-full border-collapse border border-slate-400">
+                 <thead className="bg-slate-100"><tr className="border-b border-slate-400 text-[8px]"><th className="p-1 text-left uppercase border-r border-slate-400">Classificação</th><th className="p-1 text-right uppercase">Valor</th></tr></thead>
                  <tbody>
-                    <tr className="text-[7px] font-black uppercase bg-slate-100 border border-slate-400">
-                       <td className="p-1 border-r border-slate-400">ID</td><td className="p-1 border-r border-slate-400">DATA/HORA</td><td className="p-1">OPERADOR</td>
+                    <tr className="border-b border-slate-400">
+                       <td className="p-1 border-r border-slate-400 uppercase">SALDO ANTERIOR (FUNDO)</td>
+                       <td className="p-1 text-right tabular-nums">R$ {Number(sessionData?.saldoAnterior || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                     </tr>
-                    <tr className="border border-slate-400">
-                       <td className="p-1 border-r border-slate-400">{viewingSession.id.slice(-5)}</td>
-                       <td className="p-1 border-r border-slate-400">{viewingSession.openingTime}</td>
-                       <td className="p-1 uppercase">{viewingSession.openingOperatorName}</td>
+                    <tr className="border-b border-slate-400">
+                       <td className="p-1 border-r border-slate-400 uppercase">VENDAS EM DINHEIRO (+)</td>
+                       <td className="p-1 text-right tabular-nums">R$ {Number(sessionData?.vendasEmDinheiro || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                     </tr>
+                    <tr className="font-black bg-slate-50"><td className="p-1 border-r border-slate-400">TOTAIS ESPÉCIE</td><td className="p-1 text-right">R$ {Number(sessionData?.saldoFinalCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
                  </tbody>
               </table>
-              <table className="w-full border-collapse">
-                 <thead className="bg-[#136dec] text-white print:bg-slate-200 print:text-black"><tr><th colSpan={3} className="p-1 uppercase text-center border border-slate-400">Fechamentos</th></tr></thead>
+              <table className="w-full border-collapse border border-slate-400">
+                 <thead className="bg-slate-100"><tr className="border-b border-slate-400 text-[8px]"><th className="p-1 text-left uppercase border-r border-slate-400">Saídas / Sangrias</th><th className="p-1 text-right uppercase">Valor</th></tr></thead>
                  <tbody>
-                    <tr className="text-[7px] font-black uppercase bg-slate-100 border border-slate-400">
-                       <td className="p-1 border-r border-slate-400">ID</td><td className="p-1 border-r border-slate-400">DATA/HORA</td><td className="p-1">OPERADOR</td>
-                    </tr>
-                    {viewingSession.status === CashSessionStatus.CLOSED && (
-                       <tr className="border border-slate-400">
-                          <td className="p-1 border-r border-slate-400">{viewingSession.id.slice(-5)}</td>
-                          <td className="p-1 border-r border-slate-400">{viewingSession.closingTime}</td>
-                          <td className="p-1 uppercase">{viewingSession.closingOperatorName}</td>
-                       </tr>
-                    )}
+                    <tr className="border-b border-slate-400"><td className="p-1 border-r border-slate-400 uppercase">TOTAL DE RETIRADAS (-)</td><td className="p-1 text-right tabular-nums">R$ {Number(sessionData?.totalSaidasCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
+                    <tr className="font-black bg-slate-50"><td className="p-1 border-r border-slate-400">TOTAL SANGRIAS</td><td className="p-1 text-right">R$ {Number(sessionData?.totalSaidasCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
                  </tbody>
               </table>
            </div>
 
            <div className="bg-[#136dec] text-white p-1 text-center font-black uppercase mb-1 print:bg-slate-200 print:text-black">
-              LANÇAMENTOS DO DIA
-           </div>
-
-           <div className="grid grid-cols-2 gap-1 mb-4">
-              <table className="w-full border-collapse border border-slate-400">
-                 <thead className="bg-[#136dec] text-white print:bg-slate-100 print:text-black"><tr><th colSpan={2} className="p-1 uppercase border border-slate-400">Entradas</th></tr></thead>
-                 <tbody>
-                    <tr className="text-[7px] font-black uppercase bg-slate-100 border-b border-slate-400"><td className="p-1 border-r border-slate-400">CLASSIFICAÇÃO</td><td className="p-1 text-right">VALOR</td></tr>
-                    <tr className="border-b border-slate-400"><td className="p-1 border-r border-slate-400 uppercase">001.015 - VENDAS (DINHEIRO)</td><td className="p-1 text-right tabular-nums">R$ {Number(sessionData?.vendasEmDinheiro || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
-                    <tr className="font-black bg-slate-50"><td className="p-1 border-r border-slate-400">TOTAIS</td><td className="p-1 text-right">R$ {Number(sessionData?.totalEntradasCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
-                 </tbody>
-              </table>
-              <table className="w-full border-collapse border border-slate-400">
-                 <thead className="bg-[#136dec] text-white print:bg-slate-100 print:text-black"><tr><th colSpan={2} className="p-1 uppercase border border-slate-400">Saídas</th></tr></thead>
-                 <tbody>
-                    <tr className="text-[7px] font-black uppercase bg-slate-100 border-b border-slate-400"><td className="p-1 border-r border-slate-400">CLASSIFICAÇÃO</td><td className="p-1 text-right">VALOR</td></tr>
-                    <tr className="border-b border-slate-400"><td className="p-1 border-r border-slate-400 uppercase">004.001 - SANGRIAS / PAGOS</td><td className="p-1 text-right tabular-nums">R$ {Number(sessionData?.totalSaidasCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
-                    <tr className="font-black bg-slate-50"><td className="p-1 border-r border-slate-400">TOTAIS</td><td className="p-1 text-right">R$ {Number(sessionData?.totalSaidasCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
-                 </tbody>
-              </table>
-           </div>
-
-           <div className="bg-[#136dec] text-white p-1 text-center font-black uppercase mb-1 print:bg-slate-200 print:text-black">
-              DETALHAMENTO ANALÍTICO DE VENDAS
+              RESUMO POR MEIO DE PAGAMENTO (CARTÕES / OUTROS)
            </div>
            <table className="w-full border-collapse border border-slate-400 mb-4">
-              <thead className="bg-slate-100 text-[8px]"><tr className="border-b border-slate-400"><th className="p-1 text-left uppercase border-r border-slate-400">Cliente</th><th className="p-1 text-left uppercase border-r border-slate-400">Forma</th><th className="p-1 text-center uppercase border-r border-slate-400">Parc.</th><th className="p-1 text-right uppercase">Valor</th></tr></thead>
+              <thead className="bg-slate-100 text-[8px]"><tr className="border-b border-slate-400"><th className="p-1 text-left uppercase border-r border-slate-400">Forma / Operadora / Bandeira</th><th className="p-1 text-center uppercase border-r border-slate-400">Qtd. Notas</th><th className="p-1 text-right uppercase">Total Bruto</th></tr></thead>
               <tbody>
-                 {sessionData?.vendasDetalhadas.map((v, idx) => (
-                    <tr key={idx} className={`border-b border-slate-400 text-[8px] ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
-                       <td className="p-1 uppercase border-r border-slate-400 truncate max-w-[120px]">{v.client || 'Consumidor Final'}</td>
-                       <td className="p-1 uppercase border-r border-slate-400">{v.method}</td>
-                       <td className="p-1 text-center border-r border-slate-400">{v.installments || 1}x</td>
-                       <td className="p-1 text-right tabular-nums font-black">R$ {v.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                 {Object.entries(sessionData?.resumoCartoes || {}).map(([key, data]) => (
+                    <tr key={key} className="border-b border-slate-400 text-[8px]">
+                       <td className="p-1 uppercase border-r border-slate-400">{key}</td>
+                       <td className="p-1 text-center border-r border-slate-400">{data.count}</td>
+                       <td className="p-1 text-right tabular-nums font-black">R$ {data.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                     </tr>
                  ))}
-                 {sessionData?.vendasDetalhadas.length === 0 && <tr><td colSpan={4} className="p-4 text-center opacity-40 uppercase">Sem vendas registradas</td></tr>}
+                 {Object.keys(sessionData?.resumoCartoes || {}).length === 0 && <tr><td colSpan={3} className="p-4 text-center opacity-40 uppercase">Sem movimentação de cartões</td></tr>}
               </tbody>
            </table>
 
            <div className="bg-[#136dec] text-white p-1 text-center font-black uppercase mb-1 print:bg-slate-200 print:text-black">
-              OUTRAS OPERAÇÕES / SALDOS
+              LISTAGEM ANALÍTICA DAS VENDAS
            </div>
+           <table className="w-full border-collapse border border-slate-400 mb-4">
+              <thead className="bg-slate-100 text-[7px]"><tr className="border-b border-slate-400"><th className="p-1 text-left uppercase border-r border-slate-400">Cliente</th><th className="p-1 text-left uppercase border-r border-slate-400">Forma / Operadora</th><th className="p-1 text-center uppercase border-r border-slate-400">Parcelas</th><th className="p-1 text-right uppercase">Valor Líquido</th></tr></thead>
+              <tbody>
+                 {sessionData?.allRecords.filter(r => r.cat === 'VENDA').map((v, idx) => (
+                    <tr key={idx} className={`border-b border-slate-400 text-[7px] ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
+                       <td className="p-1 uppercase border-r border-slate-400 truncate max-w-[150px]">{v.client}</td>
+                       <td className="p-1 uppercase border-r border-slate-400">{v.method} {v.operator ? `/ ${v.operator}` : ''}</td>
+                       <td className="p-1 text-center border-r border-slate-400">{v.installments}x</td>
+                       <td className="p-1 text-right tabular-nums font-black">R$ {v.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                    </tr>
+                 ))}
+              </tbody>
+           </table>
+
            <div className="space-y-1">
-              <div className="bg-black text-white p-1.5 flex justify-between font-black uppercase text-[9px] print:bg-black print:text-white"><span>SALDO ANTERIOR:</span><span>R$ {Number(sessionData?.saldoAnterior || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
-              <div className="bg-black text-white p-1.5 flex justify-between font-black uppercase text-[9px] print:bg-black print:text-white"><span>TOTAL ENTRADAS:</span><span>R$ {Number(sessionData?.totalEntradasCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
-              <div className="bg-black text-white p-1.5 flex justify-between font-black uppercase text-[9px] print:bg-black print:text-white"><span>TOTAL SAÍDAS:</span><span>R$ {Number(sessionData?.totalSaidasCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
-              <div className="bg-black text-white p-2 flex justify-between font-black uppercase text-[11px] border-t border-amber-500 mt-1 print:bg-black print:text-white"><span>SALDO FINAL EM GAVETA:</span><span>R$ {Number(sessionData?.saldoFinalCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
+              <div className="bg-black text-white p-2 flex justify-between font-black uppercase text-[11px] border-t border-amber-500 mt-1 print:bg-black print:text-white"><span>VALOR TOTAL FATURADO (TODOS MEIOS):</span><span>R$ {Number(sessionData?.totalVendasBruto || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
            </div>
            
-           <p className="mt-8 text-center opacity-40 text-[7px] uppercase font-black">TEM ACESSÓRIOS ERP - RELATÓRIO DE CONFERÊNCIA DE MOVIMENTO</p>
+           <p className="mt-8 text-center opacity-40 text-[7px] uppercase font-black">TEM ACESSÓRIOS ERP - SISTEMA DE GESTÃO - {new Date().toLocaleString()}</p>
         </div>
 
         {/* HEADER DETALHE (TELA) */}
         <div className="flex justify-between items-start bg-slate-50 dark:bg-slate-900/40 p-4 rounded-xl border border-slate-200 dark:border-slate-800 print:hidden">
            <div className="space-y-4">
               <h2 className="text-xl font-black text-slate-800 dark:text-white uppercase flex items-center gap-2">
-                 <span className="material-symbols-outlined text-primary">visibility</span> Caixas - Visualizar
+                 <span className="material-symbols-outlined text-primary">visibility</span> Movimentação de Caixa - Analítico
               </h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-2">
-                 <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase">ID:</span><span className="text-xs font-bold text-slate-600">{viewingSession.id}</span></div>
+                 <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase">ID Movimento:</span><span className="text-xs font-bold text-slate-600">{viewingSession.id}</span></div>
                  <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Loja:</span><span className="text-xs font-bold text-primary uppercase">{viewingSession.storeName}</span></div>
-                 <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase">PDV:</span><span className="text-xs font-bold text-slate-600 uppercase">{viewingSession.registerName}</span></div>
-                 <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase">Caixa:</span><span className="text-xs font-bold text-slate-600 uppercase">{viewingSession.openingOperatorName}</span></div>
+                 <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase">Status:</span><span className="text-xs font-bold text-slate-600 uppercase">{viewingSession.status}</span></div>
+                 <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase">Operador:</span><span className="text-xs font-bold text-slate-600 uppercase">{viewingSession.openingOperatorName}</span></div>
               </div>
            </div>
            <div className="flex gap-2">
@@ -329,7 +316,7 @@ const CashMovement: React.FC = () => {
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm flex flex-col min-h-[500px] print:hidden">
            <div className="flex border-b border-slate-100 dark:border-slate-800 p-2 gap-1 bg-slate-50/50">
               <button onClick={() => setActiveTab('lançamentos')} className={`px-6 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${activeTab === 'lançamentos' ? 'bg-primary text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>Detalhamento de Vendas e Lançamentos</button>
-              <button onClick={() => setActiveTab('auditoria')} className={`px-6 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${activeTab === 'auditoria' ? 'bg-primary text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>Logs de Auditoria</button>
+              <button onClick={() => setActiveTab('auditoria')} className={`px-6 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${activeTab === 'auditoria' ? 'bg-primary text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>Resumo Cartões / Operadoras</button>
               
               <div className="ml-auto">
                  {viewingSession.status === CashSessionStatus.OPEN && (
@@ -339,55 +326,54 @@ const CashMovement: React.FC = () => {
            </div>
 
            {activeTab === 'lançamentos' ? (
-             <>
-               <div className="p-4 flex flex-wrap items-center gap-2 bg-slate-50/20">
-                  <button disabled={viewingSession.status === CashSessionStatus.CLOSED} onClick={() => setShowEntryModal({show: true, type: 'INCOME'})} className="px-4 py-2 bg-primary text-white rounded-lg text-[10px] font-black uppercase flex items-center gap-2 shadow-lg disabled:opacity-50"><span className="material-symbols-outlined text-sm">add</span> Entrada Manual</button>
-                  <button disabled={viewingSession.status === CashSessionStatus.CLOSED} onClick={() => setShowEntryModal({show: true, type: 'EXPENSE'})} className="px-4 py-2 bg-rose-500 text-white rounded-lg text-[10px] font-black uppercase flex items-center gap-2 shadow-lg disabled:opacity-50"><span className="material-symbols-outlined text-sm">remove</span> Sangria / Saída</button>
-                  <div className="flex-1 ml-4 relative">
-                     <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 text-sm">search</span>
-                     <input placeholder="PESQUISAR CLIENTE OU PAGAMENTO..." className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-lg pl-10 text-[9px] font-black uppercase h-9 focus:ring-1 focus:ring-primary/20" />
-                  </div>
-               </div>
-
-               <div className="flex-1 overflow-auto">
-                  <table className="w-full text-left text-[11px] font-bold border-collapse">
-                     <thead className="bg-primary text-white sticky top-0 z-10">
-                        <tr>
-                           <th className="px-4 py-2.5 w-10 text-center font-black uppercase"><span className="material-symbols-outlined text-sm">settings</span></th>
-                           <th className="px-4 py-2.5 uppercase">Cliente</th>
-                           <th className="px-4 py-2.5 uppercase">Meio Pagto</th>
-                           <th className="px-4 py-2.5 text-center uppercase">Parcelas</th>
-                           <th className="px-4 py-2.5 text-center uppercase">Nat.</th>
-                           <th className="px-4 py-2.5 text-right uppercase">Valor Bruto</th>
-                           <th className="px-4 py-2.5 uppercase">Tipo Lançamento</th>
+             <div className="flex-1 overflow-auto">
+                <table className="w-full text-left text-[11px] font-bold border-collapse">
+                   <thead className="bg-primary text-white sticky top-0 z-10">
+                      <tr>
+                         <th className="px-4 py-2.5 w-10 text-center font-black uppercase"><span className="material-symbols-outlined text-sm">info</span></th>
+                         <th className="px-4 py-2.5 uppercase">Cliente</th>
+                         <th className="px-4 py-2.5 uppercase">Forma / Operadora</th>
+                         <th className="px-4 py-2.5 text-center uppercase">Band.</th>
+                         <th className="px-4 py-2.5 text-center uppercase">Parc.</th>
+                         <th className="px-4 py-2.5 text-right uppercase">Valor Bruto</th>
+                      </tr>
+                   </thead>
+                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {sessionData?.allRecords.map(record => (
+                        <tr key={record.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                           <td className="px-4 py-2.5 text-center"><span className={`size-2.5 rounded-full inline-block ${record.natureza === 'E' ? 'bg-emerald-500' : 'bg-rose-500'}`}></span></td>
+                           <td className="px-4 py-2.5 uppercase text-slate-900 dark:text-white font-black">{record.client}</td>
+                           <td className="px-4 py-2.5 uppercase text-primary">{record.method} {record.operator ? `/ ${record.operator}` : ''}</td>
+                           <td className="px-4 py-2.5 text-center uppercase text-slate-400">{record.brand || '---'}</td>
+                           <td className="px-4 py-2.5 text-center font-black text-slate-400">{record.installments}x</td>
+                           <td className={`px-4 py-2.5 text-right font-black ${record.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>R$ {Number(record.value || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                         </tr>
-                     </thead>
-                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                        {sessionData?.allRecords.map(record => (
-                          <tr key={record.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                             <td className="px-4 py-2.5 text-center"><span className="size-1.5 bg-blue-600 rounded-full inline-block"></span></td>
-                             <td className="px-4 py-2.5 uppercase text-slate-900 dark:text-white font-black">{record.client}</td>
-                             <td className="px-4 py-2.5 uppercase text-primary">{record.method}</td>
-                             <td className="px-4 py-2.5 text-center font-black text-slate-400">{record.installments}x</td>
-                             <td className="px-4 py-2.5 text-center">
-                                <span className={`size-5 rounded-full inline-flex items-center justify-center text-[9px] text-white font-black ${record.natureza === 'E' ? 'bg-emerald-500' : record.natureza === 'S' ? 'bg-rose-500' : 'bg-blue-500'}`}>{record.natureza}</span>
-                             </td>
-                             <td className={`px-4 py-2.5 text-right font-black ${record.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>R$ {Number(record.value || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
-                             <td className="px-4 py-2.5 text-slate-400 uppercase text-[9px]">{record.cat}</td>
-                          </tr>
-                        ))}
-                     </tbody>
-                  </table>
-               </div>
-             </>
+                      ))}
+                   </tbody>
+                </table>
+             </div>
            ) : (
-             <div className="p-10 space-y-10">
-                <div className="grid grid-cols-2 gap-8">
-                   <div className="p-6 bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-100">
-                      <h4 className="text-[10px] font-black uppercase text-slate-400 mb-4 tracking-widest">Informações de Abertura</h4>
-                      <p className="text-sm font-bold uppercase">Operador Responsável: {viewingSession.openingOperatorName}</p>
-                      <p className="text-sm font-bold uppercase">Abertura: {viewingSession.openingTime}</p>
-                      <p className="text-sm font-black text-primary mt-2 uppercase">Fundo Inicial: R$ {Number(viewingSession.openingValue || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+             <div className="p-8 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                   <div className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700">
+                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Resumo Consolidado de Cartões</h4>
+                      <div className="space-y-4">
+                         {Object.entries(sessionData?.resumoCartoes || {}).map(([key, data]) => (
+                            <div key={key} className="flex justify-between items-center border-b border-slate-200 dark:border-slate-700 pb-2">
+                               <div className="flex flex-col">
+                                  <span className="text-xs font-black uppercase text-slate-700 dark:text-slate-200">{key}</span>
+                                  <span className="text-[9px] font-bold text-slate-400 uppercase">{data.count} Transações</span>
+                               </div>
+                               <span className="text-sm font-black text-primary">R$ {data.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                            </div>
+                         ))}
+                      </div>
+                   </div>
+                   <div className="p-6 bg-slate-900 text-white rounded-3xl space-y-6">
+                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Informações de Abertura</h4>
+                      <div className="flex justify-between items-center"><span className="text-xs font-bold uppercase">Operador Responsável</span><span className="text-xs font-black uppercase">{viewingSession.openingOperatorName}</span></div>
+                      <div className="flex justify-between items-center"><span className="text-xs font-bold uppercase">Hora Abertura</span><span className="text-xs font-black uppercase">{viewingSession.openingTime}</span></div>
+                      <div className="flex justify-between items-center pt-4 border-t border-white/10"><span className="text-sm font-black uppercase text-primary">Fundo Inicial (Espécie)</span><span className="text-sm font-black text-white">R$ {Number(viewingSession.openingValue || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
                    </div>
                 </div>
              </div>
@@ -401,7 +387,7 @@ const CashMovement: React.FC = () => {
               <span className="text-xl font-black tabular-nums">R$ {Number(sessionData?.saldoAnterior || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
            </div>
            <div className="bg-slate-900 text-white p-4 rounded-2xl flex flex-col items-center shadow-lg">
-              <span className="text-[10px] font-black uppercase text-emerald-500">Total Entradas:</span>
+              <span className="text-[10px] font-black uppercase text-emerald-500">Total Entradas (Espécie):</span>
               <span className="text-xl font-black tabular-nums">R$ {Number(sessionData?.totalEntradasCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
            </div>
            <div className="bg-slate-900 text-white p-4 rounded-2xl flex flex-col items-center shadow-lg">
@@ -409,7 +395,7 @@ const CashMovement: React.FC = () => {
               <span className="text-xl font-black tabular-nums">R$ {Number(sessionData?.totalSaidasCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
            </div>
            <div className="bg-primary text-white p-4 rounded-2xl flex flex-col items-center shadow-xl border-l-4 border-amber-400">
-              <span className="text-[10px] font-black uppercase text-white/70">Saldo Final Gaveta:</span>
+              <span className="text-[10px] font-black uppercase text-white/70">Saldo Final em Gaveta:</span>
               <span className="text-xl font-black tabular-nums">R$ {Number(sessionData?.saldoFinalCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
            </div>
         </div>
