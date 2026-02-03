@@ -5,7 +5,7 @@ import { Transaction, UserRole } from '../types';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 const Reports: React.FC = () => {
-  const { transactions, users, currentUser, establishments, products } = useApp();
+  const { transactions, users, currentUser, establishments, products, cardOperators, cardBrands } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
   const query = new URLSearchParams(location.search);
@@ -16,18 +16,39 @@ const Reports: React.FC = () => {
   const [filterStore, setFilterStore] = useState('TODAS LOJAS');
   const [showHub, setShowHub] = useState(false);
 
+  // Novos Filtros Específicos para Conferência
+  const [methodFilter, setMethodFilter] = useState('TODOS');
+  const [installmentsFilter, setInstallmentsFilter] = useState('TODAS');
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [minValue, setMinValue] = useState('');
+  const [maxValue, setMaxValue] = useState('');
+
   const isAdmin = currentUser?.role === UserRole.ADMIN;
   const currentStoreName = establishments.find(e => e.id === currentUser?.storeId)?.name || 'ADMIN';
 
-  // Base de dados filtrada globalmente
+  // Base de dados filtrada globalmente + Filtros específicos de conferência
   const baseData = useMemo(() => {
     return transactions.filter(t => {
       const matchesDate = t.date >= startDate && t.date <= endDate;
       const belongs = isAdmin || t.store === currentStoreName;
       const matchesStore = filterStore === 'TODAS LOJAS' || t.store === filterStore;
+      
+      // Aplicar filtros extras se for conferência de caixa
+      if (reportType === 'conferencia_caixa') {
+        const matchesMethod = methodFilter === 'TODOS' || t.method === methodFilter;
+        const matchesInstallments = installmentsFilter === 'TODAS' || String(t.installments || 1) === installmentsFilter;
+        const matchesCustomer = !customerSearch || t.client?.toLowerCase().includes(customerSearch.toLowerCase());
+        const val = Number(t.value);
+        const matchesMinVal = !minValue || val >= Number(minValue);
+        const matchesMaxVal = !maxValue || val <= Number(maxValue);
+        
+        return t.type === 'INCOME' && matchesDate && belongs && matchesStore && 
+               matchesMethod && matchesInstallments && matchesCustomer && matchesMinVal && matchesMaxVal;
+      }
+
       return t.type === 'INCOME' && matchesDate && belongs && matchesStore;
     });
-  }, [transactions, startDate, endDate, isAdmin, currentStoreName, filterStore]);
+  }, [transactions, startDate, endDate, isAdmin, currentStoreName, filterStore, reportType, methodFilter, installmentsFilter, customerSearch, minValue, maxValue]);
 
   // Definição dos Modelos de Relatórios
   const reportOptions = [
@@ -49,6 +70,20 @@ const Reports: React.FC = () => {
     const groups: Record<string, any> = {};
 
     switch (reportType) {
+      case 'conferencia_caixa':
+        return baseData.map(t => {
+          const operator = cardOperators.find(o => o.id === t.cardOperatorId)?.name || '---';
+          const brand = cardBrands.find(b => b.id === t.cardBrandId)?.name || '---';
+          return {
+            col1: t.date.split('-').reverse().join('/'), 
+            col2: t.client || 'Consumidor Final', 
+            col3: `${t.method}${t.cardOperatorId ? ` (${operator})` : ''}`, 
+            col4: `${brand} / ${t.installments || 1}x`, 
+            col5: t.id.slice(-6), 
+            value: t.value
+          };
+        });
+
       case 'evolucao':
       case 'por_vendas':
         return baseData.map(t => ({
@@ -57,16 +92,6 @@ const Reports: React.FC = () => {
           col3: t.client || 'Consumidor Final', 
           col4: `${t.items?.length || 0} itens`, 
           col5: t.method, 
-          value: t.value
-        }));
-
-      case 'conferencia_caixa':
-        return baseData.map(t => ({
-          col1: t.date.split('-').reverse().join('/'), 
-          col2: t.client || 'Consumidor Final', 
-          col3: t.method || 'Dinheiro', 
-          col4: t.installments ? `${t.installments}x` : '1x', 
-          col5: 'PAGO', 
           value: t.value
         }));
 
@@ -149,7 +174,7 @@ const Reports: React.FC = () => {
         });
         return Object.values(groups).map(g => ({ ...g, col4: `${g.count} Transações`, col5: 'OPERACIONAL', value: g.value }));
     }
-  }, [baseData, reportType, users]);
+  }, [baseData, reportType, users, cardOperators, cardBrands]);
 
   const totalRevenue = baseData.reduce((acc, t) => acc + t.value, 0);
 
@@ -157,7 +182,7 @@ const Reports: React.FC = () => {
     if (['por_produto', 'margem_bruta', 'giro_estoque', 'por_servico'].includes(reportType)) 
       return ['REF/SKU', 'CATEGORIA', 'DESCRIÇÃO ITEM', 'VOLUME', 'MARGEM/STATUS', 'TOTAL FATURADO'];
     if (reportType === 'ticket_vendedor') return ['VENDEDOR', 'UNIDADE', 'CARGO', 'VOL. VENDAS', 'TICKET MÉDIO', 'TOTAL VENDIDO'];
-    if (reportType === 'conferencia_caixa') return ['DATA', 'NOME DA CLIENTE', 'FORMA PAGTO', 'PARCELAS', 'STATUS', 'VALOR'];
+    if (reportType === 'conferencia_caixa') return ['DATA', 'NOME DA CLIENTE', 'FORMA (OPERADORA)', 'BAND. / PARC.', 'DOC', 'VALOR'];
     if (reportType === 'por_cliente') return ['TIPO', 'ÚLT. UNIDADE', 'NOME CLIENTE', 'FREQUÊNCIA', 'STATUS', 'TOTAL GASTO'];
     if (reportType === 'ticket_medio') return ['TIPO', 'CATEGORIA', 'UNIDADE', 'VOL. VENDAS', 'TICKET MÉDIO', 'TOTAL BRUTO'];
     return ['DATA', 'UNIDADE', 'IDENTIFICAÇÃO', 'DETALHE', 'MÉTODO', 'TOTAL'];
@@ -180,24 +205,60 @@ const Reports: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 bg-slate-900/80 p-2 rounded-2xl border border-slate-800 shadow-2xl print:hidden">
-           <div className="flex items-center px-4 border-r border-slate-800">
-              <span className="material-symbols-outlined text-slate-500 mr-2 text-sm">calendar_month</span>
-              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-transparent border-none text-[10px] font-black text-white uppercase focus:ring-0" />
-              <span className="text-slate-700 mx-2 font-black">ATÉ</span>
-              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-transparent border-none text-[10px] font-black text-white uppercase focus:ring-0" />
+        <div className="flex flex-col lg:flex-row items-end lg:items-center gap-2 print:hidden">
+           <div className="flex items-center gap-2 bg-slate-900/80 p-2 rounded-2xl border border-slate-800 shadow-2xl">
+              <div className="flex items-center px-4 border-r border-slate-800">
+                 <span className="material-symbols-outlined text-slate-500 mr-2 text-sm">calendar_month</span>
+                 <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-transparent border-none text-[10px] font-black text-white uppercase focus:ring-0" />
+                 <span className="text-slate-700 mx-2 font-black">ATÉ</span>
+                 <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-transparent border-none text-[10px] font-black text-white uppercase focus:ring-0" />
+              </div>
+              {isAdmin && (
+                <select value={filterStore} onChange={e => setFilterStore(e.target.value)} className="bg-transparent border-none text-[10px] font-black text-primary uppercase focus:ring-0 pr-8">
+                   <option value="TODAS LOJAS">TODAS LOJAS</option>
+                   {establishments.map(e => <option key={e.id} value={e.name}>{e.name}</option>)}
+                </select>
+              )}
+              <button onClick={() => window.print()} className="bg-primary hover:bg-blue-600 px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-2">
+                 <span className="material-symbols-outlined text-sm">print</span> IMPRIMIR
+              </button>
            </div>
-           {isAdmin && (
-             <select value={filterStore} onChange={e => setFilterStore(e.target.value)} className="bg-transparent border-none text-[10px] font-black text-primary uppercase focus:ring-0 pr-8">
-                <option value="TODAS LOJAS">TODAS LOJAS</option>
-                {establishments.map(e => <option key={e.id} value={e.name}>{e.name}</option>)}
-             </select>
-           )}
-           <button onClick={() => window.print()} className="bg-primary hover:bg-blue-600 px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-2">
-              <span className="material-symbols-outlined text-sm">print</span> IMPRIMIR
-           </button>
         </div>
       </div>
+
+      {/* PAINEL DE FILTROS AVANÇADOS (CONFERÊNCIA) */}
+      {reportType === 'conferencia_caixa' && (
+        <div className="bg-slate-900/40 p-6 rounded-[2.5rem] border border-slate-800 grid grid-cols-1 md:grid-cols-5 gap-4 animate-in slide-in-from-top-2 print:hidden">
+           <div className="space-y-1">
+              <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest px-2">Meio de Pagamento</label>
+              <select value={methodFilter} onChange={e => setMethodFilter(e.target.value)} className="w-full bg-slate-800 border-none rounded-xl text-[10px] font-black uppercase h-11 text-white">
+                 <option value="TODOS">TODOS OS MEIOS</option>
+                 <option value="Dinheiro">DINHEIRO</option>
+                 <option value="Pix">PIX</option>
+                 <option value="Debito">DÉBITO</option>
+                 <option value="Credito">CRÉDITO</option>
+              </select>
+           </div>
+           <div className="space-y-1">
+              <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest px-2">Parcelamento</label>
+              <select value={installmentsFilter} onChange={e => setInstallmentsFilter(e.target.value)} className="w-full bg-slate-800 border-none rounded-xl text-[10px] font-black uppercase h-11 text-white">
+                 <option value="TODAS">TODAS PARC.</option>
+                 {[1,2,3,4,5,6,10,12].map(n => <option key={n} value={String(n)}>{n}X</option>)}
+              </select>
+           </div>
+           <div className="space-y-1">
+              <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest px-2">Pesquisar Cliente</label>
+              <input value={customerSearch} onChange={e => setCustomerSearch(e.target.value)} placeholder="NOME DA CLIENTE..." className="w-full bg-slate-800 border-none rounded-xl text-[10px] font-black uppercase h-11 text-white" />
+           </div>
+           <div className="space-y-1 md:col-span-2">
+              <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest px-2">Faixa de Valor (R$)</label>
+              <div className="flex gap-2">
+                 <input type="number" placeholder="MIN" value={minValue} onChange={e => setMinValue(e.target.value)} className="w-full bg-slate-800 border-none rounded-xl text-[10px] font-black uppercase h-11 text-white" />
+                 <input type="number" placeholder="MAX" value={maxValue} onChange={e => setMaxValue(e.target.value)} className="w-full bg-slate-800 border-none rounded-xl text-[10px] font-black uppercase h-11 text-white" />
+              </div>
+           </div>
+        </div>
+      )}
 
       {/* HUB DE RELATÓRIOS (GRID DE SELEÇÃO) */}
       {showHub && (
