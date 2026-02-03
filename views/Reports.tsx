@@ -29,16 +29,17 @@ const Reports: React.FC = () => {
     });
   }, [transactions, startDate, endDate, isAdmin, currentStoreName, filterStore]);
 
-  // Definição dos 10 Modelos de Relatórios
+  // Definição dos Modelos de Relatórios
   const reportOptions = [
     { id: 'evolucao', label: 'Evolução de Vendas', icon: 'trending_up', color: 'bg-blue-500' },
     { id: 'por_unidade', label: 'Vendas por Unidade', icon: 'store', color: 'bg-emerald-500' },
     { id: 'por_produto', label: 'Vendas por Produto', icon: 'inventory_2', color: 'bg-amber-500' },
     { id: 'margem_bruta', label: 'Margem Bruta / Lucro', icon: 'payments', color: 'bg-rose-500' },
-    { id: 'por_vendedor', label: 'Desempenho Vendedor', icon: 'badge', color: 'bg-indigo-500' },
+    { id: 'ticket_vendedor', label: 'Ticket Médio / Vendedor', icon: 'badge', color: 'bg-indigo-500' },
+    { id: 'conferencia_caixa', label: 'Conferência de Caixa', icon: 'account_balance_wallet', color: 'bg-emerald-600' },
     { id: 'por_cliente', label: 'Ranking de Clientes', icon: 'groups', color: 'bg-cyan-500' },
     { id: 'por_servico', label: 'Serviços Prestados', icon: 'build', color: 'bg-orange-500' },
-    { id: 'ticket_medio', label: 'Análise Ticket Médio', icon: 'analytics', color: 'bg-purple-500' },
+    { id: 'ticket_medio', label: 'Ticket Médio / Loja', icon: 'analytics', color: 'bg-purple-500' },
     { id: 'giro_estoque', label: 'Giro de Estoque', icon: 'sync', color: 'bg-teal-500' },
     { id: 'por_vendas', label: 'Listagem Detalhada', icon: 'list_alt', color: 'bg-slate-500' },
   ];
@@ -56,6 +57,16 @@ const Reports: React.FC = () => {
           col3: t.client || 'Consumidor Final', 
           col4: `${t.items?.length || 0} itens`, 
           col5: t.method, 
+          value: t.value
+        }));
+
+      case 'conferencia_caixa':
+        return baseData.map(t => ({
+          col1: t.date.split('-').reverse().join('/'), 
+          col2: t.client || 'Consumidor Final', 
+          col3: t.method || 'Dinheiro', 
+          col4: t.installments ? `${t.installments}x` : '1x', 
+          col5: 'PAGO', 
           value: t.value
         }));
 
@@ -79,15 +90,20 @@ const Reports: React.FC = () => {
           col5: g.revenue > 0 ? `${(((g.revenue - g.cost) / g.revenue) * 100).toFixed(1)}%` : '0%'
         })).sort((a, b) => b.value - a.value);
 
-      case 'por_vendedor':
+      case 'ticket_vendedor':
         baseData.forEach(t => {
           const v = users.find(u => u.id === t.vendorId);
           const key = t.vendorId || 'BALCAO';
-          if (!groups[key]) groups[key] = { col1: v?.role || 'VENDEDOR', col2: t.store, col3: v?.name || 'BALCÃO', count: 0, value: 0 };
+          if (!groups[key]) groups[key] = { col1: v?.name || 'BALCÃO', col2: t.store, col3: v?.role || 'VENDEDOR', count: 0, value: 0 };
           groups[key].count += 1;
           groups[key].value += t.value;
         });
-        return Object.values(groups).map(g => ({ ...g, col4: `${g.count} Vendas`, col5: 'ATIVO', value: g.value })).sort((a, b) => b.value - a.value);
+        return Object.values(groups).map(g => ({ 
+          ...g, 
+          col4: `${g.count} Vendas`, 
+          col5: `T.M. R$ ${(g.value / g.count).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`,
+          value: g.value 
+        })).sort((a, b) => b.value - a.value);
 
       case 'por_cliente':
         baseData.forEach(t => {
@@ -140,7 +156,8 @@ const Reports: React.FC = () => {
   const getHeaders = () => {
     if (['por_produto', 'margem_bruta', 'giro_estoque', 'por_servico'].includes(reportType)) 
       return ['REF/SKU', 'CATEGORIA', 'DESCRIÇÃO ITEM', 'VOLUME', 'MARGEM/STATUS', 'TOTAL FATURADO'];
-    if (reportType === 'por_vendedor') return ['CARGO', 'UNIDADE', 'COLABORADOR', 'VOLUME', 'STATUS', 'TOTAL VENDIDO'];
+    if (reportType === 'ticket_vendedor') return ['VENDEDOR', 'UNIDADE', 'CARGO', 'VOL. VENDAS', 'TICKET MÉDIO', 'TOTAL VENDIDO'];
+    if (reportType === 'conferencia_caixa') return ['DATA', 'NOME DA CLIENTE', 'FORMA PAGTO', 'PARCELAS', 'STATUS', 'VALOR'];
     if (reportType === 'por_cliente') return ['TIPO', 'ÚLT. UNIDADE', 'NOME CLIENTE', 'FREQUÊNCIA', 'STATUS', 'TOTAL GASTO'];
     if (reportType === 'ticket_medio') return ['TIPO', 'CATEGORIA', 'UNIDADE', 'VOL. VENDAS', 'TICKET MÉDIO', 'TOTAL BRUTO'];
     return ['DATA', 'UNIDADE', 'IDENTIFICAÇÃO', 'DETALHE', 'MÉTODO', 'TOTAL'];
@@ -184,7 +201,7 @@ const Reports: React.FC = () => {
 
       {/* HUB DE RELATÓRIOS (GRID DE SELEÇÃO) */}
       {showHub && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 animate-in zoom-in-95 duration-300 print:hidden">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 animate-in zoom-in-95 duration-300 print:hidden">
            {reportOptions.map(opt => (
              <button 
                key={opt.id} 
