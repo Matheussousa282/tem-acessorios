@@ -422,6 +422,47 @@ const CashMovement: React.FC = () => {
               </div>
            </div>
         )}
+
+        <style>{`
+          @media print {
+            /* Garante que o corpo do documento de impressão seja visível e o resto oculto */
+            body * { visibility: hidden !important; }
+            #root, #root * { visibility: hidden !important; }
+            
+            /* Remove restrições de overflow do layout principal para permitir impressão multi-página */
+            #root, main, .flex-1 { 
+              overflow: visible !important; 
+              height: auto !important; 
+              display: block !important; 
+            }
+
+            /* Força a visibilidade apenas do bloco de relatório */
+            #cash-report-print, #cash-report-print * { 
+              visibility: visible !important; 
+              display: block !important; 
+            }
+
+            /* Posicionamento absoluto no topo da página de impressão */
+            #cash-report-print {
+              position: absolute !important;
+              left: 0 !important;
+              top: 0 !important;
+              width: 100% !important;
+              background: white !important;
+              color: black !important;
+              margin: 0 !important;
+              padding: 10mm !important;
+              border: none !important;
+            }
+
+            /* Remove cores escuras de fundo das tabelas na impressão para legibilidade */
+            #cash-report-print table { border: 1px solid #333 !important; }
+            #cash-report-print th { background-color: #f0f0f0 !important; color: black !important; }
+            #cash-report-print .bg-[#136dec] { background-color: #e0e0e0 !important; color: black !important; border: 1px solid #ccc !important; }
+
+            @page { size: auto; margin: 0mm; }
+          }
+        `}</style>
       </div>
     );
   }
@@ -494,7 +535,7 @@ const CashMovement: React.FC = () => {
                  </div>
                  <div className="space-y-1">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Selecionar Operador do Terminal</label>
-                    <select required value={selectedRegister} onChange={e => setSelectedRegister(e.target.value)} className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-xs font-black uppercase"><option value="">Selecione o Operador...</option>{availableCashiers.map((u, idx) => (<option key={u.id} value={`Caixa ${idx + 1} - ${u.name}`}>Caixa {idx + 1} - {u.name}</option>))}</select>
+                    <select required value={selectedRegister} onChange={e => setSelectedRegister(e.target.value)} className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-xs font-black uppercase"><option value="">Selecione o Operador...</option>{availableCashiers.map((u, idx) => (<option key={u.id} value={`Caixa {idx + 1} - {u.name}`}>Caixa {idx + 1} - {u.name}</option>))}</select>
                  </div>
                  <div className="space-y-1">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Fundo de Troco Inicial (R$)</label>
@@ -505,37 +546,6 @@ const CashMovement: React.FC = () => {
            </div>
         </div>
       )}
-
-      <style>{`
-        @media print {
-          /* Esconde absolutamente tudo da UI */
-          body * { visibility: hidden !important; }
-          /* Garante que o root não mate o render */
-          #root { display: block !important; }
-          /* Esconde menus específicos se ainda estiverem visíveis */
-          aside, header, footer, nav, .print\\:hidden, div[class*="fixed"], div[class*="backdrop-blur"] { 
-            display: none !important; 
-            opacity: 0 !important;
-          }
-          /* Mostra apenas a área do relatório e seus filhos */
-          #cash-report-print, #cash-report-print * { 
-            visibility: visible !important; 
-            display: block !important;
-          }
-          /* Posiciona o relatório no topo para a impressora térmica ou PDF */
-          #cash-report-print { 
-            position: absolute !important; 
-            left: 0 !important; 
-            top: 0 !important; 
-            width: 100% !important; 
-            background: white !important; 
-            color: black !important;
-            padding: 0 !important;
-            margin: 0 !important;
-          }
-          @page { size: auto; margin: 0mm; }
-        }
-      `}</style>
     </div>
   );
 };
