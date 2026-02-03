@@ -15,11 +15,9 @@ const CashMovement: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'lançamentos' | 'auditoria'>('lançamentos');
 
   const [showOpeningModal, setShowOpeningModal] = useState(false);
-  const [showEntryModal, setShowEntryModal] = useState<{show: boolean, type: 'INCOME' | 'EXPENSE' | 'TRANSFER'}>({show: false, type: 'INCOME'});
   
   const [openingValue, setOpeningValue] = useState(0);
   const [selectedRegister, setSelectedRegister] = useState('');
-  const [entryForm, setEntryForm] = useState({ description: '', value: 0, category: 'Ajuste Manual' });
 
   const currentStore = establishments.find(e => e.id === currentUser?.storeId);
 
@@ -75,13 +73,13 @@ const CashMovement: React.FC = () => {
 
     const sessionManualEntries = cashEntries.filter(e => e.sessionId === viewingSession.id);
 
-    // Resumo por Operadora/Bandeira para Cartões
     const resumoCartoes: Record<string, { count: number, value: number }> = {};
     sessionVendas.forEach(v => {
-       if (v.method === 'Credito' || v.method === 'Debito') {
-          const op = cardOperators.find(o => o.id === v.cardOperatorId)?.name || 'OUTRA';
-          const br = cardBrands.find(b => b.id === v.cardBrandId)?.name || 'OUTRA';
-          const key = `${v.method}: ${op} / ${br}`;
+       if (v.method === 'Credito' || v.method === 'Debito' || v.method === 'Pix') {
+          const methodKey = v.method === 'Pix' ? 'PIX' : v.method.toUpperCase();
+          const op = cardOperators.find(o => o.id === v.cardOperatorId)?.name || '';
+          const br = cardBrands.find(b => b.id === v.cardBrandId)?.name || '';
+          const key = op && br ? `${methodKey}: ${op} / ${br}` : methodKey;
           if (!resumoCartoes[key]) resumoCartoes[key] = { count: 0, value: 0 };
           resumoCartoes[key].count += 1;
           resumoCartoes[key].value += v.value;
@@ -162,24 +160,6 @@ const CashMovement: React.FC = () => {
     await refreshData();
   };
 
-  const handleAddEntry = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!viewingSession) return;
-    const entry: CashEntry = {
-      id: `ENT-${Date.now()}`,
-      sessionId: viewingSession.id,
-      type: showEntryModal.type,
-      category: entryForm.category,
-      description: entryForm.description,
-      value: entryForm.value,
-      timestamp: new Date().toLocaleTimeString('pt-BR')
-    };
-    await addCashEntry(entry);
-    setShowEntryModal({ ...showEntryModal, show: false });
-    setEntryForm({ description: '', value: 0, category: 'Ajuste Manual' });
-    await refreshData();
-  };
-
   const handleCloseCash = async () => {
     if (!viewingSession || !sessionData) return;
     const formattedBalance = Number(sessionData.saldoFinalCaixa).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
@@ -202,125 +182,171 @@ const CashMovement: React.FC = () => {
     return (
       <div className="p-6 space-y-6 animate-in slide-in-from-right-10 duration-500 pb-20 print:p-0">
         
-        {/* RELATÓRIO DE IMPRESSÃO (PERFEITAMENTE CENTRALIZADO E IDENTICO AO PRINT) */}
-        <div id="cash-report-print" className="hidden print:block bg-white text-black font-sans text-[10px] leading-tight w-full max-w-[210mm] mx-auto overflow-visible">
-           <div className="border-b border-slate-300 pb-4 mb-6">
-              <h1 className="font-black uppercase text-[12px] mb-2 text-left">DADOS DO MOVIMENTO DE CAIXA</h1>
-              <div className="grid grid-cols-2 gap-x-20">
+        {/* RELATÓRIO DE IMPRESSÃO (ESTILO EXATO DO PRINT) */}
+        <div id="cash-report-print" className="hidden print:block bg-white text-black font-sans text-[10px] leading-tight w-full max-w-[210mm] mx-auto p-4">
+           {/* CABEÇALHO SUPERIOR */}
+           <div className="mb-4">
+              <h1 className="font-black uppercase text-[12px] mb-2">DADOS DO MOVIMENTO DE CAIXA</h1>
+              <div className="grid grid-cols-2 text-[10px]">
                  <div className="space-y-0.5">
-                    <p className="font-black">DATA/HORA ABERTURA: <span className="font-normal">{viewingSession.openingTime}</span></p>
-                    <p className="font-black">OPERADOR: <span className="font-normal">{viewingSession.openingOperatorName?.toUpperCase()}</span></p>
+                    <p><span className="font-black uppercase">DATA/HORA ABERTURA:</span> <span>{viewingSession.openingTime}</span></p>
+                    <p><span className="font-black uppercase">OPERADOR:</span> <span>{viewingSession.openingOperatorName?.toUpperCase()}</span></p>
                  </div>
-                 <div className="space-y-0.5 text-right">
-                    <p className="font-black">DATA/HORA FECHAMENTO: <span className="font-normal">{viewingSession.closingTime || '--'}</span></p>
-                    <p className="font-black">OPERADOR: <span className="font-normal">{viewingSession.closingOperatorName?.toUpperCase() || '--'}</span></p>
+                 <div className="space-y-0.5">
+                    <p><span className="font-black uppercase">DATA/HORA FECHAMENTO:</span> <span>{viewingSession.closingTime || '--'}</span></p>
+                    <p><span className="font-black uppercase">OPERADOR:</span> <span>{viewingSession.closingOperatorName?.toUpperCase() || '--'}</span></p>
                  </div>
               </div>
+              <div className="border-b border-black w-full mt-2"></div>
            </div>
 
-           <div className="bg-[#136dec] text-white p-2 text-center font-black uppercase mb-6 text-[11px]">
+           {/* FAIXA AZUL CENTRAL - CAIXA */}
+           <div className="bg-[#136dec] text-white p-1.5 text-center font-black uppercase mb-4 text-[11px] print:bg-[#136dec] print:text-white">
               CAIXA: {viewingSession.id.slice(-4)} - {viewingSession.openingOperatorName?.toUpperCase()}
            </div>
 
-           <div className="bg-[#136dec] text-white p-1.5 text-center font-black uppercase mb-4 text-[10px]">
+           {/* SEÇÃO: LANÇAMENTOS DO DIA */}
+           <div className="text-center font-black uppercase mb-2 text-[10px]">
               LANÇAMENTOS DO DIA (VALORES EM ESPÉCIE / GAVETA)
            </div>
 
-           <div className="grid grid-cols-2 gap-8 mb-8">
-              <table className="w-full border-collapse border border-slate-900">
-                 <thead><tr className="bg-slate-50 border-b border-slate-900"><th className="p-1.5 text-left uppercase border-r border-slate-900 text-[9px] font-black">Classificação</th><th className="p-1.5 text-right uppercase text-[9px] font-black">Valor</th></tr></thead>
-                 <tbody>
-                    <tr className="border-b border-slate-900">
-                       <td className="p-1.5 border-r border-slate-900 uppercase">SALDO ANTERIOR (FUNDO)</td>
-                       <td className="p-1.5 text-right tabular-nums">R$ {Number(sessionData?.saldoAnterior || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
-                    </tr>
-                    <tr className="border-b border-slate-900">
-                       <td className="p-1.5 border-r border-slate-900 uppercase">VENDAS EM DINHEIRO (+)</td>
-                       <td className="p-1.5 text-right tabular-nums">R$ {Number(sessionData?.vendasEmDinheiro || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
-                    </tr>
-                    <tr className="font-black bg-slate-50"><td className="p-1.5 border-r border-slate-900 uppercase">TOTAIS ESPÉCIE</td><td className="p-1.5 text-right">R$ {Number(sessionData?.saldoFinalCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
-                 </tbody>
-              </table>
-              <table className="w-full border-collapse border border-slate-900">
-                 <thead><tr className="bg-slate-50 border-b border-slate-900"><th className="p-1.5 text-left uppercase border-r border-slate-900 text-[9px] font-black">Saídas / Sangrias</th><th className="p-1.5 text-right uppercase text-[9px] font-black">Valor</th></tr></thead>
-                 <tbody>
-                    <tr className="border-b border-slate-900"><td className="p-1.5 border-r border-slate-900 uppercase">TOTAL DE RETIRADAS (-)</td><td className="p-1.5 text-right tabular-nums">R$ {Number(sessionData?.totalSaidasCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
-                    <tr className="font-black bg-slate-50"><td className="p-1.5 border-r border-slate-900 uppercase">TOTAL SANGRIAS</td><td className="p-1.5 text-right">R$ {Number(sessionData?.totalSaidasCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
-                 </tbody>
-              </table>
+           <div className="flex gap-4 mb-6">
+              {/* TABELA ESQUERDA: CLASSIFICAÇÃO */}
+              <div className="flex-1">
+                 <table className="w-full border-collapse border border-black">
+                    <thead>
+                       <tr className="border-b border-black">
+                          <th className="p-1 text-left uppercase border-r border-black font-black text-[9px]">Classificação</th>
+                          <th className="p-1 text-right uppercase font-black text-[9px]">Valor</th>
+                       </tr>
+                    </thead>
+                    <tbody>
+                       <tr className="border-b border-black">
+                          <td className="p-1 border-r border-black uppercase">SALDO ANTERIOR (FUNDO)</td>
+                          <td className="p-1 text-right tabular-nums">R$ {Number(sessionData?.saldoAnterior || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                       </tr>
+                       <tr className="border-b border-black">
+                          <td className="p-1 border-r border-black uppercase">VENDAS EM DINHEIRO (+)</td>
+                          <td className="p-1 text-right tabular-nums">R$ {Number(sessionData?.vendasEmDinheiro || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                       </tr>
+                       <tr className="font-black">
+                          <td className="p-1 border-r border-black uppercase">TOTAIS ESPÉCIE</td>
+                          <td className="p-1 text-right">R$ {Number(sessionData?.saldoFinalCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                       </tr>
+                    </tbody>
+                 </table>
+              </div>
+
+              {/* TABELA DIREITA: SAÍDAS */}
+              <div className="flex-1">
+                 <table className="w-full border-collapse border border-black">
+                    <thead>
+                       <tr className="border-b border-black">
+                          <th className="p-1 text-left uppercase border-r border-black font-black text-[9px]">Saídas / Sangrias</th>
+                          <th className="p-1 text-right uppercase font-black text-[9px]">Valor</th>
+                       </tr>
+                    </thead>
+                    <tbody>
+                       <tr className="border-b border-black">
+                          <td className="p-1 border-r border-black uppercase">TOTAL DE RETIRADAS (-)</td>
+                          <td className="p-1 text-right tabular-nums">R$ {Number(sessionData?.totalSaidasCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                       </tr>
+                       <tr className="font-black">
+                          <td className="p-1 border-r border-black uppercase">TOTAL SANGRIAS</td>
+                          <td className="p-1 text-right">R$ {Number(sessionData?.totalSaidasCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                       </tr>
+                    </tbody>
+                 </table>
+              </div>
            </div>
 
-           <div className="bg-[#136dec] text-white p-1.5 text-center font-black uppercase mb-4 text-[10px]">
+           {/* FAIXA AZUL: RESUMO MEIO PAGAMENTO */}
+           <div className="bg-[#136dec] text-white p-1.5 text-center font-black uppercase mb-2 text-[10px] print:bg-[#136dec] print:text-white">
               RESUMO POR MEIO DE PAGAMENTO (CARTÕES / OUTROS)
            </div>
-           <table className="w-full border-collapse border border-slate-900 mb-8">
-              <thead><tr className="bg-slate-50 border-b border-slate-900"><th className="p-1.5 text-left uppercase border-r border-slate-900 text-[9px] font-black">Forma / Operadora / Bandeira</th><th className="p-1.5 text-center uppercase border-r border-slate-900 text-[9px] font-black w-32">Qtd. Notas</th><th className="p-1.5 text-right uppercase text-[9px] font-black w-40">Total Bruto</th></tr></thead>
+           <table className="w-full border-collapse border border-black mb-6">
+              <thead>
+                 <tr className="border-b border-black">
+                    <th className="p-1 text-left uppercase border-r border-black font-black text-[9px]">Forma / Operadora / Bandeira</th>
+                    <th className="p-1 text-center uppercase border-r border-black font-black text-[9px] w-28">Qtd. Notas</th>
+                    <th className="p-1 text-right uppercase font-black text-[9px] w-36">Total Bruto</th>
+                 </tr>
+              </thead>
               <tbody>
                  {Object.entries(sessionData?.resumoCartoes || {}).map(([key, data]) => (
-                    <tr key={key} className="border-b border-slate-900">
-                       <td className="p-1.5 uppercase border-r border-slate-900 font-bold">{key}</td>
-                       <td className="p-1.5 text-center border-r border-slate-900 font-bold tabular-nums">{data.count}</td>
-                       <td className="p-1.5 text-right tabular-nums font-black">R$ {data.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                    <tr key={key} className="border-b border-black font-bold">
+                       <td className="p-1 uppercase border-r border-black">{key}</td>
+                       <td className="p-1 text-center border-r border-black">{data.count}</td>
+                       <td className="p-1 text-right tabular-nums">R$ {data.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                     </tr>
                  ))}
-                 {Object.keys(sessionData?.resumoCartoes || {}).length === 0 && <tr><td colSpan={3} className="p-10 text-center opacity-40 uppercase italic font-bold">Sem movimentação de cartões no período</td></tr>}
+                 {Object.keys(sessionData?.resumoCartoes || {}).length === 0 && <tr><td colSpan={3} className="p-4 text-center opacity-30 uppercase italic font-bold">Sem movimentação de cartões</td></tr>}
               </tbody>
            </table>
 
-           <div className="bg-[#136dec] text-white p-1.5 text-center font-black uppercase mb-4 text-[10px]">
+           {/* FAIXA AZUL: LISTAGEM ANALÍTICA */}
+           <div className="bg-[#136dec] text-white p-1.5 text-center font-black uppercase mb-2 text-[10px] print:bg-[#136dec] print:text-white">
               LISTAGEM ANALÍTICA DAS VENDAS
            </div>
-           <table className="w-full border-collapse border border-slate-900 mb-8">
-              <thead><tr className="bg-slate-50 border-b border-slate-900"><th className="p-1.5 text-left uppercase border-r border-slate-900 text-[8px] font-black">Cliente</th><th className="p-1.5 text-left uppercase border-r border-slate-900 text-[8px] font-black">Forma / Operadora</th><th className="p-1.5 text-center uppercase border-r border-slate-900 text-[8px] font-black w-24">Parcelas</th><th className="p-1.5 text-right uppercase text-[8px] font-black w-40">Valor Líquido</th></tr></thead>
+           <table className="w-full border-collapse border border-black mb-6">
+              <thead>
+                 <tr className="border-b border-black">
+                    <th className="p-1 text-left uppercase border-r border-black font-black text-[8px] w-[180px]">Cliente</th>
+                    <th className="p-1 text-left uppercase border-r border-black font-black text-[8px] w-[220px]">Forma / Operadora</th>
+                    <th className="p-1 text-center uppercase border-r border-black font-black text-[8px] w-16">Parcelas</th>
+                    <th className="p-1 text-right uppercase font-black text-[8px]">Valor Líquido</th>
+                 </tr>
+              </thead>
               <tbody>
                  {sessionData?.allRecords.filter(r => r.cat === 'VENDA').map((v, idx) => (
-                    <tr key={idx} className="border-b border-slate-900">
-                       <td className="p-1.5 uppercase border-r border-slate-900 font-bold truncate max-w-[250px]">{v.client}</td>
-                       <td className="p-1.5 uppercase border-r border-slate-900 font-bold">{v.method} {v.operator ? `/ ${v.operator}` : ''}</td>
-                       <td className="p-1.5 text-center border-r border-slate-900 font-bold tabular-nums">{v.installments}x</td>
-                       <td className="p-1.5 text-right tabular-nums font-black">R$ {v.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                    <tr key={idx} className="border-b border-black font-bold">
+                       <td className="p-1 uppercase border-r border-black truncate">{v.client}</td>
+                       <td className="p-1 uppercase border-r border-black">{v.method} {v.operator ? `/ ${v.operator}` : ''}</td>
+                       <td className="p-1 text-center border-r border-black">{v.installments}x</td>
+                       <td className="p-1 text-right tabular-nums">R$ {v.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                     </tr>
                  ))}
-                 {sessionData?.allRecords.filter(r => r.cat === 'VENDA').length === 0 && <tr><td colSpan={4} className="p-10 text-center opacity-40 uppercase italic font-bold">Nenhuma venda analítica registrada</td></tr>}
               </tbody>
            </table>
 
-           <div className="border-t-4 border-amber-500 pt-4">
-              <div className="flex justify-between font-black uppercase text-[13px]">
+           {/* RODAPÉ TOTAL FATURADO */}
+           <div className="border-t-[3px] border-[#f59e0b] pt-1 mt-2">
+              <div className="flex justify-between font-black uppercase text-[11px] py-2">
                  <span className="text-slate-400">VALOR TOTAL FATURADO (TODOS MEIOS):</span>
-                 <span className="text-black text-[15px]">R$ {Number(sessionData?.totalVendasBruto || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                 <span className="text-black text-[13px]">R$ {Number(sessionData?.totalVendasBruto || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
               </div>
            </div>
            
-           <p className="mt-20 text-center opacity-40 text-[7px] uppercase font-black">TEM ACESSÓRIOS ERP - SISTEMA DE GESTÃO INTEGRADA - {new Date().toLocaleString('pt-BR')}</p>
+           <div className="mt-12 text-center opacity-40 text-[7px] uppercase font-black">
+              TEM ACESSÓRIOS ERP - SISTEMA DE GESTÃO - {new Date().toLocaleString('pt-BR')}
+           </div>
         </div>
 
-        {/* HEADER DETALHE (TELA - PRINT:HIDDEN) */}
+        {/* INTERFACE DE TELA (PRINT:HIDDEN) */}
         <div className="flex justify-between items-start bg-slate-50 dark:bg-slate-900/40 p-4 rounded-xl border border-slate-200 dark:border-slate-800 print:hidden">
            <div className="space-y-4">
               <h2 className="text-xl font-black text-slate-800 dark:text-white uppercase flex items-center gap-2">
-                 <span className="material-symbols-outlined text-primary">visibility</span> Movimentação de Caixa - Analítico
+                 <span className="material-symbols-outlined text-primary">visibility</span> Movimentação de Caixa
               </h2>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-2">
-                 <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase">ID Movimento:</span><span className="text-xs font-bold text-slate-600">{viewingSession.id}</span></div>
-                 <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Loja:</span><span className="text-xs font-bold text-primary uppercase">{viewingSession.storeName}</span></div>
-                 <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase">Status:</span><span className="text-xs font-bold text-slate-600 uppercase">{viewingSession.status}</span></div>
-                 <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase">Operador:</span><span className="text-xs font-bold text-slate-600 uppercase">{viewingSession.openingOperatorName}</span></div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-2 text-[11px] uppercase font-bold">
+                 <div className="flex flex-col"><span className="text-slate-400">ID Movimento:</span><span>{viewingSession.id}</span></div>
+                 <div className="flex flex-col"><span className="text-slate-400">Loja:</span><span className="text-primary">{viewingSession.storeName}</span></div>
+                 <div className="flex flex-col"><span className="text-slate-400">Status:</span><span>{viewingSession.status}</span></div>
+                 <div className="flex flex-col"><span className="text-slate-400">Operador:</span><span>{viewingSession.openingOperatorName}</span></div>
               </div>
            </div>
            <div className="flex gap-2">
-              <button onClick={() => window.print()} className="px-4 py-2 bg-slate-800 text-white rounded-lg text-[10px] font-black uppercase flex items-center gap-2 shadow-lg hover:bg-black transition-all">
-                 <span className="material-symbols-outlined text-sm">print</span> Imprimir Conferência
+              <button onClick={() => window.print()} className="px-6 py-2.5 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase flex items-center gap-2 hover:bg-black transition-all">
+                 <span className="material-symbols-outlined text-lg">print</span> Imprimir Conferência
               </button>
-              <button onClick={() => setViewingSession(null)} className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 rounded-lg text-[10px] font-black uppercase flex items-center gap-2 shadow-sm"><span className="material-symbols-outlined text-sm">arrow_back</span> Voltar</button>
+              <button onClick={() => setViewingSession(null)} className="px-6 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 rounded-xl text-[10px] font-black uppercase flex items-center gap-2"><span className="material-symbols-outlined text-lg">arrow_back</span> Voltar</button>
            </div>
         </div>
 
-        {/* CORPO DO DETALHE (TELA - PRINT:HIDDEN) */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm flex flex-col min-h-[500px] print:hidden">
            <div className="flex border-b border-slate-100 dark:border-slate-800 p-2 gap-1 bg-slate-50/50">
-              <button onClick={() => setActiveTab('lançamentos')} className={`px-6 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${activeTab === 'lançamentos' ? 'bg-primary text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>Detalhamento de Vendas e Lançamentos</button>
-              <button onClick={() => setActiveTab('auditoria')} className={`px-6 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${activeTab === 'auditoria' ? 'bg-primary text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>Resumo Cartões / Operadoras</button>
+              <button onClick={() => setActiveTab('lançamentos')} className={`px-6 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${activeTab === 'lançamentos' ? 'bg-primary text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>Lançamentos e Vendas</button>
+              <button onClick={() => setActiveTab('auditoria')} className={`px-6 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${activeTab === 'auditoria' ? 'bg-primary text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>Resumo Cartões</button>
               
               <div className="ml-auto">
                  {viewingSession.status === CashSessionStatus.OPEN && (
@@ -331,26 +357,22 @@ const CashMovement: React.FC = () => {
 
            {activeTab === 'lançamentos' ? (
              <div className="flex-1 overflow-auto">
-                <table className="w-full text-left text-[11px] font-bold border-collapse">
+                <table className="w-full text-left text-[11px] font-bold">
                    <thead className="bg-primary text-white sticky top-0 z-10">
                       <tr>
-                         <th className="px-4 py-2.5 w-10 text-center font-black uppercase"><span className="material-symbols-outlined text-sm">info</span></th>
-                         <th className="px-4 py-2.5 uppercase">Cliente</th>
-                         <th className="px-4 py-2.5 uppercase">Forma / Operadora</th>
-                         <th className="px-4 py-2.5 text-center uppercase">Band.</th>
-                         <th className="px-4 py-2.5 text-center uppercase">Parc.</th>
-                         <th className="px-4 py-2.5 text-right uppercase">Valor Bruto</th>
+                         <th className="px-4 py-3 uppercase">Cliente</th>
+                         <th className="px-4 py-3 uppercase">Forma / Operadora</th>
+                         <th className="px-4 py-3 text-center uppercase">Parc.</th>
+                         <th className="px-4 py-3 text-right uppercase">Valor Bruto</th>
                       </tr>
                    </thead>
-                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800 uppercase">
                       {sessionData?.allRecords.map(record => (
-                        <tr key={record.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                           <td className="px-4 py-2.5 text-center"><span className={`size-2.5 rounded-full inline-block ${record.natureza === 'E' ? 'bg-emerald-500' : 'bg-rose-500'}`}></span></td>
-                           <td className="px-4 py-2.5 uppercase text-slate-900 dark:text-white font-black">{record.client}</td>
-                           <td className="px-4 py-2.5 uppercase text-primary">{record.method} {record.operator ? `/ ${record.operator}` : ''}</td>
-                           <td className="px-4 py-2.5 text-center uppercase text-slate-400">{record.brand || '---'}</td>
-                           <td className="px-4 py-2.5 text-center font-black text-slate-400">{record.installments}x</td>
-                           <td className={`px-4 py-2.5 text-right font-black ${record.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>R$ {Number(record.value || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                        <tr key={record.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                           <td className="px-4 py-3 font-black text-slate-800 dark:text-white">{record.client}</td>
+                           <td className="px-4 py-3 text-primary">{record.method} {record.operator ? `/ ${record.operator}` : ''}</td>
+                           <td className="px-4 py-3 text-center text-slate-400">{record.installments}x</td>
+                           <td className="px-4 py-3 text-right font-black tabular-nums">R$ {Number(record.value || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                         </tr>
                       ))}
                    </tbody>
@@ -360,137 +382,55 @@ const CashMovement: React.FC = () => {
              <div className="p-8 space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                    <div className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700">
-                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Resumo Consolidado de Cartões</h4>
+                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Cartões e Outros Meios</h4>
                       <div className="space-y-4">
                          {Object.entries(sessionData?.resumoCartoes || {}).map(([key, data]) => (
                             <div key={key} className="flex justify-between items-center border-b border-slate-200 dark:border-slate-700 pb-2">
-                               <div className="flex flex-col">
-                                  <span className="text-xs font-black uppercase text-slate-700 dark:text-slate-200">{key}</span>
-                                  <span className="text-[9px] font-bold text-slate-400 uppercase">{data.count} Transações</span>
-                               </div>
+                               <div className="flex flex-col"><span className="text-xs font-black uppercase">{key}</span><span className="text-[9px] font-bold text-slate-400">{data.count} Transações</span></div>
                                <span className="text-sm font-black text-primary">R$ {data.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                             </div>
                          ))}
                       </div>
                    </div>
                    <div className="p-6 bg-slate-900 text-white rounded-3xl space-y-6">
-                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Informações de Abertura</h4>
-                      <div className="flex justify-between items-center"><span className="text-xs font-bold uppercase">Operador Responsável</span><span className="text-xs font-black uppercase">{viewingSession.openingOperatorName}</span></div>
-                      <div className="flex justify-between items-center"><span className="text-xs font-bold uppercase">Hora Abertura</span><span className="text-xs font-black uppercase">{viewingSession.openingTime}</span></div>
-                      <div className="flex justify-between items-center pt-4 border-t border-white/10"><span className="text-sm font-black uppercase text-primary">Fundo Inicial (Espécie)</span><span className="text-sm font-black text-white">R$ {Number(viewingSession.openingValue || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
+                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Informações em Espécie</h4>
+                      <div className="flex justify-between items-center"><span className="text-xs font-bold uppercase">Saldo Anterior (Fundo)</span><span className="text-xs font-black tabular-nums">R$ {Number(sessionData?.saldoAnterior || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
+                      <div className="flex justify-between items-center"><span className="text-xs font-bold uppercase">Vendas Dinheiro (+)</span><span className="text-xs font-black tabular-nums">R$ {Number(sessionData?.vendasEmDinheiro || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
+                      <div className="flex justify-between items-center pt-4 border-t border-white/10"><span className="text-sm font-black uppercase text-primary">Total em Gaveta</span><span className="text-sm font-black text-white tabular-nums">R$ {Number(sessionData?.saldoFinalCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
                    </div>
                 </div>
              </div>
            )}
         </div>
 
-        {/* RODAPÉ DE RESUMO (TELA - PRINT:HIDDEN) */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 print:hidden">
-           <div className="bg-slate-900 text-white p-4 rounded-2xl flex flex-col items-center shadow-lg">
-              <span className="text-[10px] font-black uppercase text-slate-400">Saldo Anterior:</span>
-              <span className="text-xl font-black tabular-nums">R$ {Number(sessionData?.saldoAnterior || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-           </div>
-           <div className="bg-slate-900 text-white p-4 rounded-2xl flex flex-col items-center shadow-lg">
-              <span className="text-[10px] font-black uppercase text-emerald-500">Total Entradas (Espécie):</span>
-              <span className="text-xl font-black tabular-nums">R$ {Number(sessionData?.totalEntradasCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-           </div>
-           <div className="bg-slate-900 text-white p-4 rounded-2xl flex flex-col items-center shadow-lg">
-              <span className="text-[10px] font-black uppercase text-rose-500">Total Saídas:</span>
-              <span className="text-xl font-black tabular-nums">R$ {Number(sessionData?.totalSaidasCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-           </div>
-           <div className="bg-primary text-white p-4 rounded-2xl flex flex-col items-center shadow-xl border-l-4 border-amber-400">
-              <span className="text-[10px] font-black uppercase text-white/70">Saldo Final em Gaveta:</span>
-              <span className="text-xl font-black tabular-nums">R$ {Number(sessionData?.saldoFinalCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-           </div>
-        </div>
-
         <style>{`
           @media print {
-            /* Forçar centralização absoluta */
             body * { visibility: hidden !important; }
-            
-            #root, #root > div, main, .flex-1, .p-6 { 
-              visibility: hidden !important;
-              display: block !important;
-              margin: 0 !important;
-              padding: 0 !important;
-              border: none !important;
-              background: white !important;
-              overflow: visible !important;
-            }
-
-            #cash-report-print, #cash-report-print * { 
-              visibility: visible !important; 
-              display: block !important; 
-            }
-
+            #root, main, .flex-1, .p-6 { visibility: hidden !important; display: block !important; height: auto !important; overflow: visible !important; margin: 0 !important; padding: 0 !important; }
+            #cash-report-print, #cash-report-print * { visibility: visible !important; }
             #cash-report-print {
-              position: static !important;
-              width: 190mm !important;
-              margin: 0 auto !important;
-              padding: 10mm 0 !important;
+              position: absolute !important;
+              left: 0 !important;
+              top: 0 !important;
+              width: 100% !important;
+              max-width: 210mm !important;
               background: white !important;
               color: black !important;
+              padding: 5mm !important;
+              margin: 0 !important;
               box-sizing: border-box !important;
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
             }
-
-            /* Estilo exato de tabelas */
-            #cash-report-print table { 
-              width: 100% !important; 
-              border: 1pt solid black !important; 
-              border-collapse: collapse !important;
-              margin-bottom: 5mm !important;
-              display: table !important;
-            }
-            #cash-report-print th, #cash-report-print td { 
-              border: 1pt solid black !important; 
-              padding: 5pt !important;
-              color: black !important;
-              background: none !important;
-              display: table-cell !important;
-            }
-            #cash-report-print tr { display: table-row !important; }
-            #cash-report-print th { 
-              font-weight: 900 !important;
-              background-color: #f2f2f2 !important;
-              text-align: center !important;
-            }
-            
-            /* Títulos e Alinhamentos */
-            #cash-report-print .text-center { text-align: center !important; width: 100% !important; }
-            #cash-report-print .text-right { text-align: right !important; }
-            #cash-report-print .text-left { text-align: left !important; }
-            
-            /* Faixas Azuis na Impressão */
-            #cash-report-print .bg-\\[\\#136dec\\] {
-              background-color: #136dec !important;
-              color: white !important;
-              -webkit-print-color-adjust: exact !important;
-            }
-
-            /* Borda Laranja no Rodapé */
-            #cash-report-print .border-amber-500 {
-              border-color: #f59e0b !important;
-              border-top-width: 3pt !important;
-            }
-
-            /* Grid Lado a Lado */
-            #cash-report-print .grid { 
-              display: flex !important;
-              gap: 10mm !important;
-              justify-content: space-between !important;
-              width: 100% !important;
-            }
-            #cash-report-print .grid-cols-2 > * { 
-              flex: 1 !important; 
-            }
-
-            @page { 
-              size: A4 portrait; 
-              margin: 10mm; 
-            }
+            #cash-report-print table { width: 100% !important; border: 1px solid black !important; border-collapse: collapse !important; }
+            #cash-report-print th, #cash-report-print td { border: 1px solid black !important; padding: 4px !important; color: black !important; }
+            #cash-report-print th { background-color: #f2f2f2 !important; font-weight: 900 !important; }
+            #cash-report-print .bg-\\[\\#136dec\\] { background-color: #136dec !important; color: white !important; }
+            #cash-report-print .border-b-black { border-bottom: 1px solid black !important; }
+            #cash-report-print .border-black { border: 1px solid black !important; }
+            #cash-report-print .grid { display: flex !important; gap: 4mm !important; }
+            #cash-report-print .flex-1 { flex: 1 !important; }
+            @page { size: A4 portrait; margin: 5mm; }
           }
         `}</style>
       </div>
@@ -499,79 +439,74 @@ const CashMovement: React.FC = () => {
 
   return (
     <div className="p-8 space-y-8 animate-in fade-in duration-500 pb-24">
-      <div className="bg-slate-50 dark:bg-slate-900/40 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-sm">
         <div>
-          <h2 className="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tight">Registro de Movimentação Diária do PDV</h2>
-          <div className="flex gap-4 mt-2 text-[10px] font-black text-slate-400 uppercase">
-             <span>Unidade: {currentStore?.name || 'Carregando...'}</span>
-             <span>Ref: {new Date().toLocaleDateString('pt-BR')}</span>
-          </div>
+          <h2 className="text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tight">Movimentação Diária de Caixas</h2>
+          <p className="text-slate-500 text-[10px] font-black uppercase mt-1">Controle de abertura, fechamento e conferência</p>
         </div>
-        <div className="flex gap-2">
-           <button onClick={() => setShowOpeningModal(true)} className="px-4 py-2 bg-emerald-500 text-white rounded-lg text-[10px] font-black uppercase flex items-center gap-2 shadow-lg shadow-emerald-500/20 hover:scale-105 transition-all"><span className="material-symbols-outlined text-sm">check_circle</span> Realizar Abertura</button>
-           <button onClick={() => navigate('/relatorios?type=conferencia_caixa')} className="px-4 py-2 bg-slate-800 text-white rounded-lg text-[10px] font-black uppercase flex items-center gap-2 shadow-lg transition-all hover:bg-black"><span className="material-symbols-outlined text-sm">monitoring</span> Relatórios Analíticos</button>
+        <div className="flex gap-3">
+           <button onClick={() => setShowOpeningModal(true)} className="px-6 py-3 bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase flex items-center gap-2 shadow-lg shadow-emerald-500/20 hover:scale-105 transition-all"><span className="material-symbols-outlined text-sm">add_circle</span> Abrir Novo Movimento</button>
+           <button onClick={() => navigate('/relatorios?type=conferencia_caixa')} className="px-6 py-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase flex items-center gap-2 shadow-lg hover:bg-black"><span className="material-symbols-outlined text-sm">monitoring</span> Auditoria Global</button>
         </div>
       </div>
 
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-sm">
          <div className="relative">
             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 text-lg">search</span>
-            <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="BUSCAR PELO NOME DO CAIXA OU OPERADOR..." className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-lg pl-10 text-[10px] font-black uppercase focus:ring-1 focus:ring-primary/20 h-10" />
+            <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="PESQUISAR TERMINAL OU OPERADOR..." className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-lg pl-10 text-[10px] font-black uppercase h-12" />
          </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
          <div className="overflow-x-auto">
-            <table className="w-full text-left text-[11px] font-bold">
-               <thead className="bg-primary text-white">
+            <table className="w-full text-left text-[11px] font-bold border-collapse">
+               <thead className="bg-primary text-white uppercase">
                   <tr>
-                     <th className="px-4 py-3 w-10 text-center uppercase"><span className="material-symbols-outlined text-sm">settings</span></th>
-                     <th className="px-4 py-3 uppercase">ID</th>
-                     <th className="px-4 py-3 uppercase">Terminal / Operador de Caixa</th>
-                     <th className="px-4 py-3 uppercase">Abertura</th>
-                     <th className="px-4 py-3 uppercase">Fechamento</th>
-                     <th className="px-4 py-3 uppercase">Status</th>
-                     <th className="px-4 py-3 text-right uppercase">Ação</th>
+                     <th className="px-6 py-4 w-10 text-center">Status</th>
+                     <th className="px-6 py-4">Caixa / Operador</th>
+                     <th className="px-6 py-4">Data Abertura</th>
+                     <th className="px-6 py-4">Data Fechamento</th>
+                     <th className="px-6 py-4 text-right">Ação</th>
                   </tr>
                </thead>
-               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+               <tbody className="divide-y divide-slate-100 dark:divide-slate-800 uppercase">
                   {filteredSessions.map(session => (
                     <tr key={session.id} onClick={() => setViewingSession(session)} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer group">
-                       <td className="px-4 py-3 text-center"><span className={`size-2.5 rounded-full inline-block ${session.status === CashSessionStatus.OPEN ? 'bg-emerald-500 animate-pulse' : 'bg-blue-500'}`}></span></td>
-                       <td className="px-4 py-3 font-mono text-slate-400">{session.id}</td>
-                       <td className="px-4 py-3 uppercase text-slate-900 dark:text-white group-hover:text-primary transition-colors">{session.registerName}</td>
-                       <td className="px-4 py-3 text-slate-400">{session.openingTime || '--:--'}</td>
-                       <td className="px-4 py-3 text-slate-400">{session.closingTime || '--:--'}</td>
-                       <td className="px-4 py-3 uppercase"><span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${session.status === CashSessionStatus.OPEN ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600'}`}>{session.status}</span></td>
-                       <td className="px-4 py-3 text-right"><button className="text-primary hover:underline uppercase text-[9px] font-black">Visualizar Detalhes</button></td>
+                       <td className="px-6 py-4 text-center"><span className={`size-3 rounded-full inline-block ${session.status === CashSessionStatus.OPEN ? 'bg-emerald-500 animate-pulse' : 'bg-blue-500'}`}></span></td>
+                       <td className="px-6 py-4"><p className="text-slate-900 dark:text-white font-black group-hover:text-primary transition-colors">{session.registerName}</p><p className="text-[9px] text-slate-400">ID: {session.id}</p></td>
+                       <td className="px-6 py-4 text-slate-500">{session.openingTime || '---'}</td>
+                       <td className="px-6 py-4 text-slate-500">{session.closingTime || 'EM ABERTO'}</td>
+                       <td className="px-6 py-4 text-right"><span className="text-primary hover:underline text-[9px] font-black">EXIBIR DETALHES</span></td>
                     </tr>
                   ))}
+                  {filteredSessions.length === 0 && (
+                    <tr><td colSpan={5} className="py-20 text-center opacity-30 font-black text-xs">NENHUM MOVIMENTO LOCALIZADO</td></tr>
+                  )}
                </tbody>
             </table>
          </div>
       </div>
 
       {showOpeningModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
            <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95">
               <div className="p-6 bg-primary text-white flex justify-between items-center">
-                 <h3 className="font-black uppercase tracking-tight">Abertura de Movimento PDV</h3>
+                 <h3 className="font-black uppercase tracking-tight">Abertura de Terminal</h3>
                  <button onClick={() => setShowOpeningModal(false)}><span className="material-symbols-outlined">close</span></button>
               </div>
               <form onSubmit={handleOpenCash} className="p-8 space-y-6">
                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Unidade de Venda</label>
-                    <div className="w-full h-12 bg-slate-100 dark:bg-slate-800 rounded-xl px-4 flex items-center text-xs font-black uppercase text-primary border border-primary/10">{currentStore?.name || 'Unidade não identificada'}</div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase px-2">Selecionar Terminal / Operador</label>
+                    <select required value={selectedRegister} onChange={e => setSelectedRegister(e.target.value)} className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-[11px] font-black uppercase">
+                       <option value="">Selecione...</option>
+                       {availableCashiers.map((u, idx) => (<option key={u.id} value={`CAIXA ${idx + 1} - ${u.name}`}>CAIXA {idx + 1} - {u.name}</option>))}
+                    </select>
                  </div>
                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Selecionar Operador do Terminal</label>
-                    <select required value={selectedRegister} onChange={e => setSelectedRegister(e.target.value)} className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-xs font-black uppercase"><option value="">Selecione o Operador...</option>{availableCashiers.map((u, idx) => (<option key={u.id} value={`Caixa ${idx + 1} - ${u.name}`}>Caixa {idx + 1} - {u.name}</option>))}</select>
-                 </div>
-                 <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Fundo de Troco Inicial (R$)</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase px-2">Fundo de Caixa Inicial (R$)</label>
                     <input autoFocus type="number" step="0.01" required value={openingValue} onChange={e => setOpeningValue(parseFloat(e.target.value) || 0)} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-6 text-xl font-black text-emerald-600" placeholder="0,00" />
                  </div>
-                 <button type="submit" disabled={availableCashiers.length === 0} className="w-full h-14 bg-primary text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-xl disabled:opacity-30">Confirmar Abertura</button>
+                 <button type="submit" disabled={availableCashiers.length === 0} className="w-full h-14 bg-primary text-white rounded-xl font-black text-[11px] uppercase tracking-widest shadow-xl shadow-primary/20">CONFIRMAR ABERTURA</button>
               </form>
            </div>
         </div>
