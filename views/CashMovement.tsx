@@ -189,7 +189,9 @@ const CashMovement: React.FC = () => {
 
   const handleCloseCash = async () => {
     if (!viewingSession || !sessionData) return;
-    if (confirm(`DESEJA REALMENTE FECHAR ESTE CAIXA?\nSaldo Final em Dinheiro: R$ ${sessionData.saldoFinalCaixa.toLocaleString('pt-BR')}`)) {
+    // Fix: Cast to number to ensure correct toLocaleString signature is used.
+    const formattedBalance = Number(sessionData.saldoFinalCaixa).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+    if (confirm(`DESEJA REALMENTE FECHAR ESTE CAIXA?\nSaldo Final em Dinheiro: R$ ${formattedBalance}`)) {
       const closedSession: CashSession = {
         ...viewingSession,
         status: CashSessionStatus.CLOSED,
@@ -268,16 +270,18 @@ const CashMovement: React.FC = () => {
                  <thead className="bg-[#136dec] text-white print:bg-slate-100 print:text-black"><tr><th colSpan={2} className="p-1 uppercase border border-slate-400">Entradas</th></tr></thead>
                  <tbody>
                     <tr className="text-[7px] font-black uppercase bg-slate-100 border-b border-slate-400"><td className="p-1 border-r border-slate-400">CLASSIFICAÇÃO</td><td className="p-1 text-right">VALOR</td></tr>
-                    <tr className="border-b border-slate-400"><td className="p-1 border-r border-slate-400 uppercase">001.015 - VENDAS (DINHEIRO)</td><td className="p-1 text-right tabular-nums">R$ {sessionData?.vendasEmDinheiro.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
-                    <tr className="font-black bg-slate-50"><td className="p-1 border-r border-slate-400">TOTAIS</td><td className="p-1 text-right">R$ {sessionData?.totalEntradasCaixa.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
+                    {/* Fix: Explicitly treat as number for toLocaleString and handle potential undefined. */}
+                    <tr className="border-b border-slate-400"><td className="p-1 border-r border-slate-400 uppercase">001.015 - VENDAS (DINHEIRO)</td><td className="p-1 text-right tabular-nums">R$ {Number(sessionData?.vendasEmDinheiro || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
+                    <tr className="font-black bg-slate-50"><td className="p-1 border-r border-slate-400">TOTAIS</td><td className="p-1 text-right">R$ {Number(sessionData?.totalEntradasCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
                  </tbody>
               </table>
               <table className="w-full border-collapse border border-slate-400">
                  <thead className="bg-[#136dec] text-white print:bg-slate-100 print:text-black"><tr><th colSpan={2} className="p-1 uppercase border border-slate-400">Saídas</th></tr></thead>
                  <tbody>
                     <tr className="text-[7px] font-black uppercase bg-slate-100 border-b border-slate-400"><td className="p-1 border-r border-slate-400">CLASSIFICAÇÃO</td><td className="p-1 text-right">VALOR</td></tr>
-                    <tr className="border-b border-slate-400"><td className="p-1 border-r border-slate-400 uppercase">004.001 - SANGRIAS / PAGOS</td><td className="p-1 text-right tabular-nums">R$ {sessionData?.totalSaidasCaixa.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
-                    <tr className="font-black bg-slate-50"><td className="p-1 border-r border-slate-400">TOTAIS</td><td className="p-1 text-right">R$ {sessionData?.totalSaidasCaixa.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
+                    {/* Fix: Explicitly treat as number for toLocaleString and handle potential undefined. */}
+                    <tr className="border-b border-slate-400"><td className="p-1 border-r border-slate-400 uppercase">004.001 - SANGRIAS / PAGOS</td><td className="p-1 text-right tabular-nums">R$ {Number(sessionData?.totalSaidasCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
+                    <tr className="font-black bg-slate-50"><td className="p-1 border-r border-slate-400">TOTAIS</td><td className="p-1 text-right">R$ {Number(sessionData?.totalSaidasCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
                  </tbody>
               </table>
            </div>
@@ -291,24 +295,27 @@ const CashMovement: React.FC = () => {
                  {Object.entries(sessionData?.resumoPagamentos || {}).sort().map(([method, val], idx) => (
                    <tr key={method} className={`border-b border-slate-400 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
                       <td className="p-1 uppercase font-bold border-r border-slate-400">{method}</td>
-                      <td className="p-1 text-right tabular-nums">R$ {val.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                      {/* Fix: Explicitly treat as number for toLocaleString. */}
+                      <td className="p-1 text-right tabular-nums">R$ {Number(val || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                    </tr>
                  ))}
                  <tr className="font-black bg-slate-100 border-t border-slate-400">
                     <td className="p-1 uppercase border-r border-slate-400">TOTAIS</td>
-                    <td className="p-1 text-right tabular-nums">R$ {sessionData?.totalVendasBruto.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                    {/* Fix: Explicitly treat as number for toLocaleString and handle potential undefined. */}
+                    <td className="p-1 text-right tabular-nums">R$ {Number(sessionData?.totalVendasBruto || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                  </tr>
               </tbody>
            </table>
 
-           <div className="bg-[#136dec] text-white p-1 text-center font-black uppercase mb-2 print:bg-slate-200 print:text-black">
+           <div className="bg-[#136dec] text-white p-1 text-center font-black uppercase mb-1 print:bg-slate-200 print:text-black">
               OUTRAS OPERAÇÕES
            </div>
            <div className="space-y-1">
-              <div className="bg-black text-white p-1.5 flex justify-between font-black uppercase text-[9px] print:bg-black print:text-white"><span>SALDO ANTERIOR:</span><span>R$ {sessionData?.saldoAnterior.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
-              <div className="bg-black text-white p-1.5 flex justify-between font-black uppercase text-[9px] print:bg-black print:text-white"><span>TOTAL ENTRADAS:</span><span>R$ {sessionData?.totalEntradasCaixa.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
-              <div className="bg-black text-white p-1.5 flex justify-between font-black uppercase text-[9px] print:bg-black print:text-white"><span>TOTAL SAÍDAS:</span><span>R$ {sessionData?.totalSaidasCaixa.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
-              <div className="bg-black text-white p-2 flex justify-between font-black uppercase text-[11px] border-t border-amber-500 mt-1 print:bg-black print:text-white"><span>SALDO FINAL DO DIA:</span><span>R$ {sessionData?.saldoFinalCaixa.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
+              {/* Fixes: Explicitly treat as numbers for toLocaleString calls and handle potential undefined values. */}
+              <div className="bg-black text-white p-1.5 flex justify-between font-black uppercase text-[9px] print:bg-black print:text-white"><span>SALDO ANTERIOR:</span><span>R$ {Number(sessionData?.saldoAnterior || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
+              <div className="bg-black text-white p-1.5 flex justify-between font-black uppercase text-[9px] print:bg-black print:text-white"><span>TOTAL ENTRADAS:</span><span>R$ {Number(sessionData?.totalEntradasCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
+              <div className="bg-black text-white p-1.5 flex justify-between font-black uppercase text-[9px] print:bg-black print:text-white"><span>TOTAL SAÍDAS:</span><span>R$ {Number(sessionData?.totalSaidasCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
+              <div className="bg-black text-white p-2 flex justify-between font-black uppercase text-[11px] border-t border-amber-500 mt-1 print:bg-black print:text-white"><span>SALDO FINAL DO DIA:</span><span>R$ {Number(sessionData?.saldoFinalCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
            </div>
            
            <p className="mt-8 text-center opacity-40 text-[7px] uppercase font-black">TEM ACESSÓRIOS ERP - RELATÓRIO DE CONFERÊNCIA DE MOVIMENTO</p>
@@ -384,7 +391,8 @@ const CashMovement: React.FC = () => {
                              <td className="px-4 py-2.5 text-center">
                                 <span className={`size-5 rounded-full inline-flex items-center justify-center text-[9px] text-white font-black ${record.natureza === 'E' ? 'bg-emerald-500' : record.natureza === 'S' ? 'bg-rose-500' : 'bg-blue-500'}`}>{record.natureza}</span>
                              </td>
-                             <td className={`px-4 py-2.5 text-right font-black ${record.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>R$ {record.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                             {/* Fix: Explicitly treat as number for toLocaleString. */}
+                             <td className={`px-4 py-2.5 text-right font-black ${record.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>R$ {Number(record.value || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                              <td className="px-4 py-2.5 text-slate-400 uppercase">{record.method || '---'}</td>
                              <td className="px-4 py-2.5 text-slate-500 uppercase truncate max-w-[250px]">{record.description}</td>
                           </tr>
@@ -400,7 +408,8 @@ const CashMovement: React.FC = () => {
                       <h4 className="text-[10px] font-black uppercase text-slate-400 mb-4 tracking-widest">Informações de Abertura</h4>
                       <p className="text-sm font-bold uppercase">Operador: {viewingSession.openingOperatorName}</p>
                       <p className="text-sm font-bold uppercase">Data/Hora: {viewingSession.openingTime}</p>
-                      <p className="text-sm font-black text-primary mt-2">Valor Inicial (Espécie): R$ {viewingSession.openingValue?.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                      {/* Fix: Explicitly treat as number for toLocaleString and handle potential undefined. */}
+                      <p className="text-sm font-black text-primary mt-2">Valor Inicial (Espécie): R$ {Number(viewingSession.openingValue || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
                    </div>
                 </div>
              </div>
@@ -409,21 +418,22 @@ const CashMovement: React.FC = () => {
 
         {/* RODAPÉ DE RESUMO (TELA) */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 print:hidden">
+           {/* Fixes: Explicitly treat as numbers for toLocaleString calls and handle potential undefined values. */}
            <div className="bg-black text-white p-3 rounded-lg flex flex-col items-center">
               <span className="text-[10px] font-black uppercase text-amber-500">Saldo Anterior:</span>
-              <span className="text-lg font-black tabular-nums">R$ {sessionData?.saldoAnterior.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+              <span className="text-lg font-black tabular-nums">R$ {Number(sessionData?.saldoAnterior || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
            </div>
            <div className="bg-black text-white p-3 rounded-lg flex flex-col items-center">
               <span className="text-[10px] font-black uppercase text-amber-500">Total Entradas:</span>
-              <span className="text-lg font-black tabular-nums">R$ {sessionData?.totalEntradasCaixa.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+              <span className="text-lg font-black tabular-nums">R$ {Number(sessionData?.totalEntradasCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
            </div>
            <div className="bg-black text-white p-3 rounded-lg flex flex-col items-center">
               <span className="text-[10px] font-black uppercase text-amber-500">Total Saídas:</span>
-              <span className="text-lg font-black tabular-nums">R$ {sessionData?.totalSaidasCaixa.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+              <span className="text-lg font-black tabular-nums">R$ {Number(sessionData?.totalSaidasCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
            </div>
            <div className="bg-black text-white p-3 rounded-lg flex flex-col items-center border-l-4 border-amber-500">
               <span className="text-[10px] font-black uppercase text-amber-500">Saldo em Dinheiro:</span>
-              <span className="text-lg font-black tabular-nums">R$ {sessionData?.saldoFinalCaixa.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+              <span className="text-lg font-black tabular-nums">R$ {Number(sessionData?.saldoFinalCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
            </div>
         </div>
 
