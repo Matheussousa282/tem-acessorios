@@ -20,17 +20,13 @@ const PDV: React.FC = () => {
   const isAdmin = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.MANAGER;
   const currentStore = useMemo(() => establishments.find(e => e.id === currentUser?.storeId) || { id: 'default', name: 'Terminal Local' } as Establishment, [establishments, currentUser]);
   
-  // Sincroniza dados ao abrir para garantir que o status do caixa esteja atualizado
   useEffect(() => {
     refreshData();
   }, []);
 
   const isCashOpen = useMemo(() => {
-    // Admins e Gerentes sempre conseguem entrar no PDV para supervisão
     if (isAdmin) return true;
-
     return cashSessions.some(s => 
-      // Verifica por ID ou por Nome da Loja para evitar travamentos por divergência de cadastro
       (s.storeId === currentUser?.storeId || s.storeName === currentStore.name) && 
       s.status === CashSessionStatus.OPEN
     );
@@ -46,6 +42,10 @@ const PDV: React.FC = () => {
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [showTerminalMenu, setShowTerminalMenu] = useState(false);
   
+  // NOVOS MODAIS: Edição de Item e Desconto Global
+  const [editingItem, setEditingItem] = useState<{ index: number, item: CartItem } | null>(null);
+  const [showGlobalDiscountModal, setShowGlobalDiscountModal] = useState(false);
+  
   // Estados de Negócio
   const [successType, setSuccessType] = useState<'SALE' | 'OS' | 'RETURN' | 'CANCEL'>('SALE');
   const [paymentMethod, setPaymentMethod] = useState('Dinheiro');
@@ -53,6 +53,7 @@ const PDV: React.FC = () => {
   const [selectedVendorId, setSelectedVendorId] = useState('');
   const [lastSaleData, setLastSaleData] = useState<any>(null);
   const [isFinalizing, setIsFinalizing] = useState(false);
+  const [globalDiscount, setGlobalDiscount] = useState(0);
 
   // Estados de Cartão
   const [cardInstallments, setCardInstallments] = useState(1);
@@ -66,6 +67,9 @@ const PDV: React.FC = () => {
   const [shippingValue, setShippingValue] = useState(0);
   const [priceInquirySearch, setPriceInquirySearch] = useState('');
   const [cancelSearchId, setCancelSearchId] = useState('');
+
+  // Edição de Item Local (Temp)
+  const [tempItemPrice, setTempItemPrice] = useState(0);
 
   // Estados de Troca (Returns)
   const [returnSearchTerm, setReturnSearchTerm] = useState('');
@@ -106,8 +110,9 @@ const PDV: React.FC = () => {
     return cardBrands.filter(b => b.operatorId === selectedOperatorId);
   }, [cardBrands, selectedOperatorId]);
 
+  // CÁLCULOS TOTAIS ATUALIZADOS
   const subtotal = useMemo(() => cart.reduce((acc, item) => acc + (item.salePrice * item.quantity), 0), [cart]);
-  const totalGeral = useMemo(() => subtotal + (Number(shippingValue) || 0), [subtotal, shippingValue]);
+  const totalGeral = useMemo(() => Math.max(0, subtotal + (Number(shippingValue) || 0) - (Number(globalDiscount) || 0)), [subtotal, shippingValue, globalDiscount]);
 
   const addToCart = (product: Product) => {
     if (!product.isService && product.stock <= 0) { alert('Produto sem estoque!'); return; }
@@ -148,6 +153,7 @@ const PDV: React.FC = () => {
         id: saleId, 
         items: [...cart], 
         subtotal, 
+        discount: globalDiscount,
         shipping: shippingValue, 
         total: totalGeral,
         payment: paymentMethod, 
@@ -160,10 +166,12 @@ const PDV: React.FC = () => {
       
       setLastSaleData(currentSaleData);
 
+      // Passamos o desconto global como um ajuste na venda
       await processSale(cart, totalGeral, paymentMethod, selectedCustomerId, selectedVendorId, shippingValue, cardDetails);
       
       setCart([]);
       setShippingValue(0);
+      setGlobalDiscount(0);
       setCardInstallments(1);
       setCardAuthNumber('');
       setCardNsu('');
@@ -175,6 +183,25 @@ const PDV: React.FC = () => {
     } finally {
       setIsFinalizing(false);
     }
+  };
+
+  const handleUpdateItemPrice = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingItem) return;
+    
+    const newCart = [...cart];
+    newCart[editingItem.index] = {
+      ...newCart[editingItem.index],
+      salePrice: tempItemPrice
+    };
+    
+    setCart(newCart);
+    setEditingItem(null);
+  };
+
+  const openItemEdit = (item: CartItem, index: number) => {
+    setEditingItem({ index, item });
+    setTempItemPrice(item.salePrice);
   };
 
   const handleCreateOS = async () => {
@@ -193,6 +220,7 @@ const PDV: React.FC = () => {
     };
     await addServiceOrder(newOS);
     setCart([]);
+    setGlobalDiscount(0);
     setOsDescription('');
     setShowOSModal(false);
     setSuccessType('OS');
@@ -256,6 +284,7 @@ const PDV: React.FC = () => {
   return (
     <div className="h-screen flex flex-col bg-slate-50 dark:bg-background-dark overflow-hidden font-display relative">
       
+      {/* RECIBO ATUALIZADO COM DESCONTO */}
       <div id="receipt-print-area" className="hidden print:block bg-white text-black font-mono text-[11px] leading-tight p-4">
         <div className="text-center space-y-1 mb-3 border-b-2 border-dashed border-black pb-2">
            {lastSaleData?.store?.logoUrl && <img src={lastSaleData.store.logoUrl} className="h-14 mx-auto mb-1 grayscale" alt="Logo" />}
@@ -295,6 +324,12 @@ const PDV: React.FC = () => {
               <span>SUBTOTAL:</span>
               <span>R$ {lastSaleData?.subtotal?.toLocaleString('pt-BR', {minimumFractionDigits: 2}) || '0,00'}</span>
            </div>
+           {lastSaleData?.discount > 0 && (
+             <div className="flex justify-between text-rose-600">
+                <span>DESCONTO (-):</span>
+                <span>R$ {lastSaleData?.discount?.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+             </div>
+           )}
            {lastSaleData?.shipping > 0 && (
              <div className="flex justify-between">
                 <span>FRETE (+):</span>
@@ -399,26 +434,53 @@ const PDV: React.FC = () => {
           <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
              {cart.length === 0 ? (
                <div className="h-full flex flex-col items-center justify-center opacity-20"><span className="material-symbols-outlined text-7xl">shopping_cart</span><p className="text-xs font-black uppercase mt-4">Carrinho Vazio</p></div>
-             ) : cart.map(item => (
-               <div key={item.id} className="flex items-center gap-4 bg-slate-50 dark:bg-slate-800 p-4 rounded-3xl group border border-transparent hover:border-primary/20 transition-all">
-                  <div className="flex-1 min-w-0">
-                     <p className="text-xs font-black uppercase truncate leading-none">{item.name}</p>
-                     <div className="flex justify-between items-center mt-2">
-                        <div className="flex items-center gap-3">
-                           <button onClick={() => setCart(prev => prev.map(i => i.id === item.id ? { ...i, quantity: Math.max(1, i.quantity - 1) } : i))} className="size-6 bg-slate-200 dark:bg-slate-700 rounded-lg flex items-center justify-center text-slate-500"><span className="material-symbols-outlined text-sm">remove</span></button>
-                           <span className="text-xs font-black tabular-nums">{item.quantity}</span>
-                           <button onClick={() => addToCart(item)} className="size-6 bg-primary/10 text-primary rounded-lg flex items-center justify-center"><span className="material-symbols-outlined text-sm">add</span></button>
-                        </div>
-                        <span className="text-sm font-black text-primary">R$ {(item.salePrice * item.quantity).toLocaleString('pt-BR')}</span>
-                     </div>
-                  </div>
-               </div>
-             ))}
+             ) : cart.map((item, idx) => {
+               // Encontrar o preço original para mostrar se houver desconto/acréscimo
+               const original = products.find(p => p.id === item.id);
+               const isPriceModified = original && original.salePrice !== item.salePrice;
+
+               return (
+                <div key={`${item.id}-${idx}`} onClick={() => openItemEdit(item, idx)} className="flex items-center gap-4 bg-slate-50 dark:bg-slate-800 p-4 rounded-3xl group border border-transparent hover:border-primary/20 transition-all cursor-pointer">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start">
+                        <p className="text-xs font-black uppercase truncate leading-none flex-1">{item.name}</p>
+                        <button onClick={(e) => { e.stopPropagation(); setCart(prev => prev.filter((_, i) => i !== idx)); }} className="size-5 bg-rose-500/10 text-rose-500 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"><span className="material-symbols-outlined text-xs">delete</span></button>
+                      </div>
+                      <div className="flex justify-between items-center mt-2">
+                          <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                            <button onClick={() => setCart(prev => prev.map((i, ix) => ix === idx ? { ...i, quantity: Math.max(1, i.quantity - 1) } : i))} className="size-6 bg-slate-200 dark:bg-slate-700 rounded-lg flex items-center justify-center text-slate-500"><span className="material-symbols-outlined text-sm">remove</span></button>
+                            <span className="text-xs font-black tabular-nums">{item.quantity}</span>
+                            <button onClick={() => setCart(prev => prev.map((i, ix) => ix === idx ? { ...i, quantity: i.quantity + 1 } : i))} className="size-6 bg-primary/10 text-primary rounded-lg flex items-center justify-center"><span className="material-symbols-outlined text-sm">add</span></button>
+                          </div>
+                          <div className="flex flex-col items-end">
+                            {isPriceModified && <span className="text-[8px] font-bold text-slate-400 line-through">R$ {original.salePrice.toLocaleString('pt-BR')}</span>}
+                            <span className={`text-sm font-black ${isPriceModified ? (item.salePrice < original.salePrice ? 'text-rose-500' : 'text-emerald-500') : 'text-primary'}`}>
+                              R$ {(item.salePrice * item.quantity).toLocaleString('pt-BR')}
+                            </span>
+                          </div>
+                      </div>
+                    </div>
+                </div>
+               );
+             })}
           </div>
           <div className="p-8 border-t-2 border-slate-100 dark:border-slate-800 space-y-4 bg-white dark:bg-slate-900 shadow-[0_-20px_50px_rgba(0,0,0,0.05)] shrink-0">
              <div className="space-y-2">
-                <div className="flex justify-between text-slate-500"><span className="text-[10px] font-black uppercase tracking-widest">Subtotal</span><span className="text-sm font-black tabular-nums">R$ {subtotal.toLocaleString('pt-BR')}</span></div>
-                <div className="flex justify-between pt-4 border-t border-slate-100 dark:border-slate-800"><span className="text-xs font-black uppercase opacity-50 tracking-widest">Total Geral</span><span className="text-4xl font-black text-slate-900 dark:text-white tabular-nums">R$ {totalGeral.toLocaleString('pt-BR')}</span></div>
+                <div className="flex justify-between text-slate-500 items-center">
+                  <span className="text-[10px] font-black uppercase tracking-widest">Subtotal Bruto</span>
+                  <span className="text-sm font-black tabular-nums">R$ {subtotal.toLocaleString('pt-BR')}</span>
+                </div>
+                
+                {/* BOTÃO E VALOR DE DESCONTO GLOBAL */}
+                <div className="flex justify-between items-center group">
+                  <button onClick={() => setShowGlobalDiscountModal(true)} className="flex items-center gap-1.5 text-rose-500 hover:bg-rose-500/10 px-3 py-1 rounded-lg transition-all">
+                    <span className="material-symbols-outlined text-sm">local_offer</span>
+                    <span className="text-[9px] font-black uppercase tracking-widest">Desconto Geral (-)</span>
+                  </button>
+                  <span className="text-sm font-black tabular-nums text-rose-500">- R$ {globalDiscount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                </div>
+
+                <div className="flex justify-between pt-4 border-t border-slate-100 dark:border-slate-800 items-baseline"><span className="text-xs font-black uppercase opacity-50 tracking-widest">Total Líquido</span><span className="text-4xl font-black text-slate-900 dark:text-white tabular-nums">R$ {totalGeral.toLocaleString('pt-BR')}</span></div>
              </div>
              <div className="grid grid-cols-2 gap-4 pt-2">
                 <button disabled={cart.length === 0} onClick={() => { if(!selectedCustomerId) { alert('Selecione um cliente!'); return; } setShowOSModal(true); }} className="py-5 bg-amber-500 hover:bg-amber-600 disabled:opacity-30 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl flex items-center justify-center gap-2 active:scale-95 transition-all">Gerar OS</button>
@@ -427,6 +489,90 @@ const PDV: React.FC = () => {
           </div>
         </aside>
       </main>
+
+      {/* MODAL DE EDIÇÃO DE ITEM NO CARRINHO */}
+      {editingItem && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 animate-in fade-in">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+              <div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-slate-900 text-white flex justify-between items-center">
+                 <div>
+                    <h3 className="text-xl font-black uppercase tracking-tight">AJUSTE DE ITEM</h3>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">{editingItem.item.name}</p>
+                 </div>
+                 <button onClick={() => setEditingItem(null)} className="material-symbols-outlined">close</button>
+              </div>
+              <form onSubmit={handleUpdateItemPrice} className="p-10 space-y-8">
+                 <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Preço Unitário de Venda (R$)</label>
+                    <div className="relative">
+                      <span className="absolute left-6 top-1/2 -translate-y-1/2 text-primary font-black text-lg">R$</span>
+                      <input 
+                        autoFocus 
+                        type="number" 
+                        step="0.01" 
+                        value={tempItemPrice} 
+                        onChange={e => setTempItemPrice(parseFloat(e.target.value) || 0)} 
+                        className="w-full h-20 bg-slate-50 dark:bg-slate-800 border-none rounded-[1.5rem] pl-16 pr-6 text-3xl font-black text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-primary/10 transition-all" 
+                      />
+                    </div>
+                 </div>
+
+                 <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl">
+                       <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Preço Original</p>
+                       <p className="text-sm font-black">R$ {products.find(p => p.id === editingItem.item.id)?.salePrice.toLocaleString('pt-BR')}</p>
+                    </div>
+                    <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl">
+                       <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Variação %</p>
+                       {(() => {
+                         const orig = products.find(p => p.id === editingItem.item.id)?.salePrice || 1;
+                         const diff = ((tempItemPrice / orig) - 1) * 100;
+                         return <p className={`text-sm font-black ${diff < 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{diff > 0 ? '+' : ''}{diff.toFixed(2)}%</p>
+                       })()}
+                    </div>
+                 </div>
+
+                 <button type="submit" className="w-full h-16 bg-primary text-white rounded-2xl font-black text-xs uppercase shadow-xl hover:bg-blue-600 transition-all">CONFIRMAR AJUSTE</button>
+              </form>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL DE DESCONTO GLOBAL */}
+      {showGlobalDiscountModal && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 animate-in fade-in">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+              <div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-rose-500 text-white flex justify-between items-center">
+                 <h3 className="text-xl font-black uppercase tracking-tight">DESCONTO GERAL</h3>
+                 <button onClick={() => setShowGlobalDiscountModal(false)} className="material-symbols-outlined">close</button>
+              </div>
+              <div className="p-10 space-y-8 text-center">
+                 <div className="space-y-1.5 text-left">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Valor Total do Desconto (R$)</label>
+                    <input 
+                      autoFocus 
+                      type="number" 
+                      step="0.01" 
+                      value={globalDiscount} 
+                      onChange={e => setGlobalDiscount(parseFloat(e.target.value) || 0)} 
+                      className="w-full h-20 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-3xl font-black text-rose-500 text-center outline-none focus:ring-4 focus:ring-rose-500/10 transition-all" 
+                    />
+                 </div>
+                 <div className="grid grid-cols-2 gap-4">
+                    <div className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl">
+                       <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Subtotal</p>
+                       <p className="text-lg font-black">R$ {subtotal.toLocaleString('pt-BR')}</p>
+                    </div>
+                    <div className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl">
+                       <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Total Final</p>
+                       <p className="text-lg font-black text-emerald-500">R$ {totalGeral.toLocaleString('pt-BR')}</p>
+                    </div>
+                 </div>
+                 <button onClick={() => setShowGlobalDiscountModal(false)} className="w-full h-16 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase shadow-xl hover:bg-black transition-all">APLICAR E VOLTAR</button>
+              </div>
+           </div>
+        </div>
+      )}
 
       {showCheckout && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 print:hidden">
