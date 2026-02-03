@@ -200,98 +200,101 @@ const CashMovement: React.FC = () => {
 
   if (viewingSession) {
     return (
-      <div className="p-6 space-y-6 animate-in slide-in-from-right-10 duration-500 pb-20">
+      <div className="p-6 space-y-6 animate-in slide-in-from-right-10 duration-500 pb-20 print:p-0">
         
-        {/* RELATÓRIO DE IMPRESSÃO (ESTILO CUPOM ANALÍTICO) */}
-        <div id="cash-report-print" className="hidden print:block bg-white text-black font-sans p-6 text-[10px] leading-tight w-full">
-           <div className="border-b border-slate-300 pb-2 mb-4">
-              <h1 className="font-black uppercase text-[11px] mb-1">DADOS DO MOVIMENTO DE CAIXA</h1>
-              <div className="grid grid-cols-2 gap-x-12">
-                 <div>
-                    <p className="font-bold">DATA/HORA ABERTURA: <span className="font-normal">{viewingSession.openingTime}</span></p>
-                    <p className="font-bold">OPERADOR: <span className="font-normal">{viewingSession.openingOperatorName?.toUpperCase()}</span></p>
+        {/* RELATÓRIO DE IMPRESSÃO (ESTILO CUPOM ANALÍTICO IGUAL AO PRINT) */}
+        <div id="cash-report-print" className="hidden print:block bg-white text-black font-sans p-4 text-[10px] leading-tight w-full">
+           <div className="border-b border-slate-300 pb-2 mb-6">
+              <h1 className="font-black uppercase text-[12px] mb-2">DADOS DO MOVIMENTO DE CAIXA</h1>
+              <div className="grid grid-cols-2 gap-x-24">
+                 <div className="space-y-1">
+                    <p className="font-black">DATA/HORA ABERTURA: <span className="font-bold">{viewingSession.openingTime}</span></p>
+                    <p className="font-black">OPERADOR: <span className="font-bold">{viewingSession.openingOperatorName?.toUpperCase()}</span></p>
                  </div>
-                 <div>
-                    <p className="font-bold">DATA/HORA FECHAMENTO: <span className="font-normal">{viewingSession.closingTime || '---'}</span></p>
-                    <p className="font-bold">OPERADOR: <span className="font-normal">{viewingSession.closingOperatorName?.toUpperCase() || '---'}</span></p>
+                 <div className="space-y-1">
+                    <p className="font-black">DATA/HORA FECHAMENTO: <span className="font-bold">{viewingSession.closingTime || '--'}</span></p>
+                    <p className="font-black">OPERADOR: <span className="font-bold">{viewingSession.closingOperatorName?.toUpperCase() || '--'}</span></p>
                  </div>
               </div>
            </div>
 
-           <div className="bg-[#136dec] text-white p-2 text-center font-black uppercase mb-4 text-[10px] print:bg-slate-100 print:text-black print:border print:border-slate-300">
+           <div className="text-center font-black uppercase mb-6 text-[11px] py-1">
               CAIXA: {viewingSession.id.slice(-4)} - {viewingSession.openingOperatorName?.toUpperCase()}
            </div>
 
-           <div className="bg-[#136dec] text-white p-1 text-center font-black uppercase mb-1 print:bg-slate-50 print:text-black print:border-x print:border-t print:border-slate-200">
+           <div className="text-center font-black uppercase mb-2">
               LANÇAMENTOS DO DIA (VALORES EM ESPÉCIE / GAVETA)
            </div>
 
-           <div className="grid grid-cols-2 gap-1 mb-4">
-              <table className="w-full border-collapse border border-slate-400">
-                 <thead className="bg-slate-100"><tr className="border-b border-slate-400 text-[8px]"><th className="p-1 text-left uppercase border-r border-slate-400">Classificação</th><th className="p-1 text-right uppercase">Valor</th></tr></thead>
+           <div className="grid grid-cols-2 gap-4 mb-6">
+              <table className="w-full border-collapse border border-slate-900">
+                 <thead><tr className="border-b border-slate-900"><th className="p-1.5 text-left uppercase border-r border-slate-900 text-[9px] font-black">Classificação</th><th className="p-1.5 text-right uppercase text-[9px] font-black">Valor</th></tr></thead>
                  <tbody>
-                    <tr className="border-b border-slate-400">
-                       <td className="p-1 border-r border-slate-400 uppercase">SALDO ANTERIOR (FUNDO)</td>
-                       <td className="p-1 text-right tabular-nums">R$ {Number(sessionData?.saldoAnterior || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                    <tr className="border-b border-slate-900">
+                       <td className="p-1.5 border-r border-slate-900 font-bold uppercase">SALDO ANTERIOR (FUNDO)</td>
+                       <td className="p-1.5 text-right tabular-nums font-bold">R$ {Number(sessionData?.saldoAnterior || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                     </tr>
-                    <tr className="border-b border-slate-400">
-                       <td className="p-1 border-r border-slate-400 uppercase">VENDAS EM DINHEIRO (+)</td>
-                       <td className="p-1 text-right tabular-nums">R$ {Number(sessionData?.vendasEmDinheiro || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                    <tr className="border-b border-slate-900">
+                       <td className="p-1.5 border-r border-slate-900 font-bold uppercase">VENDAS EM DINHEIRO (+)</td>
+                       <td className="p-1.5 text-right tabular-nums font-bold">R$ {Number(sessionData?.vendasEmDinheiro || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                     </tr>
-                    <tr className="font-black bg-slate-50"><td className="p-1 border-r border-slate-400">TOTAIS ESPÉCIE</td><td className="p-1 text-right">R$ {Number(sessionData?.saldoFinalCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
+                    <tr className="font-black"><td className="p-1.5 border-r border-slate-900">TOTAIS ESPÉCIE</td><td className="p-1.5 text-right">R$ {Number(sessionData?.saldoFinalCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
                  </tbody>
               </table>
-              <table className="w-full border-collapse border border-slate-400">
-                 <thead className="bg-slate-100"><tr className="border-b border-slate-400 text-[8px]"><th className="p-1 text-left uppercase border-r border-slate-400">Saídas / Sangrias</th><th className="p-1 text-right uppercase">Valor</th></tr></thead>
+              <table className="w-full border-collapse border border-slate-900">
+                 <thead><tr className="border-b border-slate-900"><th className="p-1.5 text-left uppercase border-r border-slate-900 text-[9px] font-black">Saídas / Sangrias</th><th className="p-1.5 text-right uppercase text-[9px] font-black">Valor</th></tr></thead>
                  <tbody>
-                    <tr className="border-b border-slate-400"><td className="p-1 border-r border-slate-400 uppercase">TOTAL DE RETIRADAS (-)</td><td className="p-1 text-right tabular-nums">R$ {Number(sessionData?.totalSaidasCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
-                    <tr className="font-black bg-slate-50"><td className="p-1 border-r border-slate-400">TOTAL SANGRIAS</td><td className="p-1 text-right">R$ {Number(sessionData?.totalSaidasCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
+                    <tr className="border-b border-slate-900"><td className="p-1.5 border-r border-slate-900 font-bold uppercase">TOTAL DE RETIRADAS (-)</td><td className="p-1.5 text-right tabular-nums font-bold">R$ {Number(sessionData?.totalSaidasCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
+                    <tr className="font-black"><td className="p-1.5 border-r border-slate-900 uppercase">TOTAL SANGRIAS</td><td className="p-1.5 text-right">R$ {Number(sessionData?.totalSaidasCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
                  </tbody>
               </table>
            </div>
 
-           <div className="bg-[#136dec] text-white p-1 text-center font-black uppercase mb-1 print:bg-slate-50 print:text-black print:border-x print:border-t print:border-slate-200">
+           <div className="text-center font-black uppercase mb-2">
               RESUMO POR MEIO DE PAGAMENTO (CARTÕES / OUTROS)
            </div>
-           <table className="w-full border-collapse border border-slate-400 mb-4">
-              <thead className="bg-slate-100 text-[8px]"><tr className="border-b border-slate-400"><th className="p-1 text-left uppercase border-r border-slate-400">Forma / Operadora / Bandeira</th><th className="p-1 text-center uppercase border-r border-slate-400">Qtd. Notas</th><th className="p-1 text-right uppercase">Total Bruto</th></tr></thead>
+           <table className="w-full border-collapse border border-slate-900 mb-6">
+              <thead><tr className="border-b border-slate-900"><th className="p-1.5 text-left uppercase border-r border-slate-900 text-[9px] font-black">Forma / Operadora / Bandeira</th><th className="p-1.5 text-center uppercase border-r border-slate-900 text-[9px] font-black w-24">Qtd. Notas</th><th className="p-1.5 text-right uppercase text-[9px] font-black w-32">Total Bruto</th></tr></thead>
               <tbody>
                  {Object.entries(sessionData?.resumoCartoes || {}).map(([key, data]) => (
-                    <tr key={key} className="border-b border-slate-400 text-[8px]">
-                       <td className="p-1 uppercase border-r border-slate-400">{key}</td>
-                       <td className="p-1 text-center border-r border-slate-400">{data.count}</td>
-                       <td className="p-1 text-right tabular-nums font-black">R$ {data.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                    <tr key={key} className="border-b border-slate-900">
+                       <td className="p-1.5 uppercase border-r border-slate-900 font-bold">{key}</td>
+                       <td className="p-1.5 text-center border-r border-slate-900 font-bold">{data.count}</td>
+                       <td className="p-1.5 text-right tabular-nums font-black">R$ {data.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                     </tr>
                  ))}
-                 {Object.keys(sessionData?.resumoCartoes || {}).length === 0 && <tr><td colSpan={3} className="p-4 text-center opacity-40 uppercase">Sem movimentação de cartões</td></tr>}
+                 {Object.keys(sessionData?.resumoCartoes || {}).length === 0 && <tr><td colSpan={3} className="p-4 text-center opacity-40 uppercase italic">Sem movimentação de cartões</td></tr>}
               </tbody>
            </table>
 
-           <div className="bg-[#136dec] text-white p-1 text-center font-black uppercase mb-1 print:bg-slate-50 print:text-black print:border-x print:border-t print:border-slate-200">
+           <div className="text-center font-black uppercase mb-2">
               LISTAGEM ANALÍTICA DAS VENDAS
            </div>
-           <table className="w-full border-collapse border border-slate-400 mb-4">
-              <thead className="bg-slate-100 text-[7px]"><tr className="border-b border-slate-400"><th className="p-1 text-left uppercase border-r border-slate-400">Cliente</th><th className="p-1 text-left uppercase border-r border-slate-400">Forma / Operadora</th><th className="p-1 text-center uppercase border-r border-slate-400">Parcelas</th><th className="p-1 text-right uppercase">Valor Líquido</th></tr></thead>
+           <table className="w-full border-collapse border border-slate-900 mb-6">
+              <thead><tr className="border-b border-slate-900"><th className="p-1.5 text-left uppercase border-r border-slate-900 text-[8px] font-black">Cliente</th><th className="p-1.5 text-left uppercase border-r border-slate-900 text-[8px] font-black">Forma / Operadora</th><th className="p-1.5 text-center uppercase border-r border-slate-900 text-[8px] font-black w-16">Parcelas</th><th className="p-1.5 text-right uppercase text-[8px] font-black w-32">Valor Líquido</th></tr></thead>
               <tbody>
                  {sessionData?.allRecords.filter(r => r.cat === 'VENDA').map((v, idx) => (
-                    <tr key={idx} className={`border-b border-slate-400 text-[7px] ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
-                       <td className="p-1 uppercase border-r border-slate-400 truncate max-w-[150px]">{v.client}</td>
-                       <td className="p-1 uppercase border-r border-slate-400">{v.method} {v.operator ? `/ ${v.operator}` : ''}</td>
-                       <td className="p-1 text-center border-r border-slate-400">{v.installments}x</td>
-                       <td className="p-1 text-right tabular-nums font-black">R$ {v.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                    <tr key={idx} className="border-b border-slate-900">
+                       <td className="p-1.5 uppercase border-r border-slate-900 font-bold truncate max-w-[200px]">{v.client}</td>
+                       <td className="p-1.5 uppercase border-r border-slate-900 font-bold">{v.method} {v.operator ? `/ ${v.operator}` : ''}</td>
+                       <td className="p-1.5 text-center border-r border-slate-900 font-bold">{v.installments}x</td>
+                       <td className="p-1.5 text-right tabular-nums font-black">R$ {v.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                     </tr>
                  ))}
               </tbody>
            </table>
 
-           <div className="space-y-1">
-              <div className="bg-black text-white p-2 flex justify-between font-black uppercase text-[11px] border-t border-amber-500 mt-1 print:bg-slate-900 print:text-white"><span>VALOR TOTAL FATURADO (TODOS MEIOS):</span><span>R$ {Number(sessionData?.totalVendasBruto || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
+           <div className="border-t-2 border-amber-500 pt-1">
+              <div className="flex justify-between font-black uppercase text-[12px] py-2">
+                 <span className="text-slate-400">VALOR TOTAL FATURADO (TODOS MEIOS):</span>
+                 <span className="text-slate-900">R$ {Number(sessionData?.totalVendasBruto || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+              </div>
            </div>
            
-           <p className="mt-8 text-center opacity-40 text-[7px] uppercase font-black">TEM ACESSÓRIOS ERP - SISTEMA DE GESTÃO - {new Date().toLocaleString()}</p>
+           <p className="mt-12 text-center opacity-40 text-[7px] uppercase font-black">TEM ACESSÓRIOS ERP - SISTEMA DE GESTÃO - {new Date().toLocaleString()}</p>
         </div>
 
-        {/* HEADER DETALHE (TELA) */}
+        {/* HEADER DETALHE (TELA - PRINT:HIDDEN) */}
         <div className="flex justify-between items-start bg-slate-50 dark:bg-slate-900/40 p-4 rounded-xl border border-slate-200 dark:border-slate-800 print:hidden">
            <div className="space-y-4">
               <h2 className="text-xl font-black text-slate-800 dark:text-white uppercase flex items-center gap-2">
@@ -312,7 +315,7 @@ const CashMovement: React.FC = () => {
            </div>
         </div>
 
-        {/* CORPO DO DETALHE (TELA) */}
+        {/* CORPO DO DETALHE (TELA - PRINT:HIDDEN) */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm flex flex-col min-h-[500px] print:hidden">
            <div className="flex border-b border-slate-100 dark:border-slate-800 p-2 gap-1 bg-slate-50/50">
               <button onClick={() => setActiveTab('lançamentos')} className={`px-6 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${activeTab === 'lançamentos' ? 'bg-primary text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>Detalhamento de Vendas e Lançamentos</button>
@@ -380,7 +383,7 @@ const CashMovement: React.FC = () => {
            )}
         </div>
 
-        {/* RODAPÉ DE RESUMO (TELA) */}
+        {/* RODAPÉ DE RESUMO (TELA - PRINT:HIDDEN) */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 print:hidden">
            <div className="bg-slate-900 text-white p-4 rounded-2xl flex flex-col items-center shadow-lg">
               <span className="text-[10px] font-black uppercase text-slate-400">Saldo Anterior:</span>
@@ -402,25 +405,20 @@ const CashMovement: React.FC = () => {
 
         <style>{`
           @media print {
-            /* 1. Ocultar TUDO por padrão */
+            /* Oculta tudo por padrão e isola o container do relatório */
             body * { visibility: hidden !important; }
             
-            /* 2. Reseta o display do root e containers pais para não ocuparem espaço */
             #root, #root > div, main, .flex-1 { 
               visibility: hidden !important;
               display: block !important;
-              margin: 0 !important;
-              padding: 0 !important;
               height: auto !important;
               overflow: visible !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              border: none !important;
             }
 
-            /* 3. Oculta explicitamente Sidebar, Header e botões de interface */
-            aside, header, nav, footer, .print\\:hidden, button { 
-              display: none !important; 
-            }
-
-            /* 4. Torna o relatório visível e o força para o topo da página */
+            /* Força visibilidade apenas do bloco do relatório e filhos */
             #cash-report-print, #cash-report-print * { 
               visibility: visible !important; 
               display: block !important; 
@@ -431,39 +429,37 @@ const CashMovement: React.FC = () => {
               left: 0 !important;
               top: 0 !important;
               width: 100% !important;
-              margin: 0 !important;
-              padding: 15mm !important;
               background: white !important;
               color: black !important;
-              border: none !important;
-              box-shadow: none !important;
+              padding: 10mm !important;
+              margin: 0 !important;
             }
 
-            /* Ajustes finos de tabela para impressão */
+            /* Força visibilidade de grid e flex no print para manter o layout do relatório */
+            #cash-report-print .grid { display: grid !important; }
+            #cash-report-print .flex { display: flex !important; }
+            #cash-report-print table { display: table !important; }
+            #cash-report-print tr { display: table-row !important; }
+            #cash-report-print td, #cash-report-print th { display: table-cell !important; }
+
+            /* Ajustes de bordas e tabelas para o estilo do print */
             #cash-report-print table { 
-              width: 100% !important; 
-              border: 1px solid #333 !important; 
+              border: 1.5pt solid black !important; 
               border-collapse: collapse !important;
-              margin-bottom: 5mm !important;
             }
             #cash-report-print th, #cash-report-print td { 
-              border: 0.5pt solid #ccc !important;
-              padding: 1.5mm !important;
+              border: 1pt solid black !important; 
+              padding: 4pt !important;
               color: black !important;
             }
-            #cash-report-print th { background-color: #f0f0f0 !important; }
-
-            /* Manter as barras pretas de totalizadores */
-            #cash-report-print .bg-black { 
-              background-color: #000 !important; 
-              color: #fff !important; 
-              -webkit-print-color-adjust: exact; 
-              print-color-adjust: exact;
-            }
+            
+            /* Rodapé totalizador estilo print */
+            #cash-report-print .text-slate-400 { color: #666 !important; }
+            #cash-report-print .border-amber-500 { border-color: orange !important; }
 
             @page { 
               size: A4 portrait; 
-              margin: 0; 
+              margin: 0mm; 
             }
           }
         `}</style>
