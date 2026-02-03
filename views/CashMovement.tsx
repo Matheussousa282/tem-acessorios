@@ -202,96 +202,97 @@ const CashMovement: React.FC = () => {
     return (
       <div className="p-6 space-y-6 animate-in slide-in-from-right-10 duration-500 pb-20 print:p-0">
         
-        {/* RELATÓRIO DE IMPRESSÃO (ESTILO ANALÍTICO IDÊNTICO AO PRINT) */}
-        <div id="cash-report-print" className="hidden print:block bg-white text-black font-sans text-[10px] leading-tight w-full mx-auto">
-           <div className="border-b border-slate-300 pb-2 mb-6">
-              <h1 className="font-black uppercase text-[12px] mb-2">DADOS DO MOVIMENTO DE CAIXA</h1>
+        {/* RELATÓRIO DE IMPRESSÃO (PERFEITAMENTE CENTRALIZADO E IDENTICO AO PRINT) */}
+        <div id="cash-report-print" className="hidden print:block bg-white text-black font-sans text-[10px] leading-tight w-full max-w-[210mm] mx-auto overflow-visible">
+           <div className="border-b border-slate-300 pb-4 mb-6">
+              <h1 className="font-black uppercase text-[12px] mb-2 text-left">DADOS DO MOVIMENTO DE CAIXA</h1>
               <div className="grid grid-cols-2 gap-x-20">
                  <div className="space-y-0.5">
                     <p className="font-black">DATA/HORA ABERTURA: <span className="font-normal">{viewingSession.openingTime}</span></p>
                     <p className="font-black">OPERADOR: <span className="font-normal">{viewingSession.openingOperatorName?.toUpperCase()}</span></p>
                  </div>
-                 <div className="space-y-0.5">
+                 <div className="space-y-0.5 text-right">
                     <p className="font-black">DATA/HORA FECHAMENTO: <span className="font-normal">{viewingSession.closingTime || '--'}</span></p>
                     <p className="font-black">OPERADOR: <span className="font-normal">{viewingSession.closingOperatorName?.toUpperCase() || '--'}</span></p>
                  </div>
               </div>
            </div>
 
-           <div className="bg-[#136dec] text-white p-2 text-center font-black uppercase mb-6 text-[11px] print:bg-[#136dec] print:text-white">
+           <div className="bg-[#136dec] text-white p-2 text-center font-black uppercase mb-6 text-[11px]">
               CAIXA: {viewingSession.id.slice(-4)} - {viewingSession.openingOperatorName?.toUpperCase()}
            </div>
 
-           <div className="text-center font-black uppercase mb-2">
+           <div className="bg-[#136dec] text-white p-1.5 text-center font-black uppercase mb-4 text-[10px]">
               LANÇAMENTOS DO DIA (VALORES EM ESPÉCIE / GAVETA)
            </div>
 
-           <div className="grid grid-cols-2 gap-4 mb-8">
-              <table className="w-full border-collapse border border-black">
-                 <thead className="bg-slate-50"><tr className="border-b border-black"><th className="p-1.5 text-left uppercase border-r border-black text-[9px] font-black">Classificação</th><th className="p-1.5 text-right uppercase text-[9px] font-black">Valor</th></tr></thead>
+           <div className="grid grid-cols-2 gap-8 mb-8">
+              <table className="w-full border-collapse border border-slate-900">
+                 <thead><tr className="bg-slate-50 border-b border-slate-900"><th className="p-1.5 text-left uppercase border-r border-slate-900 text-[9px] font-black">Classificação</th><th className="p-1.5 text-right uppercase text-[9px] font-black">Valor</th></tr></thead>
                  <tbody>
-                    <tr className="border-b border-black">
-                       <td className="p-1.5 border-r border-black uppercase">SALDO ANTERIOR (FUNDO)</td>
+                    <tr className="border-b border-slate-900">
+                       <td className="p-1.5 border-r border-slate-900 uppercase">SALDO ANTERIOR (FUNDO)</td>
                        <td className="p-1.5 text-right tabular-nums">R$ {Number(sessionData?.saldoAnterior || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                     </tr>
-                    <tr className="border-b border-black">
-                       <td className="p-1.5 border-r border-black uppercase">VENDAS EM DINHEIRO (+)</td>
+                    <tr className="border-b border-slate-900">
+                       <td className="p-1.5 border-r border-slate-900 uppercase">VENDAS EM DINHEIRO (+)</td>
                        <td className="p-1.5 text-right tabular-nums">R$ {Number(sessionData?.vendasEmDinheiro || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                     </tr>
-                    <tr className="font-black bg-slate-50"><td className="p-1.5 border-r border-black uppercase">TOTAIS ESPÉCIE</td><td className="p-1.5 text-right">R$ {Number(sessionData?.saldoFinalCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
+                    <tr className="font-black bg-slate-50"><td className="p-1.5 border-r border-slate-900 uppercase">TOTAIS ESPÉCIE</td><td className="p-1.5 text-right">R$ {Number(sessionData?.saldoFinalCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
                  </tbody>
               </table>
-              <table className="w-full border-collapse border border-black">
-                 <thead className="bg-slate-50"><tr className="border-b border-black"><th className="p-1.5 text-left uppercase border-r border-black text-[9px] font-black">Saídas / Sangrias</th><th className="p-1.5 text-right uppercase text-[9px] font-black">Valor</th></tr></thead>
+              <table className="w-full border-collapse border border-slate-900">
+                 <thead><tr className="bg-slate-50 border-b border-slate-900"><th className="p-1.5 text-left uppercase border-r border-slate-900 text-[9px] font-black">Saídas / Sangrias</th><th className="p-1.5 text-right uppercase text-[9px] font-black">Valor</th></tr></thead>
                  <tbody>
-                    <tr className="border-b border-black"><td className="p-1.5 border-r border-black uppercase">TOTAL DE RETIRADAS (-)</td><td className="p-1.5 text-right tabular-nums">R$ {Number(sessionData?.totalSaidasCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
-                    <tr className="font-black bg-slate-50"><td className="p-1.5 border-r border-black uppercase">TOTAL SANGRIAS</td><td className="p-1.5 text-right">R$ {Number(sessionData?.totalSaidasCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
+                    <tr className="border-b border-slate-900"><td className="p-1.5 border-r border-slate-900 uppercase">TOTAL DE RETIRADAS (-)</td><td className="p-1.5 text-right tabular-nums">R$ {Number(sessionData?.totalSaidasCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
+                    <tr className="font-black bg-slate-50"><td className="p-1.5 border-r border-slate-900 uppercase">TOTAL SANGRIAS</td><td className="p-1.5 text-right">R$ {Number(sessionData?.totalSaidasCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td></tr>
                  </tbody>
               </table>
            </div>
 
-           <div className="bg-[#136dec] text-white p-1 text-center font-black uppercase mb-2 print:bg-[#136dec] print:text-white">
+           <div className="bg-[#136dec] text-white p-1.5 text-center font-black uppercase mb-4 text-[10px]">
               RESUMO POR MEIO DE PAGAMENTO (CARTÕES / OUTROS)
            </div>
-           <table className="w-full border-collapse border border-black mb-8">
-              <thead className="bg-slate-50"><tr className="border-b border-black"><th className="p-1.5 text-left uppercase border-r border-black text-[9px] font-black">Forma / Operadora / Bandeira</th><th className="p-1.5 text-center uppercase border-r border-black text-[9px] font-black w-24">Qtd. Notas</th><th className="p-1.5 text-right uppercase text-[9px] font-black w-32">Total Bruto</th></tr></thead>
+           <table className="w-full border-collapse border border-slate-900 mb-8">
+              <thead><tr className="bg-slate-50 border-b border-slate-900"><th className="p-1.5 text-left uppercase border-r border-slate-900 text-[9px] font-black">Forma / Operadora / Bandeira</th><th className="p-1.5 text-center uppercase border-r border-slate-900 text-[9px] font-black w-32">Qtd. Notas</th><th className="p-1.5 text-right uppercase text-[9px] font-black w-40">Total Bruto</th></tr></thead>
               <tbody>
                  {Object.entries(sessionData?.resumoCartoes || {}).map(([key, data]) => (
-                    <tr key={key} className="border-b border-black">
-                       <td className="p-1.5 uppercase border-r border-black font-bold">{key}</td>
-                       <td className="p-1.5 text-center border-r border-black font-bold">{data.count}</td>
+                    <tr key={key} className="border-b border-slate-900">
+                       <td className="p-1.5 uppercase border-r border-slate-900 font-bold">{key}</td>
+                       <td className="p-1.5 text-center border-r border-slate-900 font-bold tabular-nums">{data.count}</td>
                        <td className="p-1.5 text-right tabular-nums font-black">R$ {data.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                     </tr>
                  ))}
-                 {Object.keys(sessionData?.resumoCartoes || {}).length === 0 && <tr><td colSpan={3} className="p-4 text-center opacity-40 uppercase italic">Sem movimentação de cartões</td></tr>}
+                 {Object.keys(sessionData?.resumoCartoes || {}).length === 0 && <tr><td colSpan={3} className="p-10 text-center opacity-40 uppercase italic font-bold">Sem movimentação de cartões no período</td></tr>}
               </tbody>
            </table>
 
-           <div className="bg-[#136dec] text-white p-1 text-center font-black uppercase mb-2 print:bg-[#136dec] print:text-white">
+           <div className="bg-[#136dec] text-white p-1.5 text-center font-black uppercase mb-4 text-[10px]">
               LISTAGEM ANALÍTICA DAS VENDAS
            </div>
-           <table className="w-full border-collapse border border-black mb-8">
-              <thead className="bg-slate-50"><tr className="border-b border-black"><th className="p-1.5 text-left uppercase border-r border-black text-[8px] font-black">Cliente</th><th className="p-1.5 text-left uppercase border-r border-black text-[8px] font-black">Forma / Operadora</th><th className="p-1.5 text-center uppercase border-r border-black text-[8px] font-black w-16">Parcelas</th><th className="p-1.5 text-right uppercase border-r border-black text-[8px] font-black w-32">Valor Líquido</th></tr></thead>
+           <table className="w-full border-collapse border border-slate-900 mb-8">
+              <thead><tr className="bg-slate-50 border-b border-slate-900"><th className="p-1.5 text-left uppercase border-r border-slate-900 text-[8px] font-black">Cliente</th><th className="p-1.5 text-left uppercase border-r border-slate-900 text-[8px] font-black">Forma / Operadora</th><th className="p-1.5 text-center uppercase border-r border-slate-900 text-[8px] font-black w-24">Parcelas</th><th className="p-1.5 text-right uppercase text-[8px] font-black w-40">Valor Líquido</th></tr></thead>
               <tbody>
                  {sessionData?.allRecords.filter(r => r.cat === 'VENDA').map((v, idx) => (
-                    <tr key={idx} className="border-b border-black">
-                       <td className="p-1.5 uppercase border-r border-black font-bold truncate max-w-[200px]">{v.client}</td>
-                       <td className="p-1.5 uppercase border-r border-black font-bold">{v.method} {v.operator ? `/ ${v.operator}` : ''}</td>
-                       <td className="p-1.5 text-center border-r border-black font-bold">{v.installments}x</td>
-                       <td className="p-1.5 text-right tabular-nums font-black border-r border-black">R$ {v.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                    <tr key={idx} className="border-b border-slate-900">
+                       <td className="p-1.5 uppercase border-r border-slate-900 font-bold truncate max-w-[250px]">{v.client}</td>
+                       <td className="p-1.5 uppercase border-r border-slate-900 font-bold">{v.method} {v.operator ? `/ ${v.operator}` : ''}</td>
+                       <td className="p-1.5 text-center border-r border-slate-900 font-bold tabular-nums">{v.installments}x</td>
+                       <td className="p-1.5 text-right tabular-nums font-black">R$ {v.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                     </tr>
                  ))}
+                 {sessionData?.allRecords.filter(r => r.cat === 'VENDA').length === 0 && <tr><td colSpan={4} className="p-10 text-center opacity-40 uppercase italic font-bold">Nenhuma venda analítica registrada</td></tr>}
               </tbody>
            </table>
 
-           <div className="border-t-2 border-amber-500 pt-1">
-              <div className="flex justify-between font-black uppercase text-[12px] py-2">
+           <div className="border-t-4 border-amber-500 pt-4">
+              <div className="flex justify-between font-black uppercase text-[13px]">
                  <span className="text-slate-400">VALOR TOTAL FATURADO (TODOS MEIOS):</span>
-                 <span className="text-black">R$ {Number(sessionData?.totalVendasBruto || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                 <span className="text-black text-[15px]">R$ {Number(sessionData?.totalVendasBruto || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
               </div>
            </div>
            
-           <p className="mt-12 text-center opacity-40 text-[7px] uppercase font-black">TEM ACESSÓRIOS ERP - SISTEMA DE GESTÃO - {new Date().toLocaleString()}</p>
+           <p className="mt-20 text-center opacity-40 text-[7px] uppercase font-black">TEM ACESSÓRIOS ERP - SISTEMA DE GESTÃO INTEGRADA - {new Date().toLocaleString('pt-BR')}</p>
         </div>
 
         {/* HEADER DETALHE (TELA - PRINT:HIDDEN) */}
@@ -405,96 +406,90 @@ const CashMovement: React.FC = () => {
 
         <style>{`
           @media print {
-            /* Ocultar TUDO exceto o container de impressão */
+            /* Forçar centralização absoluta */
             body * { visibility: hidden !important; }
             
             #root, #root > div, main, .flex-1, .p-6 { 
               visibility: hidden !important;
               display: block !important;
-              height: auto !important;
-              overflow: visible !important;
               margin: 0 !important;
               padding: 0 !important;
               border: none !important;
               background: white !important;
+              overflow: visible !important;
             }
 
-            /* Força visibilidade apenas do container de relatório e seus filhos */
             #cash-report-print, #cash-report-print * { 
               visibility: visible !important; 
               display: block !important; 
             }
 
             #cash-report-print {
-              position: absolute !important;
-              left: 0 !important;
-              top: 0 !important;
-              width: 100% !important;
-              max-width: 210mm !important; /* Largura A4 */
+              position: static !important;
+              width: 190mm !important;
+              margin: 0 auto !important;
+              padding: 10mm 0 !important;
               background: white !important;
               color: black !important;
-              padding: 10mm !important;
-              margin: 0 auto !important; /* Centraliza na página de impressão */
               box-sizing: border-box !important;
-              box-shadow: none !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
             }
 
-            /* Centralização e Estilo de Tabelas */
+            /* Estilo exato de tabelas */
             #cash-report-print table { 
               width: 100% !important; 
-              border: 1px solid black !important; 
+              border: 1pt solid black !important; 
               border-collapse: collapse !important;
               margin-bottom: 5mm !important;
               display: table !important;
             }
             #cash-report-print th, #cash-report-print td { 
-              border: 1px solid black !important; 
-              padding: 4pt !important;
+              border: 1pt solid black !important; 
+              padding: 5pt !important;
               color: black !important;
               background: none !important;
               display: table-cell !important;
             }
+            #cash-report-print tr { display: table-row !important; }
             #cash-report-print th { 
               font-weight: 900 !important;
-              text-align: center !important;
               background-color: #f2f2f2 !important;
+              text-align: center !important;
             }
             
-            #cash-report-print h1, 
-            #cash-report-print .text-center { 
-              text-align: center !important; 
-              width: 100% !important;
+            /* Títulos e Alinhamentos */
+            #cash-report-print .text-center { text-align: center !important; width: 100% !important; }
+            #cash-report-print .text-right { text-align: right !important; }
+            #cash-report-print .text-left { text-align: left !important; }
+            
+            /* Faixas Azuis na Impressão */
+            #cash-report-print .bg-\\[\\#136dec\\] {
+              background-color: #136dec !important;
+              color: white !important;
+              -webkit-print-color-adjust: exact !important;
             }
 
-            /* Garante que os grids se comportem bem na impressão e fiquem alinhados */
+            /* Borda Laranja no Rodapé */
+            #cash-report-print .border-amber-500 {
+              border-color: #f59e0b !important;
+              border-top-width: 3pt !important;
+            }
+
+            /* Grid Lado a Lado */
             #cash-report-print .grid { 
               display: flex !important;
-              gap: 5mm !important;
-              justify-content: center !important;
+              gap: 10mm !important;
+              justify-content: space-between !important;
               width: 100% !important;
             }
             #cash-report-print .grid-cols-2 > * { 
               flex: 1 !important; 
-              min-width: 0 !important;
-            }
-
-            /* Cores Azuis para Impressão */
-            #cash-report-print {
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
-            }
-            #cash-report-print .bg-\\[\\#136dec\\] {
-              background-color: #136dec !important;
-              color: white !important;
-            }
-
-            #cash-report-print .border-amber-500 {
-              border-color: #f59e0b !important;
             }
 
             @page { 
               size: A4 portrait; 
-              margin: 0mm; 
+              margin: 10mm; 
             }
           }
         `}</style>
