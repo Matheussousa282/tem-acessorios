@@ -41,7 +41,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background-light dark:bg-background-dark font-display transition-colors duration-300">
-      <aside className="w-64 flex-shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-background-dark flex flex-col justify-between p-4 z-50 overflow-y-auto no-scrollbar">
+      <aside className="w-64 flex-shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-background-dark flex flex-col justify-between p-4 z-50 overflow-y-auto no-scrollbar print:hidden">
         <div className="flex flex-col gap-8">
           <div className="flex items-center gap-3 px-2">
             <div className="bg-primary rounded-lg size-10 flex items-center justify-center text-white shadow-lg overflow-hidden">
@@ -87,7 +87,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </div>
             )}
 
-            {/* BOTÃO SERVIÇOS RESTAURADO E DESTACADO */}
             {perms.serviceOrders && (
               <SidebarItem to="/servicos" icon="build" label="Serviços (OS)" />
             )}
@@ -121,8 +120,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col overflow-hidden bg-background-light dark:bg-background-dark">
-        <header className="h-16 flex-shrink-0 border-b dark:border-slate-800 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md flex items-center justify-between px-8">
+      <main className="flex-1 flex flex-col overflow-hidden bg-background-light dark:bg-background-dark print:overflow-visible">
+        <header className="h-16 flex-shrink-0 border-b dark:border-slate-800 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md flex items-center justify-between px-8 print:hidden">
            <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest"><span className="size-2 bg-primary rounded-full animate-pulse"></span> Sistema Operacional</div>
            <div className="flex items-center gap-4">
               <button onClick={() => setIsLightMode(!isLightMode)} className="material-symbols-outlined text-slate-400 hover:text-primary transition-colors">{isLightMode ? 'dark_mode' : 'light_mode'}</button>
@@ -130,7 +129,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               <span className="text-xs font-black text-primary uppercase">{establishments.find(e => e.id === currentUser.storeId)?.name || 'Local'}</span>
            </div>
         </header>
-        <div className="flex-1 overflow-y-auto no-scrollbar">{children}</div>
+        <div className="flex-1 overflow-y-auto no-scrollbar print:overflow-visible print:block">{children}</div>
       </main>
     </div>
   );
