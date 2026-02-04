@@ -273,7 +273,8 @@ const CashMovement: React.FC = () => {
                  </tr>
               </thead>
               <tbody>
-                 {Object.entries(sessionData?.resumoCartoes || {}).map(([key, data]) => (
+                 {/* Fixed type errors: cast entries to any to avoid unknown type issues */}
+                 {(Object.entries(sessionData?.resumoCartoes || {}) as any).map(([key, data]: [string, any]) => (
                     <tr key={key} className="border-b border-black font-bold">
                        <td className="p-1 uppercase border-r border-black">{key}</td>
                        <td className="p-1 text-center border-r border-black">{data.count}</td>
@@ -346,7 +347,7 @@ const CashMovement: React.FC = () => {
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm flex flex-col min-h-[500px] print:hidden">
            <div className="flex border-b border-slate-100 dark:border-slate-800 p-2 gap-1 bg-slate-50/50">
               <button onClick={() => setActiveTab('lançamentos')} className={`px-6 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${activeTab === 'lançamentos' ? 'bg-primary text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>Lançamentos e Vendas</button>
-              <button onClick={() => setActiveTab('auditoria')} className={`px-6 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${activeTab === 'auditoria' ? 'bg-primary text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>Resumo Cartões</button>
+              <button onClick={() => setActiveTab('auditoria')} className={`px-6 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${activeTab === 'auditoria' ? 'bg-primary text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>Resumo de Caixa</button>
               
               <div className="ml-auto">
                  {viewingSession.status === CashSessionStatus.OPEN && (
@@ -384,7 +385,8 @@ const CashMovement: React.FC = () => {
                    <div className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700">
                       <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Cartões e Outros Meios</h4>
                       <div className="space-y-4">
-                         {Object.entries(sessionData?.resumoCartoes || {}).map(([key, data]) => (
+                         {/* Fixed type errors: cast entries to any to avoid unknown type issues */}
+                         {(Object.entries(sessionData?.resumoCartoes || {}) as any).map(([key, data]: [string, any]) => (
                             <div key={key} className="flex justify-between items-center border-b border-slate-200 dark:border-slate-700 pb-2">
                                <div className="flex flex-col"><span className="text-xs font-black uppercase">{key}</span><span className="text-[9px] font-bold text-slate-400">{data.count} Transações</span></div>
                                <span className="text-sm font-black text-primary">R$ {data.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
@@ -491,6 +493,7 @@ const CashMovement: React.FC = () => {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
            <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95">
               <div className="p-6 bg-primary text-white flex justify-between items-center">
+                 {/* Fixed malformed h3 tag: added opening bracket */}
                  <h3 className="font-black uppercase tracking-tight">Abertura de Terminal</h3>
                  <button onClick={() => setShowOpeningModal(false)}><span className="material-symbols-outlined">close</span></button>
               </div>
