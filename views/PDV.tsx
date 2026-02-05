@@ -148,6 +148,11 @@ const PDV: React.FC = () => {
 
   const handleFinalizeSale = async () => {
     if (cart.length === 0 || isFinalizing) return;
+
+    if (!selectedVendorId) {
+      alert("Selecione um VENDEDOR para finalizar a venda!");
+      return;
+    }
     
     const isCardOrPixMaq = (paymentMethod === 'Credito' || paymentMethod === 'Debito' || paymentMethod === 'Pix Maquineta');
     if (isCardOrPixMaq) {
@@ -228,6 +233,10 @@ const PDV: React.FC = () => {
 
   const handleCreateOS = async () => {
     if (!selectedCustomerId || cart.length === 0) return;
+    if (!selectedVendorId) {
+      alert('Selecione um VENDEDOR antes de gerar a OS!');
+      return;
+    }
     const customer = customers.find(c => c.id === selectedCustomerId)!;
     const newOS: ServiceOrder = {
       id: `OS-${Date.now()}`,
@@ -405,9 +414,13 @@ const PDV: React.FC = () => {
           <div className="p-6 space-y-4 border-b border-slate-100 dark:border-slate-800">
              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-2">Vendedor</label>
-                   <select value={selectedVendorId} onChange={e => setSelectedVendorId(e.target.value)} className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-[10px] font-black uppercase">
-                      <option value="">Selecione Vendedor</option>
+                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-2">Vendedor <span className="text-rose-500">*</span></label>
+                   <select 
+                     value={selectedVendorId} 
+                     onChange={e => setSelectedVendorId(e.target.value)} 
+                     className={`w-full h-12 bg-slate-50 dark:bg-slate-800 border-2 rounded-xl px-4 text-[10px] font-black uppercase transition-all ${!selectedVendorId ? 'border-rose-500/20' : 'border-transparent focus:border-primary'}`}
+                   >
+                      <option value="">SELECIONE VENDEDOR</option>
                       {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
                    </select>
                 </div>
@@ -464,8 +477,27 @@ const PDV: React.FC = () => {
                 <div className="flex justify-between pt-4 border-t border-slate-100 dark:border-slate-800 items-baseline"><span className="text-xs font-black uppercase opacity-50 tracking-widest">Total Líquido</span><span className="text-4xl font-black text-slate-900 dark:text-white tabular-nums">R$ {totalGeral.toLocaleString('pt-BR')}</span></div>
              </div>
              <div className="grid grid-cols-2 gap-4 pt-2">
-                <button disabled={cart.length === 0} onClick={() => { if(!selectedCustomerId) { alert('Selecione um cliente!'); return; } setShowOSModal(true); }} className="py-5 bg-amber-500 hover:bg-amber-600 disabled:opacity-30 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl flex items-center justify-center gap-2 active:scale-95 transition-all">Gerar OS</button>
-                <button disabled={cart.length === 0} onClick={() => setShowCheckout(true)} className="py-5 bg-primary hover:bg-blue-600 disabled:opacity-30 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl flex items-center justify-center gap-2 active:scale-95 transition-all">Vender</button>
+                <button 
+                  disabled={cart.length === 0} 
+                  onClick={() => { 
+                    if(!selectedVendorId) { alert('Selecione um VENDEDOR!'); return; }
+                    if(!selectedCustomerId) { alert('Selecione um CLIENTE para gerar OS!'); return; } 
+                    setShowOSModal(true); 
+                  }} 
+                  className="py-5 bg-amber-500 hover:bg-amber-600 disabled:opacity-30 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl flex items-center justify-center gap-2 active:scale-95 transition-all"
+                >
+                  Gerar OS
+                </button>
+                <button 
+                  disabled={cart.length === 0} 
+                  onClick={() => {
+                    if(!selectedVendorId) { alert('Selecione um VENDEDOR antes de vender!'); return; }
+                    setShowCheckout(true);
+                  }} 
+                  className="py-5 bg-primary hover:bg-blue-600 disabled:opacity-30 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl flex items-center justify-center gap-2 active:scale-95 transition-all"
+                >
+                  Vender
+                </button>
              </div>
           </div>
         </aside>
