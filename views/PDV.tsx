@@ -626,7 +626,7 @@ const PDV: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL: Cancelamento - AGORA FUNCIONAL */}
+      {/* MODAL: Cancelamento */}
       {showCancelModal && (
         <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 animate-in fade-in">
            <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
@@ -667,7 +667,7 @@ const PDV: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL: Trocas - AGORA FUNCIONAL */}
+      {/* MODAL: Trocas */}
       {showReturnsModal && (
         <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 animate-in fade-in">
            <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
@@ -716,7 +716,7 @@ const PDV: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL: Checkout Múltiplos Pagamentos - COM NSU E AUTH */}
+      {/* MODAL: Checkout Múltiplos Pagamentos - COM NSU E AUTH E SELEÇÃO PIX */}
       {showCheckout && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 print:hidden">
            <div className="bg-white dark:bg-slate-900 w-full max-w-6xl rounded-[3.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 transition-all duration-500">
@@ -729,19 +729,45 @@ const PDV: React.FC = () => {
                  
                  <div className="lg:col-span-4 space-y-6">
                     <div className="grid grid-cols-2 gap-3">
-                       {['Dinheiro', 'Pix', 'Debito', 'Credito', 'Pix Maquineta'].map(m => (
-                         <button 
-                            key={m}
-                            onClick={() => setPaymentMethod(m)} 
-                            className={`p-5 rounded-3xl border-2 transition-all flex flex-col items-center gap-2 ${
-                              paymentMethod === m 
-                              ? 'border-primary bg-primary/5 text-primary shadow-lg' 
-                              : 'border-slate-100 dark:border-slate-800 text-slate-400 hover:border-primary/40'
-                            }`}
-                          >
-                            <span className="material-symbols-outlined text-3xl">{m === 'Dinheiro' ? 'payments' : m.includes('Pix') ? 'qr_code_2' : 'credit_card'}</span>
-                            <span className="text-[10px] font-black uppercase tracking-widest">{m}</span>
-                         </button>
+                       {['Dinheiro', 'Pix', 'Debito', 'Credito'].map(m => (
+                         <div key={m} className="flex flex-col gap-2">
+                           <button 
+                              onClick={() => {
+                                if (m === 'Pix') {
+                                  // Se clicar em Pix, mantém selecionado mas usuário deve escolher sub-opção
+                                  if (!paymentMethod.includes('Pix')) setPaymentMethod('Pix Online');
+                                } else {
+                                  setPaymentMethod(m);
+                                }
+                              }} 
+                              className={`p-5 rounded-3xl border-2 transition-all flex flex-col items-center gap-2 ${
+                                (m === paymentMethod || (m === 'Pix' && paymentMethod.includes('Pix')))
+                                ? 'border-primary bg-primary/5 text-primary shadow-lg' 
+                                : 'border-slate-100 dark:border-slate-800 text-slate-400 hover:border-primary/40'
+                              }`}
+                            >
+                              <span className="material-symbols-outlined text-3xl">{m === 'Dinheiro' ? 'payments' : m === 'Pix' ? 'qr_code_2' : 'credit_card'}</span>
+                              <span className="text-[10px] font-black uppercase tracking-widest">{m}</span>
+                           </button>
+                           
+                           {/* SUB-SELEÇÃO PARA PIX */}
+                           {m === 'Pix' && paymentMethod.includes('Pix') && (
+                             <div className="flex gap-1 animate-in slide-in-from-top-2">
+                               <button 
+                                 onClick={() => setPaymentMethod('Pix Online')}
+                                 className={`flex-1 py-2 text-[8px] font-black uppercase rounded-lg border-2 transition-all ${paymentMethod === 'Pix Online' ? 'bg-primary text-white border-primary' : 'bg-white dark:bg-slate-800 text-slate-400 border-slate-100 dark:border-slate-700'}`}
+                               >
+                                 Online
+                               </button>
+                               <button 
+                                 onClick={() => setPaymentMethod('Pix Maquineta')}
+                                 className={`flex-1 py-2 text-[8px] font-black uppercase rounded-lg border-2 transition-all ${paymentMethod === 'Pix Maquineta' ? 'bg-primary text-white border-primary' : 'bg-white dark:bg-slate-800 text-slate-400 border-slate-100 dark:border-slate-700'}`}
+                               >
+                                 Maquineta
+                               </button>
+                             </div>
+                           )}
+                         </div>
                        ))}
                     </div>
 
