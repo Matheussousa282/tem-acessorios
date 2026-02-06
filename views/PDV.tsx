@@ -38,13 +38,26 @@ const PDV: React.FC = () => {
     refreshData();
   }, []);
 
-  const isCashOpen = useMemo(() => {
+  // Lógica de verificação de data para o caixa
+  const todayStr = new Date().toLocaleDateString('pt-BR');
+
+  const staleSession = useMemo(() => {
+    // Procura por um caixa aberto de dias anteriores
+    return cashSessions.find(s => 
+      (s.storeId === currentUser?.storeId || s.storeName === currentStore.name) && 
+      s.status === CashSessionStatus.OPEN &&
+      s.openingTime?.split(' ')[0] !== todayStr
+    );
+  }, [cashSessions, currentUser, currentStore, todayStr]);
+
+  const isCashOpenToday = useMemo(() => {
     if (isAdmin) return true;
     return cashSessions.some(s => 
       (s.storeId === currentUser?.storeId || s.storeName === currentStore.name) && 
-      s.status === CashSessionStatus.OPEN
+      s.status === CashSessionStatus.OPEN &&
+      s.openingTime?.split(' ')[0] === todayStr
     );
-  }, [cashSessions, currentUser, isAdmin, currentStore]);
+  }, [cashSessions, currentUser, isAdmin, currentStore, todayStr]);
 
   // Estados de Controle de Modais
   const [showCheckout, setShowCheckout] = useState(false);
@@ -348,13 +361,29 @@ const PDV: React.FC = () => {
      }
   };
 
-  if (!isCashOpen) {
+  // Bloqueio por Caixa de dia anterior
+  if (staleSession && !isAdmin) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center bg-slate-100 dark:bg-background-dark p-6">
+        <div className="bg-white dark:bg-slate-900 p-12 rounded-[3.5rem] shadow-2xl border border-slate-200 dark:border-slate-800 text-center max-w-lg space-y-8 animate-in zoom-in-95 duration-500">
+           <div className="size-24 bg-amber-500/10 text-amber-500 rounded-[2rem] flex items-center justify-center mx-auto animate-bounce"><span className="material-symbols-outlined text-5xl">warning</span></div>
+           <h2 className="text-3xl font-black uppercase tracking-tighter">Caixa Antigo Pendente</h2>
+           <p className="text-slate-500 font-bold text-sm uppercase leading-relaxed">Existe um movimento de caixa aberto em uma data anterior ({staleSession.openingTime?.split(' ')[0]}). É obrigatório realizar o fechamento deste movimento antes de iniciar as vendas de hoje.</p>
+           <div className="flex flex-col gap-3">
+              <button onClick={() => navigate('/caixa')} className="w-full py-5 bg-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 transition-all">Ir para Fechamento de Caixa</button>
+           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isCashOpenToday && !isAdmin) {
     return (
       <div className="h-screen w-full flex items-center justify-center bg-slate-100 dark:bg-background-dark p-6">
         <div className="bg-white dark:bg-slate-900 p-12 rounded-[3.5rem] shadow-2xl border border-slate-200 dark:border-slate-800 text-center max-w-lg space-y-8 animate-in zoom-in-95 duration-500">
            <div className="size-24 bg-rose-500/10 text-rose-500 rounded-[2rem] flex items-center justify-center mx-auto animate-pulse"><span className="material-symbols-outlined text-5xl">lock</span></div>
            <h2 className="text-3xl font-black uppercase tracking-tighter">Caixa Fechado</h2>
-           <p className="text-slate-500 font-bold text-sm uppercase leading-relaxed">Para iniciar as operações de venda, é necessário realizar a abertura do movimento diário.</p>
+           <p className="text-slate-500 font-bold text-sm uppercase leading-relaxed">Para iniciar as operações de venda hoje ({todayStr}), é necessário realizar a abertura do movimento diário.</p>
            <div className="flex flex-col gap-3">
               <button onClick={() => navigate('/caixa')} className="w-full py-5 bg-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 transition-all">Ir para Abertura de Caixa</button>
               <button onClick={() => navigate('/')} className="w-full py-5 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-2xl font-black text-xs uppercase tracking-widest transition-all">Voltar ao Início</button>
@@ -716,7 +745,7 @@ const PDV: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL: Checkout Múltiplos Pagamentos - COM NSU E AUTH E SELEÇÃO PIX */}
+      {/* MODAL: Checkout Múltiplos Pagamentos */}
       {showCheckout && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 print:hidden">
            <div className="bg-white dark:bg-slate-900 w-full max-w-6xl rounded-[3.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 transition-all duration-500">
@@ -734,7 +763,6 @@ const PDV: React.FC = () => {
                            <button 
                               onClick={() => {
                                 if (m === 'Pix') {
-                                  // Se clicar em Pix, mantém selecionado mas usuário deve escolher sub-opção
                                   if (!paymentMethod.includes('Pix')) setPaymentMethod('Pix Online');
                                 } else {
                                   setPaymentMethod(m);
@@ -750,7 +778,6 @@ const PDV: React.FC = () => {
                               <span className="text-[10px] font-black uppercase tracking-widest">{m}</span>
                            </button>
                            
-                           {/* SUB-SELEÇÃO PARA PIX */}
                            {m === 'Pix' && paymentMethod.includes('Pix') && (
                              <div className="flex gap-1 animate-in slide-in-from-top-2">
                                <button 
