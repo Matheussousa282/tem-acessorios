@@ -125,7 +125,8 @@ const PDV: React.FC = () => {
 
   const cancelCandidate = useMemo(() => {
     if (!cancelSearchId) return null;
-    return transactions.find(t => t.id === cancelSearchId || t.id.endsWith(cancelSearchId));
+    const normalizedId = cancelSearchId.toUpperCase();
+    return transactions.find(t => t.id === normalizedId || t.id.endsWith(normalizedId));
   }, [cancelSearchId, transactions]);
 
   const vendors = useMemo(() => {
@@ -238,11 +239,9 @@ const PDV: React.FC = () => {
       const vendor = vendors.find(v => v.id === selectedVendorId);
       const customer = customers.find(c => c.id === selectedCustomerId);
       
-      // Concatenar métodos para o registro de transação
       const methodsList = Array.from(new Set(payments.map(p => p.method)));
       const methodStr = methodsList.length > 1 ? `Múltiplo (${methodsList.join(', ')})` : methodsList[0];
 
-      // Detalhes do primeiro cartão (fallback para estrutura antiga de transação se necessário)
       const firstCardPayment = payments.find(p => p.details?.cardOperatorId);
       const cardDetails = firstCardPayment?.details || {};
 
@@ -256,7 +255,7 @@ const PDV: React.FC = () => {
         totalPaid,
         change: changeValue,
         payment: methodStr, 
-        payments: payments, // Novo: lista detalhada de pagamentos
+        payments: payments, 
         date: new Date().toLocaleString('pt-BR'),
         vendor: vendor?.name || 'Vendedor Não Informado', 
         customer: customer?.name || 'Consumidor Final',
@@ -266,7 +265,6 @@ const PDV: React.FC = () => {
       
       setLastSaleData(currentSaleData);
 
-      // Passar valor líquido da venda para o financeiro
       await processSale(cart, totalGeral, methodStr, selectedCustomerId, selectedVendorId, shippingValue, cardDetails);
       
       setCart([]);
@@ -346,6 +344,7 @@ const PDV: React.FC = () => {
         setShowCancelModal(false);
         setShowReturnsModal(false);
         setShowSuccessModal(true);
+        refreshData();
      }
   };
 
@@ -579,7 +578,7 @@ const PDV: React.FC = () => {
                   disabled={cart.length === 0} 
                   onClick={() => {
                     if(!selectedVendorId) { alert('Selecione um VENDEDOR antes de vender!'); return; }
-                    setPayments([]); // Limpar pagamentos anteriores
+                    setPayments([]); 
                     setShowCheckout(true);
                   }} 
                   className="py-5 bg-primary hover:bg-blue-600 disabled:opacity-30 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl flex items-center justify-center gap-2 active:scale-95 transition-all"
@@ -627,21 +626,110 @@ const PDV: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL: Checkout Múltiplos Pagamentos */}
+      {/* MODAL: Cancelamento - AGORA FUNCIONAL */}
+      {showCancelModal && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 animate-in fade-in">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+              <div className="p-8 bg-rose-600 text-white flex justify-between items-center">
+                 <div><h3 className="text-2xl font-black uppercase tracking-tight">CANCELAR DOCUMENTO</h3><p className="text-[10px] font-bold text-white/70 uppercase mt-1">Busca por número de venda</p></div>
+                 <button onClick={() => setShowCancelModal(false)} className="material-symbols-outlined text-4xl">close</button>
+              </div>
+              <div className="p-10 space-y-8">
+                 <input autoFocus value={cancelSearchId} onChange={e => setCancelSearchId(e.target.value)} placeholder="DIGITE O ID DA VENDA (Ex: SALE-1234)" className="w-full h-16 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-xl font-black text-rose-600 placeholder:text-rose-200 outline-none focus:ring-4 focus:ring-rose-500/10 transition-all uppercase" />
+                 
+                 {cancelCandidate ? (
+                    <div className="space-y-6 animate-in zoom-in-95">
+                       <div className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 space-y-4 text-slate-900 dark:text-white">
+                          <div className="flex justify-between items-start">
+                             <div><p className="text-[10px] font-black text-slate-400 uppercase">Documento</p><p className="text-lg font-black">{cancelCandidate.id}</p></div>
+                             <div className="text-right"><p className="text-[10px] font-black text-slate-400 uppercase">Data</p><p className="text-lg font-black">{cancelCandidate.date}</p></div>
+                          </div>
+                          <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
+                             <p className="text-[10px] font-black text-slate-400 uppercase mb-2">Itens do Documento</p>
+                             <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar">
+                                {cancelCandidate.items?.map((it, i) => (
+                                   <div key={i} className="flex justify-between text-xs font-bold uppercase"><span className="truncate">{it.name}</span><span>{it.quantity} UN</span></div>
+                                ))}
+                             </div>
+                          </div>
+                          <div className="border-t border-slate-200 dark:border-slate-700 pt-4 flex justify-between items-center">
+                             <span className="text-sm font-black uppercase">Valor Estorno</span>
+                             <span className="text-2xl font-black text-rose-600">R$ {cancelCandidate.value.toLocaleString('pt-BR')}</span>
+                          </div>
+                       </div>
+                       <button onClick={() => processSaleCancellation(cancelCandidate)} className="w-full h-20 bg-rose-600 text-white rounded-[2rem] font-black text-sm uppercase shadow-2xl shadow-rose-500/20 transition-all active:scale-95 flex items-center justify-center gap-4">CONFIRMAR ESTORNO INTEGRAL</button>
+                    </div>
+                 ) : cancelSearchId && (
+                    <div className="py-10 text-center opacity-30 uppercase font-black text-slate-900 dark:text-white">Venda não localizada no sistema</div>
+                 )}
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL: Trocas - AGORA FUNCIONAL */}
+      {showReturnsModal && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 animate-in fade-in">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+              <div className="p-8 bg-amber-500 text-white flex justify-between items-center">
+                 <div><h3 className="text-2xl font-black uppercase tracking-tight">CENTRAL DE TROCAS</h3><p className="text-[10px] font-bold text-white/70 uppercase mt-1">Busca por cliente ou documento</p></div>
+                 <button onClick={() => setShowReturnsModal(false)} className="material-symbols-outlined text-4xl">close</button>
+              </div>
+              <div className="p-10 space-y-6">
+                 <input autoFocus value={returnSearchTerm} onChange={e => setReturnSearchTerm(e.target.value)} placeholder="PESQUISAR CLIENTE OU NÚMERO DO DOCUMENTO..." className="w-full h-16 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-lg font-black text-amber-600 placeholder:text-amber-200 outline-none focus:ring-4 focus:ring-amber-500/10 transition-all uppercase" />
+                 <div className="space-y-3 max-h-96 overflow-y-auto custom-scrollbar">
+                    {transactions.filter(t => (t.id.toUpperCase().includes(returnSearchTerm.toUpperCase()) || t.client?.toUpperCase().includes(returnSearchTerm.toUpperCase())) && t.type === 'INCOME').slice(0, 10).map(t => (
+                       <div key={t.id} className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 flex justify-between items-center group hover:border-amber-500 transition-all cursor-pointer text-slate-900 dark:text-white" onClick={() => processSaleCancellation(t)}>
+                          <div className="flex-1">
+                             <div className="flex items-center gap-3"><span className="text-lg font-black uppercase">{t.client || 'CONSUMIDOR FINAL'}</span><span className="text-[9px] font-black bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded text-slate-500">{t.id}</span></div>
+                             <p className="text-xs font-bold text-slate-400 uppercase mt-1">{t.date} • {t.items?.length} ITENS • PAGTO: {t.method}</p>
+                          </div>
+                          <div className="text-right flex items-center gap-6">
+                             <p className="text-xl font-black text-slate-900 dark:text-white tabular-nums">R$ {t.value.toLocaleString('pt-BR')}</p>
+                             <button className="px-6 py-2.5 bg-amber-500 text-white rounded-xl text-[10px] font-black uppercase shadow-lg group-hover:scale-105 transition-all">Iniciar Devolução</button>
+                          </div>
+                       </div>
+                    ))}
+                    {returnSearchTerm && transactions.filter(t => (t.id.includes(returnSearchTerm) || t.client?.includes(returnSearchTerm))).length === 0 && (
+                       <div className="py-20 text-center opacity-30 uppercase font-black text-slate-900 dark:text-white">Nenhuma venda encontrada para os critérios informados</div>
+                    )}
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL: Edição de Item */}
+      {editingItem && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 animate-in fade-in">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+              <div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-slate-900 text-white flex justify-between items-center">
+                 <div><h3 className="text-xl font-black uppercase tracking-tight">AJUSTE DE ITEM</h3><p className="text-[10px] font-bold text-slate-400 uppercase mt-1">{editingItem.item.name}</p></div>
+                 <button onClick={() => setEditingItem(null)} className="material-symbols-outlined">close</button>
+              </div>
+              <form onSubmit={handleUpdateItemPrice} className="p-10 space-y-8">
+                 <div className="space-y-1.5"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Preço Unitário de Venda (R$)</label><div className="relative"><span className="absolute left-6 top-1/2 -translate-y-1/2 text-primary font-black text-lg">R$</span><input autoFocus type="number" step="0.01" value={tempItemPrice} onChange={e => setTempItemPrice(parseFloat(e.target.value) || 0)} className="w-full h-20 bg-slate-50 dark:bg-slate-800 border-none rounded-[1.5rem] pl-16 pr-6 text-3xl font-black text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-primary/10 transition-all" /></div></div>
+                 <div className="grid grid-cols-2 gap-4 text-slate-900 dark:text-white"><div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">Preço Original</p><p className="text-sm font-black">R$ {products.find(p => p.id === editingItem.item.id)?.salePrice.toLocaleString('pt-BR')}</p></div><div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">Variação %</p>{(() => { const orig = products.find(p => p.id === editingItem.item.id)?.salePrice || 1; const diff = ((tempItemPrice / orig) - 1) * 100; return <p className={`text-sm font-black ${diff < 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{diff > 0 ? '+' : ''}{diff.toFixed(2)}%</p> })()}</div></div>
+                 <button type="submit" className="w-full h-16 bg-primary text-white rounded-2xl font-black text-xs uppercase shadow-xl hover:bg-blue-600 transition-all">CONFIRMAR AJUSTE</button>
+              </form>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL: Checkout Múltiplos Pagamentos - COM NSU E AUTH */}
       {showCheckout && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 print:hidden">
            <div className="bg-white dark:bg-slate-900 w-full max-w-6xl rounded-[3.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 transition-all duration-500">
               <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
-                 <div><h3 className="text-2xl font-black uppercase tracking-tight">Finalização de Venda</h3><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Até 6 Formas de Pagamento • Cálculo de Troco</p></div>
-                 <button onClick={() => setShowCheckout(false)} className="size-12 bg-white dark:bg-slate-900 rounded-2xl flex items-center justify-center transition-all hover:bg-rose-500 hover:text-white shadow-sm"><span className="material-symbols-outlined">close</span></button>
+                 <div><h3 className="text-2xl font-black uppercase tracking-tight text-slate-900 dark:text-white">Finalização de Venda</h3><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Até 6 Formas de Pagamento • Cálculo de Troco</p></div>
+                 <button onClick={() => setShowCheckout(false)} className="size-12 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-2xl flex items-center justify-center transition-all hover:bg-rose-500 hover:text-white shadow-sm"><span className="material-symbols-outlined">close</span></button>
               </div>
               
               <div className="p-8 grid grid-cols-1 lg:grid-cols-12 gap-10">
                  
-                 {/* COLUNA ESQUERDA: SELEÇÃO DE MEIOS */}
                  <div className="lg:col-span-4 space-y-6">
                     <div className="grid grid-cols-2 gap-3">
-                       {['Dinheiro', 'Pix', 'Debito', 'Credito'].map(m => (
+                       {['Dinheiro', 'Pix', 'Debito', 'Credito', 'Pix Maquineta'].map(m => (
                          <button 
                             key={m}
                             onClick={() => setPaymentMethod(m)} 
@@ -651,7 +739,7 @@ const PDV: React.FC = () => {
                               : 'border-slate-100 dark:border-slate-800 text-slate-400 hover:border-primary/40'
                             }`}
                           >
-                            <span className="material-symbols-outlined text-3xl">{m === 'Dinheiro' ? 'payments' : m === 'Pix' ? 'qr_code_2' : 'credit_card'}</span>
+                            <span className="material-symbols-outlined text-3xl">{m === 'Dinheiro' ? 'payments' : m.includes('Pix') ? 'qr_code_2' : 'credit_card'}</span>
                             <span className="text-[10px] font-black uppercase tracking-widest">{m}</span>
                          </button>
                        ))}
@@ -672,9 +760,21 @@ const PDV: React.FC = () => {
                        {(paymentMethod === 'Debito' || paymentMethod === 'Credito' || paymentMethod === 'Pix Maquineta') && (
                           <div className="space-y-3 animate-in slide-in-from-top-2">
                              <div className="grid grid-cols-2 gap-2">
-                                <select value={selectedOperatorId} onChange={e => { setSelectedOperatorId(e.target.value); setSelectedBrandId(''); }} className="w-full h-11 bg-white dark:bg-slate-900 border-none rounded-xl px-4 text-[9px] font-black uppercase"><option value="">Operadora</option>{cardOperators.map(op => <option key={op.id} value={op.id}>{op.name}</option>)}</select>
-                                <select value={selectedBrandId} onChange={e => setSelectedBrandId(e.target.value)} className="w-full h-11 bg-white dark:bg-slate-900 border-none rounded-xl px-4 text-[9px] font-black uppercase"><option value="">Bandeira</option>{filteredBrands.map(br => <option key={br.id} value={br.id}>{br.name}</option>)}</select>
+                                <select value={selectedOperatorId} onChange={e => { setSelectedOperatorId(e.target.value); setSelectedBrandId(''); }} className="w-full h-11 bg-white dark:bg-slate-900 border-none rounded-xl px-4 text-[9px] font-black uppercase text-slate-900 dark:text-white shadow-sm"><option value="">Operadora</option>{cardOperators.map(op => <option key={op.id} value={op.id}>{op.name}</option>)}</select>
+                                <select value={selectedBrandId} onChange={e => setSelectedBrandId(e.target.value)} className="w-full h-11 bg-white dark:bg-slate-900 border-none rounded-xl px-4 text-[9px] font-black uppercase text-slate-900 dark:text-white shadow-sm"><option value="">Bandeira</option>{filteredBrands.map(br => <option key={br.id} value={br.id}>{br.name}</option>)}</select>
                              </div>
+                             
+                             <div className="grid grid-cols-2 gap-2">
+                                <div className="space-y-0.5">
+                                   <label className="text-[8px] font-black text-slate-400 uppercase px-1">NSU / Comprovante</label>
+                                   <input value={cardNsu} onChange={e => setCardNsu(e.target.value)} placeholder="000000" className="w-full h-11 bg-white dark:bg-slate-900 border-none rounded-xl px-4 text-[10px] font-black uppercase text-slate-900 dark:text-white shadow-sm" />
+                                </div>
+                                <div className="space-y-0.5">
+                                   <label className="text-[8px] font-black text-slate-400 uppercase px-1">Autorização</label>
+                                   <input value={cardAuthNumber} onChange={e => setCardAuthNumber(e.target.value)} placeholder="AUTORIZ" className="w-full h-11 bg-white dark:bg-slate-900 border-none rounded-xl px-4 text-[10px] font-black uppercase text-slate-900 dark:text-white shadow-sm" />
+                                </div>
+                             </div>
+
                              {paymentMethod === 'Credito' && (
                                 <div className="grid grid-cols-6 gap-1">
                                    {[1,2,3,4,5,6].map(p => (<button key={p} onClick={() => setCardInstallments(p)} className={`h-8 rounded-lg text-[9px] font-black border-2 transition-all ${cardInstallments === p ? 'border-primary bg-primary text-white' : 'border-slate-200 dark:border-slate-700 text-slate-400'}`}>{p}X</button>))}
@@ -693,27 +793,26 @@ const PDV: React.FC = () => {
                     </div>
                  </div>
 
-                 {/* COLUNA CENTRAL: LISTAGEM DE PAGAMENTOS */}
                  <div className="lg:col-span-5 flex flex-col space-y-6">
                     <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b pb-2">Pagamentos Adicionados ({payments.length}/6)</h4>
                     <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar pr-2 min-h-[300px]">
                        {payments.length === 0 ? (
                           <div className="h-full flex flex-col items-center justify-center opacity-10">
-                             <span className="material-symbols-outlined text-8xl">payments</span>
-                             <p className="text-xs font-black uppercase mt-4">Nenhum pagamento adicionado</p>
+                             <span className="material-symbols-outlined text-8xl text-slate-400">payments</span>
+                             <p className="text-xs font-black uppercase mt-4 text-slate-400">Nenhum pagamento adicionado</p>
                           </div>
                        ) : payments.map((p, idx) => (
-                          <div key={idx} className="bg-white dark:bg-slate-800 p-4 rounded-3xl border border-slate-100 dark:border-slate-700 flex justify-between items-center animate-in slide-in-from-right-4">
+                          <div key={idx} className="bg-white dark:bg-slate-800 p-4 rounded-3xl border border-slate-100 dark:border-slate-700 flex justify-between items-center animate-in slide-in-from-right-4 text-slate-900 dark:text-white">
                              <div className="flex items-center gap-4">
                                 <div className="size-10 bg-slate-50 dark:bg-slate-700 rounded-xl flex items-center justify-center text-slate-400"><span className="material-symbols-outlined">{p.method === 'Dinheiro' ? 'payments' : 'qr_code_2'}</span></div>
                                 <div>
                                    <p className="text-xs font-black uppercase text-slate-800 dark:text-white leading-none">{p.method} {p.details?.installments > 1 ? `(${p.details.installments}x)` : ''}</p>
-                                   <p className="text-[9px] text-slate-400 font-bold mt-1 uppercase">{p.details?.operatorName} {p.details?.brandName}</p>
+                                   <p className="text-[9px] text-slate-400 font-bold mt-1 uppercase">{p.details?.operatorName} {p.details?.brandName} {p.details?.transactionSku ? `• NSU: ${p.details.transactionSku}` : ''}</p>
                                 </div>
                              </div>
                              <div className="flex items-center gap-6">
                                 <span className="text-lg font-black text-primary tabular-nums">R$ {p.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                                <button onClick={() => setPayments(payments.filter((_, i) => i !== idx))} className="size-8 bg-rose-500/10 text-rose-500 rounded-lg hover:bg-rose-500 hover:text-white transition-all"><span className="material-symbols-outlined text-lg">delete</span></button>
+                                <button onClick={() => setPayments(payments.filter((_, i) => i !== idx))} className="size-8 bg-rose-500/10 text-rose-500 rounded-lg hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center"><span className="material-symbols-outlined text-lg">delete</span></button>
                              </div>
                           </div>
                        ))}
@@ -725,7 +824,6 @@ const PDV: React.FC = () => {
                     </div>
                  </div>
 
-                 {/* COLUNA DIREITA: RESUMO E FINALIZAÇÃO */}
                  <div className="lg:col-span-3 space-y-6">
                     <div className="bg-slate-900 text-white p-8 rounded-[3rem] space-y-6 shadow-2xl relative overflow-hidden">
                        <div className="absolute top-0 right-0 size-32 bg-primary/20 blur-3xl"></div>
@@ -753,10 +851,6 @@ const PDV: React.FC = () => {
                           </button>
                        </div>
                     </div>
-                    
-                    <div className="p-6 bg-slate-100 dark:bg-slate-800/40 rounded-3xl border border-slate-200 dark:border-slate-700">
-                       <p className="text-[9px] font-black text-slate-500 uppercase leading-relaxed text-center">Certifique-se de que todos os valores foram recebidos fisicamente antes de concluir.</p>
-                    </div>
                  </div>
               </div>
            </div>
@@ -769,7 +863,7 @@ const PDV: React.FC = () => {
            <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[4rem] shadow-2xl overflow-hidden text-center animate-in zoom-in-95">
               <div className="p-12 space-y-8">
                  <div className="size-24 bg-emerald-500 text-white rounded-[2rem] flex items-center justify-center mx-auto shadow-2xl shadow-emerald-500/30 animate-bounce"><span className="material-symbols-outlined text-5xl">check</span></div>
-                 <h2 className="text-3xl font-black uppercase tracking-tighter">Operação Realizada!</h2>
+                 <h2 className="text-3xl font-black uppercase tracking-tighter text-slate-900 dark:text-white">Operação Realizada!</h2>
                  {lastSaleData && successType === 'SALE' && (
                     <div className="bg-slate-50 dark:bg-slate-800 p-6 rounded-3xl text-left space-y-3 border border-slate-100 dark:border-slate-700">
                        <div className="flex justify-between text-sm font-black text-slate-800 dark:text-white uppercase"><span>Total Pago</span><span className="text-emerald-500 text-xl">R$ {lastSaleData.totalPaid.toLocaleString('pt-BR')}</span></div>
@@ -780,6 +874,41 @@ const PDV: React.FC = () => {
                     <button onClick={() => { if(successType === 'SALE') window.print(); setShowSuccessModal(false); }} className={`py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg flex items-center justify-center gap-2 hover:bg-black transition-all ${successType === 'CANCEL' ? 'opacity-20 pointer-events-none' : ''}`}><span className="material-symbols-outlined text-lg">print</span> Imprimir Recibo</button>
                     <button onClick={() => setShowSuccessModal(false)} className="py-4 bg-primary text-white rounded-2xl font-black text-[10px] uppercase shadow-lg hover:bg-blue-600 transition-all">Concluir</button>
                  </div>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL: Cadastro de Cliente Rápido */}
+      {showCustomerModal && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/90 backdrop-blur-2xl p-4 animate-in fade-in">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 flex flex-col">
+              <div className="p-8 bg-primary text-white flex justify-between items-center">
+                 <div><h3 className="text-2xl font-black uppercase tracking-tight">CADASTRO DE CLIENTE</h3><p className="text-[10px] font-bold text-white/70 uppercase mt-1">Insira os dados para venda fidelizada</p></div>
+                 <button onClick={() => setShowCustomerModal(false)} className="material-symbols-outlined text-4xl">close</button>
+              </div>
+              <form onSubmit={handleSaveCustomer} className="p-10 space-y-6">
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Nome Completo</label><input required value={customerForm.name} onChange={e => setCustomerForm({...customerForm, name: e.target.value.toUpperCase()})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold uppercase text-slate-900 dark:text-white" /></div>
+                      <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">WhatsApp / Tel</label><input required value={customerForm.phone} onChange={e => setCustomerForm({...customerForm, phone: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold text-slate-900 dark:text-white" /></div>
+                      <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">CPF / CNPJ</label><input value={customerForm.cpfCnpj} onChange={e => setCustomerForm({...customerForm, cpfCnpj: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold text-slate-900 dark:text-white" /></div>
+                   </div>
+                 <div className="pt-6">
+                    <button type="submit" className="w-full h-20 bg-primary text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 transition-all">CONCLUIR CADASTRO</button>
+                 </div>
+              </form>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL: Desconto Global */}
+      {showGlobalDiscountModal && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 animate-in fade-in">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+              <div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-rose-500 text-white flex justify-between items-center"><h3 className="text-xl font-black uppercase tracking-tight">DESCONTO GERAL</h3><button onClick={() => setShowGlobalDiscountModal(false)} className="material-symbols-outlined">close</button></div>
+              <div className="p-10 space-y-8 text-center text-slate-900 dark:text-white"><div className="space-y-1.5 text-left"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Valor Total do Desconto (R$)</label><input autoFocus type="number" step="0.01" value={globalDiscount} onChange={e => setGlobalDiscount(parseFloat(e.target.value) || 0)} className="w-full h-20 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-3xl font-black text-rose-500 text-center outline-none focus:ring-4 focus:ring-rose-500/10 transition-all" /></div>
+                 <div className="grid grid-cols-2 gap-4"><div className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl"><p className="text-[10px] font-black text-slate-400 uppercase mb-1">Subtotal</p><p className="text-lg font-black">R$ {subtotal.toLocaleString('pt-BR')}</p></div><div className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl"><p className="text-[10px] font-black text-slate-400 uppercase mb-1">Total Final</p><p className="text-lg font-black text-emerald-500">R$ {totalGeral.toLocaleString('pt-BR')}</p></div></div>
+                 <button onClick={() => setShowGlobalDiscountModal(false)} className="w-full h-16 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase shadow-xl hover:bg-black transition-all">APLICAR E VOLTAR</button>
               </div>
            </div>
         </div>
