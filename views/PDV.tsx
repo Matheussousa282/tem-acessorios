@@ -106,10 +106,10 @@ const PDV: React.FC = () => {
   const [tempItemPrice, setTempItemPrice] = useState(0);
   const [returnSearchTerm, setReturnSearchTerm] = useState('');
 
-  const [activeCustomerTab, setActiveCustomerTab] = useState<'basic' | 'address'>('basic');
+  // Formulário completo de cliente no PDV
   const initialCustomerForm: Omit<Customer, 'id'> = { 
     name: '', phone: '', email: '', birthDate: new Date().toISOString().split('T')[0],
-    cpfCnpj: '', zipCode: '', address: '', number: '', neighborhood: '', city: '', state: ''
+    cpfCnpj: '', zipCode: '', address: '', number: '', neighborhood: '', city: '', state: '', complement: '', notes: ''
   };
   const [customerForm, setCustomerForm] = useState(initialCustomerForm);
 
@@ -937,37 +937,110 @@ const PDV: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL: Cadastro de Cliente Rápido */}
+      {/* MODAL: Cadastro de Cliente Rápido - AGORA COMPLETO */}
       {showCustomerModal && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/90 backdrop-blur-2xl p-4 animate-in fade-in">
-           <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 flex flex-col">
-              <div className="p-8 bg-primary text-white flex justify-between items-center">
-                 <div><h3 className="text-2xl font-black uppercase tracking-tight">CADASTRO DE CLIENTE</h3><p className="text-[10px] font-bold text-white/70 uppercase mt-1">Insira os dados para venda fidelizada</p></div>
-                 <button onClick={() => setShowCustomerModal(false)} className="material-symbols-outlined text-4xl">close</button>
+           <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 flex flex-col max-h-[90vh]">
+              <div className="p-8 bg-primary text-white flex justify-between items-center shrink-0">
+                 <div className="flex items-center gap-4">
+                    <div className="size-12 bg-white/20 rounded-2xl flex items-center justify-center">
+                       <span className="material-symbols-outlined text-3xl">person_add</span>
+                    </div>
+                    <div>
+                       <h3 className="text-2xl font-black uppercase tracking-tight">CADASTRO DE CLIENTE</h3>
+                       <p className="text-[10px] font-bold text-white/70 uppercase">Insira os dados completos para o registro</p>
+                    </div>
+                 </div>
+                 <button onClick={() => setShowCustomerModal(false)} className="size-12 bg-white/10 rounded-full flex items-center justify-center hover:bg-white/20 transition-all"><span className="material-symbols-outlined">close</span></button>
               </div>
-              <form onSubmit={handleSaveCustomer} className="p-10 space-y-6">
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Nome Completo</label><input required value={customerForm.name} onChange={e => setCustomerForm({...customerForm, name: e.target.value.toUpperCase()})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold uppercase text-slate-900 dark:text-white" /></div>
-                      <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">WhatsApp / Tel</label><input required value={customerForm.phone} onChange={e => setCustomerForm({...customerForm, phone: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold text-slate-900 dark:text-white" /></div>
-                      <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">CPF / CNPJ</label><input value={customerForm.cpfCnpj} onChange={e => setCustomerForm({...customerForm, cpfCnpj: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold text-slate-900 dark:text-white" /></div>
-                   </div>
-                 <div className="pt-6">
-                    <button type="submit" className="w-full h-20 bg-primary text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 transition-all">CONCLUIR CADASTRO</button>
+              
+              <form onSubmit={handleSaveCustomer} className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar">
+                 {/* DADOS BÁSICOS */}
+                 <div className="space-y-6">
+                    <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
+                       <span className="material-symbols-outlined text-primary text-lg">person</span>
+                       <h4 className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Informações Pessoais</h4>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                       <div className="space-y-1">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Nome Completo / Razão Social <span className="text-rose-500">*</span></label>
+                          <input required value={customerForm.name} onChange={e => setCustomerForm({...customerForm, name: e.target.value.toUpperCase()})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold uppercase text-slate-900 dark:text-white" />
+                       </div>
+                       <div className="space-y-1">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">CPF / CNPJ</label>
+                          <input value={customerForm.cpfCnpj} onChange={e => setCustomerForm({...customerForm, cpfCnpj: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold text-slate-900 dark:text-white" />
+                       </div>
+                       <div className="space-y-1">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">WhatsApp / Celular <span className="text-rose-500">*</span></label>
+                          <input required value={customerForm.phone} onChange={e => setCustomerForm({...customerForm, phone: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold text-slate-900 dark:text-white" placeholder="(00) 00000-0000" />
+                       </div>
+                       <div className="space-y-1">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">E-mail</label>
+                          <input type="email" value={customerForm.email} onChange={e => setCustomerForm({...customerForm, email: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold text-slate-900 dark:text-white" placeholder="exemplo@email.com" />
+                       </div>
+                       <div className="space-y-1">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Data de Nascimento</label>
+                          <input type="date" value={customerForm.birthDate} onChange={e => setCustomerForm({...customerForm, birthDate: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold text-slate-900 dark:text-white" />
+                       </div>
+                    </div>
+                 </div>
+
+                 {/* ENDEREÇO */}
+                 <div className="space-y-6">
+                    <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
+                       <span className="material-symbols-outlined text-primary text-lg">location_on</span>
+                       <h4 className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Localização / Endereço</h4>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-6 gap-6">
+                       <div className="md:col-span-2 space-y-1">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">CEP</label>
+                          <input value={customerForm.zipCode} onChange={e => setCustomerForm({...customerForm, zipCode: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold text-slate-900 dark:text-white" placeholder="00000-000" />
+                       </div>
+                       <div className="md:col-span-3 space-y-1">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Endereço / Rua</label>
+                          <input value={customerForm.address} onChange={e => setCustomerForm({...customerForm, address: e.target.value.toUpperCase()})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold text-slate-900 dark:text-white uppercase" />
+                       </div>
+                       <div className="md:col-span-1 space-y-1">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Nº</label>
+                          <input value={customerForm.number} onChange={e => setCustomerForm({...customerForm, number: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold text-slate-900 dark:text-white" />
+                       </div>
+                       <div className="md:col-span-2 space-y-1">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Complemento</label>
+                          <input value={customerForm.complement} onChange={e => setCustomerForm({...customerForm, complement: e.target.value.toUpperCase()})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold text-slate-900 dark:text-white uppercase" />
+                       </div>
+                       <div className="md:col-span-2 space-y-1">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Bairro</label>
+                          <input value={customerForm.neighborhood} onChange={e => setCustomerForm({...customerForm, neighborhood: e.target.value.toUpperCase()})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold text-slate-900 dark:text-white uppercase" />
+                       </div>
+                       <div className="md:col-span-1 space-y-1">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Cidade</label>
+                          <input value={customerForm.city} onChange={e => setCustomerForm({...customerForm, city: e.target.value.toUpperCase()})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold text-slate-900 dark:text-white uppercase" />
+                       </div>
+                       <div className="md:col-span-1 space-y-1">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Estado (UF)</label>
+                          <input value={customerForm.state} onChange={e => setCustomerForm({...customerForm, state: e.target.value.toUpperCase()})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold text-slate-900 dark:text-white uppercase" maxLength={2} />
+                       </div>
+                    </div>
+                 </div>
+
+                 {/* NOTAS */}
+                 <div className="space-y-6">
+                    <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
+                       <span className="material-symbols-outlined text-primary text-lg">description</span>
+                       <h4 className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Observações</h4>
+                    </div>
+                    <textarea 
+                       value={customerForm.notes} 
+                       onChange={e => setCustomerForm({...customerForm, notes: e.target.value})} 
+                       className="w-full h-32 bg-slate-50 dark:bg-slate-800 border-none rounded-3xl p-6 text-sm font-bold outline-none focus:ring-4 focus:ring-primary/10 transition-all text-slate-900 dark:text-white uppercase" 
+                       placeholder="Anotações sobre preferências do cliente ou observações técnicas..."
+                    />
+                 </div>
+
+                 <div className="pt-6 shrink-0">
+                    <button type="submit" className="w-full h-20 bg-primary text-white rounded-[2.5rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 transition-all active:scale-95">CONCLUIR E VINCULAR À VENDA</button>
                  </div>
               </form>
-           </div>
-        </div>
-      )}
-
-      {/* MODAL: Desconto Global */}
-      {showGlobalDiscountModal && (
-        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 animate-in fade-in">
-           <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
-              <div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-rose-500 text-white flex justify-between items-center"><h3 className="text-xl font-black uppercase tracking-tight">DESCONTO GERAL</h3><button onClick={() => setShowGlobalDiscountModal(false)} className="material-symbols-outlined">close</button></div>
-              <div className="p-10 space-y-8 text-center text-slate-900 dark:text-white"><div className="space-y-1.5 text-left"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Valor Total do Desconto (R$)</label><input autoFocus type="number" step="0.01" value={globalDiscount} onChange={e => setGlobalDiscount(parseFloat(e.target.value) || 0)} className="w-full h-20 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-3xl font-black text-rose-500 text-center outline-none focus:ring-4 focus:ring-rose-500/10 transition-all" /></div>
-                 <div className="grid grid-cols-2 gap-4"><div className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl"><p className="text-[10px] font-black text-slate-400 uppercase mb-1">Subtotal</p><p className="text-lg font-black">R$ {subtotal.toLocaleString('pt-BR')}</p></div><div className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl"><p className="text-[10px] font-black text-slate-400 uppercase mb-1">Total Final</p><p className="text-lg font-black text-emerald-500">R$ {totalGeral.toLocaleString('pt-BR')}</p></div></div>
-                 <button onClick={() => setShowGlobalDiscountModal(false)} className="w-full h-16 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase shadow-xl hover:bg-black transition-all">APLICAR E VOLTAR</button>
-              </div>
            </div>
         </div>
       )}
