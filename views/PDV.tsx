@@ -38,25 +38,30 @@ const PDV: React.FC = () => {
     refreshData();
   }, []);
 
-  // Lógica de verificação de data para o caixa
-  const todayStr = new Date().toLocaleDateString('pt-BR');
+  // Lógica de verificação de data para o caixa - Mais robusta
+  const todayStr = useMemo(() => new Date().toLocaleDateString('pt-BR'), []);
 
   const staleSession = useMemo(() => {
-    // Procura por um caixa aberto de dias anteriores
-    return cashSessions.find(s => 
-      (s.storeId === currentUser?.storeId || s.storeName === currentStore.name) && 
-      s.status === CashSessionStatus.OPEN &&
-      s.openingTime?.split(' ')[0] !== todayStr
-    );
+    return cashSessions.find(s => {
+      // Filtrar apenas caixas desta loja que estejam ABERTOS
+      const isThisStore = s.storeId === currentUser?.storeId || s.storeName === currentStore.name;
+      const isOpen = s.status === CashSessionStatus.OPEN;
+      if (!isThisStore || !isOpen) return false;
+
+      // Comparar apenas a parte da data (DD/MM/YYYY)
+      const sessionDate = s.openingTime?.split(',')[0].split(' ')[0].trim();
+      return sessionDate !== todayStr;
+    });
   }, [cashSessions, currentUser, currentStore, todayStr]);
 
   const isCashOpenToday = useMemo(() => {
     if (isAdmin) return true;
-    return cashSessions.some(s => 
-      (s.storeId === currentUser?.storeId || s.storeName === currentStore.name) && 
-      s.status === CashSessionStatus.OPEN &&
-      s.openingTime?.split(' ')[0] === todayStr
-    );
+    return cashSessions.some(s => {
+      const isThisStore = s.storeId === currentUser?.storeId || s.storeName === currentStore.name;
+      const isOpen = s.status === CashSessionStatus.OPEN;
+      const sessionDate = s.openingTime?.split(',')[0].split(' ')[0].trim();
+      return isThisStore && isOpen && sessionDate === todayStr;
+    });
   }, [cashSessions, currentUser, isAdmin, currentStore, todayStr]);
 
   // Estados de Controle de Modais
@@ -368,7 +373,7 @@ const PDV: React.FC = () => {
         <div className="bg-white dark:bg-slate-900 p-12 rounded-[3.5rem] shadow-2xl border border-slate-200 dark:border-slate-800 text-center max-w-lg space-y-8 animate-in zoom-in-95 duration-500">
            <div className="size-24 bg-amber-500/10 text-amber-500 rounded-[2rem] flex items-center justify-center mx-auto animate-bounce"><span className="material-symbols-outlined text-5xl">warning</span></div>
            <h2 className="text-3xl font-black uppercase tracking-tighter">Caixa Antigo Pendente</h2>
-           <p className="text-slate-500 font-bold text-sm uppercase leading-relaxed">Existe um movimento de caixa aberto em uma data anterior ({staleSession.openingTime?.split(' ')[0]}). É obrigatório realizar o fechamento deste movimento antes de iniciar as vendas de hoje.</p>
+           <p className="text-slate-500 font-bold text-sm uppercase leading-relaxed">Existe um movimento de caixa aberto em uma data anterior ({staleSession.openingTime?.split(',')[0].split(' ')[0]}). É obrigatório realizar o fechamento deste movimento antes de iniciar as vendas de hoje.</p>
            <div className="flex flex-col gap-3">
               <button onClick={() => navigate('/caixa')} className="w-full py-5 bg-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 transition-all">Ir para Fechamento de Caixa</button>
            </div>
