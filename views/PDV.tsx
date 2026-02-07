@@ -38,17 +38,13 @@ const PDV: React.FC = () => {
     refreshData();
   }, []);
 
-  // Lógica de verificação de data para o caixa - Mais robusta
   const todayStr = useMemo(() => new Date().toLocaleDateString('pt-BR'), []);
 
   const staleSession = useMemo(() => {
     return cashSessions.find(s => {
-      // Filtrar apenas caixas desta loja que estejam ABERTOS
       const isThisStore = s.storeId === currentUser?.storeId || s.storeName === currentStore.name;
       const isOpen = s.status === CashSessionStatus.OPEN;
       if (!isThisStore || !isOpen) return false;
-
-      // Comparar apenas a parte da data (DD/MM/YYYY)
       const sessionDate = s.openingTime?.split(',')[0].split(' ')[0].trim();
       return sessionDate !== todayStr;
     });
@@ -73,9 +69,9 @@ const PDV: React.FC = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [showTerminalMenu, setShowTerminalMenu] = useState(false);
+  const [showGlobalDiscountModal, setShowGlobalDiscountModal] = useState(false);
   
   const [editingItem, setEditingItem] = useState<{ index: number, item: CartItem } | null>(null);
-  const [showGlobalDiscountModal, setShowGlobalDiscountModal] = useState(false);
   
   // Estados de Negócio
   const [successType, setSuccessType] = useState<'SALE' | 'OS' | 'RETURN' | 'CANCEL'>('SALE');
@@ -84,14 +80,21 @@ const PDV: React.FC = () => {
   const [selectedVendorId, setSelectedVendorId] = useState('');
   const [lastSaleData, setLastSaleData] = useState<any>(null);
   const [isFinalizing, setIsFinalizing] = useState(false);
+  
+  // Controle de Desconto e Frete
   const [globalDiscount, setGlobalDiscount] = useState(0);
+  const [discountType, setDiscountType] = useState<'VALUE' | 'PERCENT'>('VALUE');
   const [shippingValue, setShippingValue] = useState(0);
+
+  // Estados Temporários do Modal de Desconto (Garante que o botão APLICAR seja necessário)
+  const [tempDiscount, setTempDiscount] = useState(0);
+  const [tempDiscountType, setTempDiscountType] = useState<'VALUE' | 'PERCENT'>('VALUE');
 
   // Estados de Pagamento Múltiplo
   const [payments, setPayments] = useState<MultiPayment[]>([]);
   const [currentPaymentValue, setCurrentPaymentValue] = useState<number>(0);
 
-  // Estados de Cartão (Temporários para adição de pagamento)
+  // Estados de Cartão
   const [cardInstallments, setCardInstallments] = useState(1);
   const [cardAuthNumber, setCardAuthNumber] = useState('');
   const [cardNsu, setCardNsu] = useState('');
@@ -102,11 +105,10 @@ const PDV: React.FC = () => {
   const [osDescription, setOsDescription] = useState('');
   const [priceInquirySearch, setPriceInquirySearch] = useState('');
   const [cancelSearchId, setCancelSearchId] = useState('');
-
   const [tempItemPrice, setTempItemPrice] = useState(0);
   const [returnSearchTerm, setReturnSearchTerm] = useState('');
 
-  // Formulário completo de cliente no PDV
+  // Cadastro de Cliente Rápido (Completo conforme solicitado)
   const initialCustomerForm: Omit<Customer, 'id'> = { 
     name: '', phone: '', email: '', birthDate: new Date().toISOString().split('T')[0],
     cpfCnpj: '', zipCode: '', address: '', number: '', neighborhood: '', city: '', state: '', complement: '', notes: ''
@@ -114,6 +116,35 @@ const PDV: React.FC = () => {
   const [customerForm, setCustomerForm] = useState(initialCustomerForm);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Cálculos de Totais
+  const subtotal = useMemo(() => cart.reduce((acc, item) => acc + (item.salePrice * item.quantity), 0), [cart]);
+  
+  const discountValueCalculated = useMemo(() => {
+    if (discountType === 'PERCENT') {
+      return (subtotal * (globalDiscount / 100));
+    }
+    return globalDiscount;
+  }, [subtotal, globalDiscount, discountType]);
+
+  const totalGeral = useMemo(() => {
+    const val = subtotal + (Number(shippingValue) || 0) - (Number(discountValueCalculated) || 0);
+    return Math.max(0, val);
+  }, [subtotal, shippingValue, discountValueCalculated]);
+  
+  const totalPaid = useMemo(() => payments.reduce((acc, p) => acc + p.value, 0), [payments]);
+  const remainingValue = useMemo(() => Math.max(0, totalGeral - totalPaid), [totalGeral, totalPaid]);
+  const changeValue = useMemo(() => Math.max(0, totalPaid - totalGeral), [totalGeral, totalPaid]);
+
+  useEffect(() => {
+    if (showCheckout) {
+      setCurrentPaymentValue(remainingValue);
+    }
+  }, [showCheckout, remainingValue]);
+
+  const vendors = useMemo(() => {
+    return users.filter(u => (u.role === UserRole.VENDOR || u.role === UserRole.ADMIN || u.role === UserRole.MANAGER) && (isAdmin || u.storeId === currentUser?.storeId));
+  }, [users, currentUser, isAdmin]);
 
   const categories = useMemo(() => {
     const cats = ['Todos', 'Serviços'];
@@ -132,42 +163,6 @@ const PDV: React.FC = () => {
     });
   }, [search, category, products]);
 
-  const inquiryResults = useMemo(() => {
-    if (!priceInquirySearch) return [];
-    return products.filter(p => 
-      p.name.toLowerCase().includes(priceInquirySearch.toLowerCase()) || 
-      p.sku.toLowerCase().includes(priceInquirySearch.toLowerCase()) || 
-      p.barcode?.includes(priceInquirySearch)
-    ).slice(0, 5);
-  }, [priceInquirySearch, products]);
-
-  const cancelCandidate = useMemo(() => {
-    if (!cancelSearchId) return null;
-    const normalizedId = cancelSearchId.toUpperCase();
-    return transactions.find(t => t.id === normalizedId || t.id.endsWith(normalizedId));
-  }, [cancelSearchId, transactions]);
-
-  const vendors = useMemo(() => {
-    return users.filter(u => (u.role === UserRole.VENDOR || u.role === UserRole.ADMIN || u.role === UserRole.MANAGER) && (isAdmin || u.storeId === currentUser?.storeId));
-  }, [users, currentUser, isAdmin]);
-
-  const filteredBrands = useMemo(() => {
-    return cardBrands.filter(b => b.operatorId === selectedOperatorId);
-  }, [cardBrands, selectedOperatorId]);
-
-  const subtotal = useMemo(() => cart.reduce((acc, item) => acc + (item.salePrice * item.quantity), 0), [cart]);
-  const totalGeral = useMemo(() => Math.max(0, subtotal + (Number(shippingValue) || 0) - (Number(globalDiscount) || 0)), [subtotal, shippingValue, globalDiscount]);
-  
-  const totalPaid = useMemo(() => payments.reduce((acc, p) => acc + p.value, 0), [payments]);
-  const remainingValue = useMemo(() => Math.max(0, totalGeral - totalPaid), [totalGeral, totalPaid]);
-  const changeValue = useMemo(() => Math.max(0, totalPaid - totalGeral), [totalGeral, totalPaid]);
-
-  useEffect(() => {
-    if (showCheckout) {
-      setCurrentPaymentValue(remainingValue);
-    }
-  }, [showCheckout, remainingValue]);
-
   const addToCart = (product: Product) => {
     if (!product.isService && product.stock <= 0) { alert('Produto sem estoque!'); return; }
     setCart(prev => {
@@ -179,58 +174,22 @@ const PDV: React.FC = () => {
     searchInputRef.current?.focus();
   };
 
-  const handleAddPayment = () => {
-    if (currentPaymentValue <= 0) return;
-    if (payments.length >= 6) {
-      alert("Máximo de 6 formas de pagamento atingido!");
-      return;
-    }
+  // Lógica de Desconto
+  const handleOpenDiscountModal = () => {
+    setTempDiscount(globalDiscount);
+    setTempDiscountType(discountType);
+    setShowGlobalDiscountModal(true);
+  };
 
-    const isCard = (paymentMethod === 'Debito' || paymentMethod === 'Credito' || paymentMethod === 'Pix Maquineta');
-    if (isCard) {
-      if (!selectedOperatorId || !selectedBrandId) {
-        alert("Selecione Operadora e Bandeira!");
-        return;
-      }
-    }
-
-    const operator = cardOperators.find(o => o.id === selectedOperatorId);
-    const brand = cardBrands.find(b => b.id === selectedBrandId);
-
-    const newPayment: MultiPayment = {
-      method: paymentMethod,
-      value: currentPaymentValue,
-      details: isCard ? {
-        installments: cardInstallments,
-        authNumber: cardAuthNumber,
-        transactionSku: cardNsu,
-        cardOperatorId: selectedOperatorId,
-        cardBrandId: selectedBrandId,
-        operatorName: operator?.name,
-        brandName: brand?.name
-      } : undefined
-    };
-
-    setPayments([...payments, newPayment]);
-    
-    // Limpar estados auxiliares
-    setCardAuthNumber('');
-    setCardNsu('');
-    setSelectedOperatorId('');
-    setSelectedBrandId('');
-    setCardInstallments(1);
-    
-    // Resetar valor sugerido para o restante
-    const newRemaining = totalGeral - (totalPaid + currentPaymentValue);
-    setCurrentPaymentValue(newRemaining > 0 ? newRemaining : 0);
+  const handleApplyDiscount = () => {
+    setGlobalDiscount(tempDiscount);
+    setDiscountType(tempDiscountType);
+    setShowGlobalDiscountModal(false);
   };
 
   const handleSaveCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
-    if(!customerForm.name || !customerForm.phone) {
-      alert("Preencha ao menos nome e telefone!");
-      return;
-    }
+    if(!customerForm.name || !customerForm.phone) { alert("Preencha ao menos nome e telefone!"); return; }
     const newId = `CUST-${Date.now()}`;
     const newCustomer: Customer = { ...customerForm, id: newId };
     await addCustomer(newCustomer);
@@ -241,49 +200,27 @@ const PDV: React.FC = () => {
 
   const handleFinalizeSale = async () => {
     if (cart.length === 0 || isFinalizing) return;
-    if (totalPaid < totalGeral) {
-      alert("O valor total pago é inferior ao total da venda!");
-      return;
-    }
-
-    if (!selectedVendorId) {
-      alert("Selecione um VENDEDOR para finalizar a venda!");
-      return;
-    }
+    if (totalPaid < totalGeral) { alert("O valor total pago é inferior ao total da venda!"); return; }
+    if (!selectedVendorId) { alert("Selecione um VENDEDOR para finalizar a venda!"); return; }
 
     setIsFinalizing(true);
     try {
       const saleId = `SALE-${Date.now()}`;
       const vendor = vendors.find(v => v.id === selectedVendorId);
       const customer = customers.find(c => c.id === selectedCustomerId);
-      
       const methodsList = Array.from(new Set(payments.map(p => p.method)));
       const methodStr = methodsList.length > 1 ? `Múltiplo (${methodsList.join(', ')})` : methodsList[0];
 
-      const firstCardPayment = payments.find(p => p.details?.cardOperatorId);
-      const cardDetails = firstCardPayment?.details || {};
-
       const currentSaleData = {
-        id: saleId, 
-        items: [...cart], 
-        subtotal, 
-        discount: globalDiscount,
-        shipping: shippingValue, 
-        total: totalGeral,
-        totalPaid,
-        change: changeValue,
-        payment: methodStr, 
-        payments: payments, 
-        date: new Date().toLocaleString('pt-BR'),
-        vendor: vendor?.name || 'Vendedor Não Informado', 
-        customer: customer?.name || 'Consumidor Final',
-        store: currentStore,
-        ...cardDetails
+        id: saleId, items: [...cart], subtotal, discount: discountValueCalculated,
+        shipping: shippingValue, total: totalGeral, totalPaid, change: changeValue,
+        payment: methodStr, payments: payments, date: new Date().toLocaleString('pt-BR'),
+        vendor: vendor?.name || 'Vendedor Não Informado', customer: customer?.name || 'Consumidor Final',
+        store: currentStore
       };
       
       setLastSaleData(currentSaleData);
-
-      await processSale(cart, totalGeral, methodStr, selectedCustomerId, selectedVendorId, shippingValue, cardDetails);
+      await processSale(cart, totalGeral, methodStr, selectedCustomerId, selectedVendorId, shippingValue);
       
       setCart([]);
       setShippingValue(0);
@@ -313,60 +250,6 @@ const PDV: React.FC = () => {
     setTempItemPrice(item.salePrice);
   };
 
-  const handleCreateOS = async () => {
-    if (!selectedCustomerId || cart.length === 0) return;
-    if (!selectedVendorId) {
-      alert('Selecione um VENDEDOR antes de gerar a OS!');
-      return;
-    }
-    const customer = customers.find(c => c.id === selectedCustomerId)!;
-    const newOS: ServiceOrder = {
-      id: `OS-${Date.now()}`,
-      date: new Date().toLocaleDateString('pt-BR'),
-      customerId: selectedCustomerId,
-      customerName: customer.name,
-      description: osDescription,
-      status: ServiceOrderStatus.OPEN,
-      items: [...cart],
-      totalValue: totalGeral,
-      store: currentStore.name
-    };
-    await addServiceOrder(newOS);
-    setCart([]);
-    setGlobalDiscount(0);
-    setShippingValue(0);
-    setOsDescription('');
-    setShowOSModal(false);
-    setSuccessType('OS');
-    setShowSuccessModal(true);
-  };
-
-  const processSaleCancellation = async (sale: Transaction) => {
-    if(confirm(`Deseja realmente realizar o estorno integral da venda ${sale.id}?\nO estoque dos produtos será devolvido automaticamente.`)) {
-        const estorno: Transaction = {
-          ...sale,
-          id: `CANCEL-${Date.now()}`,
-          description: `ESTORNO DE VENDA: ${sale.id}`,
-          type: 'EXPENSE',
-          category: 'Devolução',
-          date: new Date().toISOString().split('T')[0],
-          value: sale.value
-        };
-        const stockUpdates = (sale.items || []).map(item => {
-           const p = products.find(x => x.id === item.id);
-           if(p && !p.isService) return addProduct({ ...p, stock: p.stock + item.quantity });
-           return Promise.resolve();
-        });
-        await Promise.all([...stockUpdates, addTransaction(estorno)]);
-        setSuccessType('CANCEL');
-        setShowCancelModal(false);
-        setShowReturnsModal(false);
-        setShowSuccessModal(true);
-        refreshData();
-     }
-  };
-
-  // Bloqueio por Caixa de dia anterior
   if (staleSession && !isAdmin) {
     return (
       <div className="h-screen w-full flex items-center justify-center bg-slate-100 dark:bg-background-dark p-6">
@@ -374,9 +257,7 @@ const PDV: React.FC = () => {
            <div className="size-24 bg-amber-500/10 text-amber-500 rounded-[2rem] flex items-center justify-center mx-auto animate-bounce"><span className="material-symbols-outlined text-5xl">warning</span></div>
            <h2 className="text-3xl font-black uppercase tracking-tighter">Caixa Antigo Pendente</h2>
            <p className="text-slate-500 font-bold text-sm uppercase leading-relaxed">Existe um movimento de caixa aberto em uma data anterior ({staleSession.openingTime?.split(',')[0].split(' ')[0]}). É obrigatório realizar o fechamento deste movimento antes de iniciar as vendas de hoje.</p>
-           <div className="flex flex-col gap-3">
-              <button onClick={() => navigate('/caixa')} className="w-full py-5 bg-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 transition-all">Ir para Fechamento de Caixa</button>
-           </div>
+           <button onClick={() => navigate('/caixa')} className="w-full py-5 bg-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 transition-all">Ir para Fechamento de Caixa</button>
         </div>
       </div>
     );
@@ -401,62 +282,20 @@ const PDV: React.FC = () => {
   return (
     <div className="h-screen flex flex-col bg-slate-50 dark:bg-background-dark overflow-hidden font-display relative">
       
-      {/* RECIBO TÉRMICO */}
+      {/* RECIBO TÉRMICO OCULTO PARA IMPRESSÃO */}
       <div id="receipt-print-area" className="hidden print:block bg-white text-black font-mono text-[11px] leading-tight p-4">
         <div className="text-center space-y-1 mb-3 border-b-2 border-dashed border-black pb-2">
            {lastSaleData?.store?.logoUrl && <img src={lastSaleData.store.logoUrl} className="h-14 mx-auto mb-1 grayscale" alt="Logo" />}
            <h2 className="text-[14px] font-black uppercase">{lastSaleData?.store?.name || 'TEM ACESSÓRIOS'}</h2>
-           <p className="text-[9px] uppercase">{lastSaleData?.store?.location || 'LOCAL NÃO INFORMADO'}</p>
-           <p className="text-[9px]">CNPJ: {lastSaleData?.store?.cnpj || '00.000.000/0001-00'}</p>
            <div className="font-black text-[12px] pt-1">*** CUPOM NÃO FISCAL ***</div>
         </div>
-
-        <div className="space-y-1 mb-2 text-[10px]">
-           <div className="flex justify-between font-bold"><span>DOC: {lastSaleData?.id || '---'}</span><span>{lastSaleData?.date || '---'}</span></div>
-           <div className="uppercase">CLIENTE: {lastSaleData?.customer || 'CONSUMIDOR FINAL'}</div>
-           <div className="uppercase">VENDEDOR: {lastSaleData?.vendor || 'BALCÃO'}</div>
-        </div>
-
-        <div className="border-t border-b border-black py-1 mb-1 font-black flex justify-between uppercase text-[9px]">
-           <span className="w-8">QTD</span><span className="flex-1 px-2">DESCRIÇÃO</span><span className="w-16 text-right">VALOR</span>
-        </div>
-
         <div className="space-y-1 mb-3 text-[10px]">
            {lastSaleData?.items?.map((item: any, idx: number) => (
-             <div key={idx} className="flex justify-between items-start uppercase">
-                <span className="w-8">{item.quantity.toFixed(0)}</span>
-                <span className="flex-1 px-2">{item.name}</span>
-                <span className="w-16 text-right">{(item.quantity * item.salePrice).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-             </div>
+             <div key={idx} className="flex justify-between items-start uppercase"><span className="w-8">{item.quantity.toFixed(0)}</span><span className="flex-1 px-2">{item.name}</span><span className="w-16 text-right">{(item.quantity * item.salePrice).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
            ))}
         </div>
-
         <div className="space-y-1 border-t border-black pt-2 mb-3 text-[11px]">
-           <div className="flex justify-between font-bold"><span>SUBTOTAL:</span><span>R$ {lastSaleData?.subtotal?.toLocaleString('pt-BR', {minimumFractionDigits: 2}) || '0,00'}</span></div>
-           {lastSaleData?.discount > 0 && <div className="flex justify-between text-rose-600"><span>DESCONTO (-):</span><span>R$ {lastSaleData?.discount?.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>}
-           {lastSaleData?.shipping > 0 && <div className="flex justify-between text-blue-600"><span>FRETE (+):</span><span>R$ {lastSaleData?.shipping?.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>}
-           <div className="flex justify-between text-[13px] font-black border-t-2 border-black pt-1"><span>TOTAL GERAL:</span><span>R$ {lastSaleData?.total?.toLocaleString('pt-BR', {minimumFractionDigits: 2}) || '0,00'}</span></div>
-        </div>
-
-        <div className="bg-black/5 p-2 border border-black mb-4 text-[10px] space-y-1">
-           <div className="font-black uppercase border-b border-black/10 pb-1">PAGAMENTOS EFETUADOS:</div>
-           {lastSaleData?.payments?.map((p: any, i: number) => (
-             <div key={i} className="flex justify-between uppercase font-bold text-[10px]">
-               <span>{p.method} {p.details?.installments > 1 ? `(${p.details.installments}X)` : ''}:</span>
-               <span>R$ {p.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-             </div>
-           ))}
-           {lastSaleData?.change > 0 && (
-             <div className="flex justify-between text-emerald-600 font-black border-t border-black/10 pt-1 mt-1">
-               <span>TROCO RECEBIDO:</span>
-               <span>R$ {lastSaleData.change.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-             </div>
-           )}
-        </div>
-
-        <div className="text-center space-y-1 pt-2 border-t border-dashed border-black text-[9px]">
-           <p className="font-black">OBRIGADO PELA PREFERÊNCIA!</p>
-           <p className="opacity-70 uppercase">SISTEMA ERP CLOUD - v4.5.2</p>
+           <div className="flex justify-between font-black text-[13px]"><span>TOTAL GERAL:</span><span>R$ {lastSaleData?.total?.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
         </div>
       </div>
 
@@ -466,10 +305,7 @@ const PDV: React.FC = () => {
              <div onClick={() => setShowTerminalMenu(!showTerminalMenu)} className="size-12 rounded-xl bg-primary flex items-center justify-center text-white shadow-lg overflow-hidden cursor-pointer hover:scale-105 transition-all">
                 {currentStore.logoUrl ? <img src={currentStore.logoUrl} className="size-full object-cover" alt="Terminal Logo" /> : <span className="material-symbols-outlined">point_of_sale</span>}
              </div>
-             <div>
-                <h1 className="text-lg font-black uppercase text-slate-900 dark:text-white leading-none">{currentStore.name}</h1>
-                <p className="text-[10px] font-black text-slate-400 uppercase mt-1">Terminal em Operação</p>
-             </div>
+             <div><h1 className="text-lg font-black uppercase text-slate-900 dark:text-white leading-none">{currentStore.name}</h1><p className="text-[10px] font-black text-slate-400 uppercase mt-1">Terminal Ativo</p></div>
           </div>
           <div className="h-8 w-px bg-slate-200 dark:border-slate-800 mx-2"></div>
           <div className="flex gap-2 overflow-x-auto no-scrollbar max-w-[450px]">
@@ -479,12 +315,8 @@ const PDV: React.FC = () => {
           </div>
         </div>
         <div className="flex gap-3">
-           <button onClick={() => { setCancelSearchId(''); setShowCancelModal(true); }} className="px-5 py-2.5 bg-rose-500/10 text-rose-500 rounded-xl font-black text-[10px] hover:bg-rose-500 hover:text-white transition-all uppercase flex items-center gap-2"><span className="material-symbols-outlined text-lg">cancel</span> Cancelamento</button>
-           <button onClick={() => { setReturnSearchTerm(''); setShowReturnsModal(true); }} className="px-5 py-2.5 bg-amber-500/10 text-amber-600 rounded-xl font-black text-[10px] hover:bg-amber-500 hover:text-white transition-all uppercase flex items-center gap-2"><span className="material-symbols-outlined text-lg">history</span> Trocas</button>
            <button onClick={() => setShowPriceInquiry(true)} className="px-5 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl font-black text-[10px] hover:bg-primary hover:text-white transition-all uppercase flex items-center gap-2"><span className="material-symbols-outlined text-lg">sell</span> Consulta Preço</button>
-           <button onClick={() => navigate('/servicos?tab=list')} className="px-5 py-2.5 bg-slate-900 text-white rounded-xl font-black text-[10px] hover:bg-primary transition-all uppercase flex items-center gap-2">
-              <span className="material-symbols-outlined text-lg">build</span> Serviços / OS
-           </button>
+           <button onClick={() => navigate('/servicos?tab=list')} className="px-5 py-2.5 bg-slate-900 text-white rounded-xl font-black text-[10px] hover:bg-primary transition-all uppercase flex items-center gap-2"><span className="material-symbols-outlined text-lg">build</span> Serviços / OS</button>
            <button onClick={() => window.history.back()} className="px-5 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-xl font-black text-[10px] hover:bg-rose-500 hover:text-white transition-all uppercase tracking-widest">Sair</button>
         </div>
       </header>
@@ -501,15 +333,10 @@ const PDV: React.FC = () => {
             {filteredProducts.map(p => (
               <div key={p.id} onClick={() => addToCart(p)} className="bg-white dark:bg-slate-800 p-3 rounded-3xl border-2 border-transparent hover:border-primary transition-all cursor-pointer shadow-sm group relative flex flex-col h-fit">
                 <div className="absolute top-4 left-4 z-10"><span className={`px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-tighter shadow-sm ${p.isService ? 'bg-amber-500 text-white' : 'bg-slate-900/60 text-white backdrop-blur-md'}`}>{p.isService ? 'Serviço' : p.category}</span></div>
-                <div className={`aspect-square w-full rounded-2xl mb-3 overflow-hidden flex items-center justify-center shrink-0 ${p.isService ? 'bg-amber-500/5' : 'bg-slate-100 dark:bg-slate-700'}`}>
-                  {p.isService ? <span className="material-symbols-outlined text-4xl text-amber-500/50">build</span> : <img src={p.image} className="size-full object-cover group-hover:scale-110 transition-transform duration-500" alt={p.name} />}
-                </div>
+                <div className={`aspect-square w-full rounded-2xl mb-3 overflow-hidden flex items-center justify-center shrink-0 ${p.isService ? 'bg-amber-500/5' : 'bg-slate-100 dark:bg-slate-700'}`}><img src={p.image} className="size-full object-cover" alt={p.name} /></div>
                 <div className="flex flex-col flex-1 px-1">
-                   <h4 className="text-[11px] font-black uppercase text-slate-700 dark:text-slate-200 line-clamp-2 min-h-[32px] leading-tight mb-1">{p.name}</h4>
-                   <div className="mt-auto flex justify-between items-end">
-                      <div className="flex flex-col"><span className="text-[14px] font-black text-primary leading-none">R$ {p.salePrice.toLocaleString('pt-BR')}</span></div>
-                      {!p.isService && <div className="text-right"><p className={`text-xs font-black leading-none ${p.stock <= 5 ? 'text-rose-500' : 'text-slate-600 dark:text-slate-300'}`}>{p.stock} <span className="text-[8px]">un</span></p></div>}
-                   </div>
+                   <h4 className="text-[11px] font-black uppercase text-slate-700 dark:text-slate-200 line-clamp-2 leading-tight mb-1">{p.name}</h4>
+                   <div className="mt-auto flex justify-between items-end"><span className="text-[14px] font-black text-primary">R$ {p.salePrice.toLocaleString('pt-BR')}</span></div>
                 </div>
               </div>
             ))}
@@ -519,528 +346,209 @@ const PDV: React.FC = () => {
         <aside className="w-[480px] bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 flex flex-col shadow-2xl shrink-0">
           <div className="p-6 space-y-4 border-b border-slate-100 dark:border-slate-800">
              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-2">Vendedor <span className="text-rose-500">*</span></label>
-                   <select 
-                     value={selectedVendorId} 
-                     onChange={e => setSelectedVendorId(e.target.value)} 
-                     className={`w-full h-12 bg-slate-50 dark:bg-slate-800 border-2 rounded-xl px-4 text-[10px] font-black uppercase transition-all ${!selectedVendorId ? 'border-rose-500/20' : 'border-transparent focus:border-primary'}`}
-                   >
-                      <option value="">SELECIONE VENDEDOR</option>
-                      {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-                   </select>
+                <div className="space-y-1.5"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Vendedor</label>
+                   <select value={selectedVendorId} onChange={e => setSelectedVendorId(e.target.value)} className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-2 rounded-xl px-4 text-[10px] font-black uppercase"><option value="">SELECIONE VENDEDOR</option>{vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}</select>
                 </div>
                 <div className="space-y-1.5">
-                   <div className="flex justify-between items-center px-2">
-                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Cliente</label>
-                      <button onClick={() => setShowCustomerModal(true)} className="text-[9px] font-black text-primary uppercase hover:underline flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">person_add</span> Novo</button>
-                   </div>
-                   <select value={selectedCustomerId} onChange={e => setSelectedCustomerId(e.target.value)} className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-[10px] font-black uppercase">
-                      <option value="">Consumidor Final</option>
-                      {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                   </select>
+                   <div className="flex justify-between items-center px-2"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Cliente</label><button onClick={() => setShowCustomerModal(true)} className="text-[9px] font-black text-primary uppercase">Novo</button></div>
+                   <select value={selectedCustomerId} onChange={e => setSelectedCustomerId(e.target.value)} className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-[10px] font-black uppercase"><option value="">Consumidor Final</option>{customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
                 </div>
              </div>
           </div>
           <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
-             {cart.length === 0 ? (
-               <div className="h-full flex flex-col items-center justify-center opacity-20"><span className="material-symbols-outlined text-7xl">shopping_cart</span><p className="text-xs font-black uppercase mt-4">Carrinho Vazio</p></div>
-             ) : cart.map((item, idx) => {
-               const original = products.find(p => p.id === item.id);
-               const isPriceModified = original && original.salePrice !== item.salePrice;
-               return (
-                <div key={`${item.id}-${idx}`} onClick={() => openItemEdit(item, idx)} className="flex items-center gap-4 bg-slate-50 dark:bg-slate-800 p-4 rounded-3xl group border border-transparent hover:border-primary/20 transition-all cursor-pointer">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-start">
-                        <p className="text-xs font-black uppercase truncate leading-none flex-1">{item.name}</p>
-                        <button onClick={(e) => { e.stopPropagation(); setCart(prev => prev.filter((_, i) => i !== idx)); }} className="size-5 bg-rose-500/10 text-rose-500 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"><span className="material-symbols-outlined text-xs">delete</span></button>
-                      </div>
-                      <div className="flex justify-between items-center mt-2">
-                          <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
-                            <button onClick={() => setCart(prev => prev.map((i, ix) => ix === idx ? { ...i, quantity: Math.max(1, i.quantity - 1) } : i))} className="size-6 bg-slate-200 dark:bg-slate-700 rounded-lg flex items-center justify-center text-slate-500"><span className="material-symbols-outlined text-sm">remove</span></button>
-                            <span className="text-xs font-black tabular-nums">{item.quantity}</span>
-                            <button onClick={() => setCart(prev => prev.map((i, ix) => ix === idx ? { ...i, quantity: i.quantity + 1 } : i))} className="size-6 bg-primary/10 text-primary rounded-lg flex items-center justify-center"><span className="material-symbols-outlined text-sm">add</span></button>
-                          </div>
-                          <div className="flex flex-col items-end">
-                            {isPriceModified && <span className="text-[8px] font-bold text-slate-400 line-through">R$ {original.salePrice.toLocaleString('pt-BR')}</span>}
-                            <span className={`text-sm font-black ${isPriceModified ? (item.salePrice < original.salePrice ? 'text-rose-500' : 'text-emerald-500') : 'text-primary'}`}>
-                              R$ {(item.salePrice * item.quantity).toLocaleString('pt-BR')}
-                            </span>
-                          </div>
-                      </div>
-                    </div>
-                </div>
-               );
-             })}
+             {cart.map((item, idx) => (
+               <div key={`${item.id}-${idx}`} onClick={() => openItemEdit(item, idx)} className="flex items-center gap-4 bg-slate-50 dark:bg-slate-800 p-4 rounded-3xl group cursor-pointer border border-transparent hover:border-primary/20 transition-all">
+                  <div className="flex-1 min-w-0"><p className="text-xs font-black uppercase truncate">{item.name}</p><div className="flex justify-between items-center mt-2"><span className="text-xs font-black">{item.quantity}x</span><span className="text-sm font-black text-primary">R$ {(item.salePrice * item.quantity).toLocaleString('pt-BR')}</span></div></div>
+                  <button onClick={(e) => { e.stopPropagation(); setCart(prev => prev.filter((_, i) => i !== idx)); }} className="size-8 bg-rose-500/10 text-rose-500 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100"><span className="material-symbols-outlined text-sm">delete</span></button>
+               </div>
+             ))}
           </div>
-          <div className="p-8 border-t-2 border-slate-100 dark:border-slate-800 space-y-4 bg-white dark:bg-slate-900 shadow-[0_-20px_50px_rgba(0,0,0,0.05)] shrink-0">
+          <div className="p-8 border-t-2 border-slate-100 dark:border-slate-800 space-y-4 bg-white dark:bg-slate-900 shrink-0">
              <div className="space-y-2">
-                <div className="flex justify-between text-slate-500 items-center"><span className="text-[10px] font-black uppercase tracking-widest">Subtotal Bruto</span><span className="text-sm font-black tabular-nums">R$ {subtotal.toLocaleString('pt-BR')}</span></div>
-                
-                <div className="flex justify-between items-center group">
-                  <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-sm text-blue-500">local_shipping</span>
-                    <span className="text-[9px] font-black uppercase tracking-widest text-blue-500">Frete (+)</span>
-                  </div>
-                  <input 
-                    type="number" 
-                    value={shippingValue} 
-                    onChange={e => setShippingValue(parseFloat(e.target.value) || 0)} 
-                    className="w-24 h-8 bg-slate-50 dark:bg-slate-800 border-none rounded-lg text-right text-xs font-black text-blue-600 px-2"
-                  />
+                <div className="flex justify-between items-center"><span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Subtotal</span><span className="text-sm font-black tabular-nums">R$ {subtotal.toLocaleString('pt-BR')}</span></div>
+                <div className="flex justify-between items-center">
+                   <button onClick={handleOpenDiscountModal} className="text-rose-500 flex items-center gap-1.5 hover:bg-rose-500/10 px-2 py-1 rounded-lg transition-all"><span className="material-symbols-outlined text-sm">local_offer</span><span className="text-[9px] font-black uppercase">Desconto Geral (-)</span></button>
+                   <span className="text-sm font-black tabular-nums text-rose-500">- R$ {discountValueCalculated.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                 </div>
-
-                <div className="flex justify-between items-center group">
-                  <button onClick={() => setShowGlobalDiscountModal(true)} className="flex items-center gap-1.5 text-rose-500 hover:bg-rose-500/10 px-3 py-1 rounded-lg transition-all"><span className="material-symbols-outlined text-sm">local_offer</span><span className="text-[9px] font-black uppercase tracking-widest">Desconto Geral (-)</span></button>
-                  <span className="text-sm font-black tabular-nums text-rose-500">- R$ {globalDiscount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                </div>
-                <div className="flex justify-between pt-4 border-t border-slate-100 dark:border-slate-800 items-baseline"><span className="text-xs font-black uppercase opacity-50 tracking-widest">Total Líquido</span><span className="text-4xl font-black text-slate-900 dark:text-white tabular-nums">R$ {totalGeral.toLocaleString('pt-BR')}</span></div>
+                <div className="flex justify-between pt-4 border-t border-slate-100 items-baseline"><span className="text-xs font-black uppercase opacity-50 tracking-widest">Total Líquido</span><span className="text-4xl font-black text-slate-900 dark:text-white tabular-nums">R$ {totalGeral.toLocaleString('pt-BR')}</span></div>
              </div>
-             <div className="grid grid-cols-2 gap-4 pt-2">
-                <button 
-                  disabled={cart.length === 0} 
-                  onClick={() => { 
-                    if(!selectedVendorId) { alert('Selecione um VENDEDOR!'); return; }
-                    if(!selectedCustomerId) { alert('Selecione um CLIENTE para gerar OS!'); return; } 
-                    setShowOSModal(true); 
-                  }} 
-                  className="py-5 bg-amber-500 hover:bg-amber-600 disabled:opacity-30 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl flex items-center justify-center gap-2 active:scale-95 transition-all"
-                >
-                  Gerar OS
-                </button>
-                <button 
-                  disabled={cart.length === 0} 
-                  onClick={() => {
-                    if(!selectedVendorId) { alert('Selecione um VENDEDOR antes de vender!'); return; }
-                    setPayments([]); 
-                    setShowCheckout(true);
-                  }} 
-                  className="py-5 bg-primary hover:bg-blue-600 disabled:opacity-30 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl flex items-center justify-center gap-2 active:scale-95 transition-all"
-                >
-                  Vender
-                </button>
+             <div className="grid grid-cols-2 gap-4">
+                <button disabled={cart.length === 0} onClick={() => { if(!selectedVendorId || !selectedCustomerId) { alert('Selecione Vendedor e Cliente!'); return; } setShowOSModal(true); }} className="py-5 bg-amber-500 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl hover:bg-amber-600 transition-all">Gerar OS</button>
+                <button disabled={cart.length === 0} onClick={() => { if(!selectedVendorId) { alert('Selecione Vendedor!'); return; } setPayments([]); setShowCheckout(true); }} className="py-5 bg-primary text-white rounded-2xl font-black text-[10px] uppercase shadow-xl hover:bg-blue-600 transition-all">Vender</button>
              </div>
           </div>
         </aside>
       </main>
 
-      {/* MODAL: Consulta de Preço */}
-      {showPriceInquiry && (
+      {/* MODAL: DESCONTO GERAL (RESTAURADO E FUNCIONAL) */}
+      {showGlobalDiscountModal && (
         <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 animate-in fade-in">
-           <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
-              <div className="p-8 bg-slate-900 text-white flex justify-between items-center">
-                 <div><h3 className="text-2xl font-black uppercase tracking-tight">CONSULTA DE PREÇO</h3><p className="text-[10px] font-bold text-slate-400 uppercase mt-1">Busca rápida de valores e estoque</p></div>
-                 <button onClick={() => { setPriceInquirySearch(''); setShowPriceInquiry(false); }} className="material-symbols-outlined text-4xl">close</button>
-              </div>
-              <div className="p-10 space-y-8">
-                 <div className="relative">
-                    <span className="material-symbols-outlined absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 text-3xl">search</span>
-                    <input autoFocus value={priceInquirySearch} onChange={e => setPriceInquirySearch(e.target.value)} placeholder="NOME DO PRODUTO OU SKU..." className="w-full h-20 bg-slate-50 dark:bg-slate-800 border-none rounded-[1.5rem] pl-20 pr-6 text-2xl font-black text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-primary/10 transition-all uppercase" />
+           <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+              <div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-rose-500 text-white flex justify-between items-center">
+                 <div className="flex items-center gap-3">
+                    <span className="material-symbols-outlined text-3xl">local_offer</span>
+                    <h3 className="text-xl font-black uppercase tracking-tight">Aplicar Desconto Geral</h3>
                  </div>
-                 <div className="space-y-4">
-                    {inquiryResults.map(p => (
-                       <div key={p.id} className="flex items-center gap-6 p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 animate-in slide-in-from-bottom-2">
-                          <img src={p.image} className="size-20 rounded-2xl object-cover" />
-                          <div className="flex-1">
-                             <h4 className="text-lg font-black uppercase text-slate-900 dark:text-white leading-tight">{p.name}</h4>
-                             <p className="text-xs font-bold text-slate-400 mt-1 uppercase">SKU: {p.sku} | ESTOQUE: {p.stock} UN</p>
-                          </div>
-                          <div className="text-right">
-                             <p className="text-[10px] font-black text-slate-400 uppercase">Preço Venda</p>
-                             <p className="text-4xl font-black text-primary tabular-nums">R$ {p.salePrice.toLocaleString('pt-BR')}</p>
-                          </div>
-                       </div>
-                    ))}
-                    {priceInquirySearch && inquiryResults.length === 0 && (
-                       <div className="py-20 text-center opacity-30 uppercase font-black">Nenhum produto localizado</div>
-                    )}
+                 <button onClick={() => setShowGlobalDiscountModal(false)} className="material-symbols-outlined hover:rotate-90 transition-transform">close</button>
+              </div>
+              <div className="p-10 space-y-8 text-center">
+                 {/* Seletor de Tipo */}
+                 <div className="flex bg-slate-50 dark:bg-slate-800 p-1.5 rounded-2xl mb-4">
+                    <button onClick={() => setTempDiscountType('VALUE')} className={`flex-1 py-3 text-[10px] font-black uppercase rounded-xl transition-all ${tempDiscountType === 'VALUE' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-400'}`}>Em Reais (R$)</button>
+                    <button onClick={() => setTempDiscountType('PERCENT')} className={`flex-1 py-3 text-[10px] font-black uppercase rounded-xl transition-all ${tempDiscountType === 'PERCENT' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-400'}`}>Porcentagem (%)</button>
                  </div>
-              </div>
-           </div>
-        </div>
-      )}
-
-      {/* MODAL: Cancelamento */}
-      {showCancelModal && (
-        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 animate-in fade-in">
-           <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
-              <div className="p-8 bg-rose-600 text-white flex justify-between items-center">
-                 <div><h3 className="text-2xl font-black uppercase tracking-tight">CANCELAR DOCUMENTO</h3><p className="text-[10px] font-bold text-white/70 uppercase mt-1">Busca por número de venda</p></div>
-                 <button onClick={() => setShowCancelModal(false)} className="material-symbols-outlined text-4xl">close</button>
-              </div>
-              <div className="p-10 space-y-8">
-                 <input autoFocus value={cancelSearchId} onChange={e => setCancelSearchId(e.target.value)} placeholder="DIGITE O ID DA VENDA (Ex: SALE-1234)" className="w-full h-16 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-xl font-black text-rose-600 placeholder:text-rose-200 outline-none focus:ring-4 focus:ring-rose-500/10 transition-all uppercase" />
                  
-                 {cancelCandidate ? (
-                    <div className="space-y-6 animate-in zoom-in-95">
-                       <div className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 space-y-4 text-slate-900 dark:text-white">
-                          <div className="flex justify-between items-start">
-                             <div><p className="text-[10px] font-black text-slate-400 uppercase">Documento</p><p className="text-lg font-black">{cancelCandidate.id}</p></div>
-                             <div className="text-right"><p className="text-[10px] font-black text-slate-400 uppercase">Data</p><p className="text-lg font-black">{cancelCandidate.date}</p></div>
-                          </div>
-                          <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
-                             <p className="text-[10px] font-black text-slate-400 uppercase mb-2">Itens do Documento</p>
-                             <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar">
-                                {cancelCandidate.items?.map((it, i) => (
-                                   <div key={i} className="flex justify-between text-xs font-bold uppercase"><span className="truncate">{it.name}</span><span>{it.quantity} UN</span></div>
-                                ))}
-                             </div>
-                          </div>
-                          <div className="border-t border-slate-200 dark:border-slate-700 pt-4 flex justify-between items-center">
-                             <span className="text-sm font-black uppercase">Valor Estorno</span>
-                             <span className="text-2xl font-black text-rose-600">R$ {cancelCandidate.value.toLocaleString('pt-BR')}</span>
-                          </div>
-                       </div>
-                       <button onClick={() => processSaleCancellation(cancelCandidate)} className="w-full h-20 bg-rose-600 text-white rounded-[2rem] font-black text-sm uppercase shadow-2xl shadow-rose-500/20 transition-all active:scale-95 flex items-center justify-center gap-4">CONFIRMAR ESTORNO INTEGRAL</button>
+                 <div className="space-y-1.5 text-left">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Valor do Desconto</label>
+                    <div className="relative">
+                       <span className="absolute left-6 top-1/2 -translate-y-1/2 text-rose-500 font-black text-lg">{tempDiscountType === 'VALUE' ? 'R$' : '%'}</span>
+                       <input 
+                         autoFocus 
+                         type="number" 
+                         step="0.01" 
+                         value={tempDiscount || ''} 
+                         onChange={e => setTempDiscount(parseFloat(e.target.value) || 0)} 
+                         className="w-full h-20 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl pl-16 pr-6 text-3xl font-black text-rose-500 text-center outline-none focus:ring-4 focus:ring-rose-500/10" 
+                         placeholder="0,00"
+                       />
                     </div>
-                 ) : cancelSearchId && (
-                    <div className="py-10 text-center opacity-30 uppercase font-black text-slate-900 dark:text-white">Venda não localizada no sistema</div>
-                 )}
+                 </div>
+
+                 {/* Comparativo Visual */}
+                 <div className="grid grid-cols-2 gap-4">
+                    <div className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl">
+                       <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Subtotal Bruto</p>
+                       <p className="text-lg font-black text-slate-800 dark:text-white">R$ {subtotal.toLocaleString('pt-BR')}</p>
+                    </div>
+                    <div className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl">
+                       <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Valor Final Líquido</p>
+                       <p className="text-lg font-black text-emerald-500">R$ {
+                         (subtotal - (tempDiscountType === 'PERCENT' ? (subtotal * (tempDiscount/100)) : tempDiscount)).toLocaleString('pt-BR', {minimumFractionDigits: 2})
+                       }</p>
+                    </div>
+                 </div>
+
+                 <button 
+                   onClick={handleApplyDiscount} 
+                   className="w-full h-16 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase shadow-xl hover:scale-105 active:scale-95 transition-all"
+                 >
+                   APLICAR DESCONTO AGORA
+                 </button>
               </div>
            </div>
         </div>
       )}
 
-      {/* MODAL: Trocas */}
-      {showReturnsModal && (
-        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 animate-in fade-in">
-           <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
-              <div className="p-8 bg-amber-500 text-white flex justify-between items-center">
-                 <div><h3 className="text-2xl font-black uppercase tracking-tight">CENTRAL DE TROCAS</h3><p className="text-[10px] font-bold text-white/70 uppercase mt-1">Busca por cliente ou documento</p></div>
-                 <button onClick={() => setShowReturnsModal(false)} className="material-symbols-outlined text-4xl">close</button>
-              </div>
-              <div className="p-10 space-y-6">
-                 <input autoFocus value={returnSearchTerm} onChange={e => setReturnSearchTerm(e.target.value)} placeholder="PESQUISAR CLIENTE OU NÚMERO DO DOCUMENTO..." className="w-full h-16 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-lg font-black text-amber-600 placeholder:text-amber-200 outline-none focus:ring-4 focus:ring-amber-500/10 transition-all uppercase" />
-                 <div className="space-y-3 max-h-96 overflow-y-auto custom-scrollbar">
-                    {transactions.filter(t => (t.id.toUpperCase().includes(returnSearchTerm.toUpperCase()) || t.client?.toUpperCase().includes(returnSearchTerm.toUpperCase())) && t.type === 'INCOME').slice(0, 10).map(t => (
-                       <div key={t.id} className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 flex justify-between items-center group hover:border-amber-500 transition-all cursor-pointer text-slate-900 dark:text-white" onClick={() => processSaleCancellation(t)}>
-                          <div className="flex-1">
-                             <div className="flex items-center gap-3"><span className="text-lg font-black uppercase">{t.client || 'CONSUMIDOR FINAL'}</span><span className="text-[9px] font-black bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded text-slate-500">{t.id}</span></div>
-                             <p className="text-xs font-bold text-slate-400 uppercase mt-1">{t.date} • {t.items?.length} ITENS • PAGTO: {t.method}</p>
-                          </div>
-                          <div className="text-right flex items-center gap-6">
-                             <p className="text-xl font-black text-slate-900 dark:text-white tabular-nums">R$ {t.value.toLocaleString('pt-BR')}</p>
-                             <button className="px-6 py-2.5 bg-amber-500 text-white rounded-xl text-[10px] font-black uppercase shadow-lg group-hover:scale-105 transition-all">Iniciar Devolução</button>
-                          </div>
-                       </div>
-                    ))}
-                    {returnSearchTerm && transactions.filter(t => (t.id.includes(returnSearchTerm) || t.client?.includes(returnSearchTerm))).length === 0 && (
-                       <div className="py-20 text-center opacity-30 uppercase font-black text-slate-900 dark:text-white">Nenhuma venda encontrada para os critérios informados</div>
-                    )}
-                 </div>
-              </div>
-           </div>
-        </div>
-      )}
-
-      {/* MODAL: Edição de Item */}
-      {editingItem && (
-        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 animate-in fade-in">
-           <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
-              <div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-slate-900 text-white flex justify-between items-center">
-                 <div><h3 className="text-xl font-black uppercase tracking-tight">AJUSTE DE ITEM</h3><p className="text-[10px] font-bold text-slate-400 uppercase mt-1">{editingItem.item.name}</p></div>
-                 <button onClick={() => setEditingItem(null)} className="material-symbols-outlined">close</button>
-              </div>
-              <form onSubmit={handleUpdateItemPrice} className="p-10 space-y-8">
-                 <div className="space-y-1.5"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Preço Unitário de Venda (R$)</label><div className="relative"><span className="absolute left-6 top-1/2 -translate-y-1/2 text-primary font-black text-lg">R$</span><input autoFocus type="number" step="0.01" value={tempItemPrice} onChange={e => setTempItemPrice(parseFloat(e.target.value) || 0)} className="w-full h-20 bg-slate-50 dark:bg-slate-800 border-none rounded-[1.5rem] pl-16 pr-6 text-3xl font-black text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-primary/10 transition-all" /></div></div>
-                 <div className="grid grid-cols-2 gap-4 text-slate-900 dark:text-white"><div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">Preço Original</p><p className="text-sm font-black">R$ {products.find(p => p.id === editingItem.item.id)?.salePrice.toLocaleString('pt-BR')}</p></div><div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">Variação %</p>{(() => { const orig = products.find(p => p.id === editingItem.item.id)?.salePrice || 1; const diff = ((tempItemPrice / orig) - 1) * 100; return <p className={`text-sm font-black ${diff < 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{diff > 0 ? '+' : ''}{diff.toFixed(2)}%</p> })()}</div></div>
-                 <button type="submit" className="w-full h-16 bg-primary text-white rounded-2xl font-black text-xs uppercase shadow-xl hover:bg-blue-600 transition-all">CONFIRMAR AJUSTE</button>
-              </form>
-           </div>
-        </div>
-      )}
-
-      {/* MODAL: Checkout Múltiplos Pagamentos */}
-      {showCheckout && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 print:hidden">
-           <div className="bg-white dark:bg-slate-900 w-full max-w-6xl rounded-[3.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 transition-all duration-500">
-              <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
-                 <div><h3 className="text-2xl font-black uppercase tracking-tight text-slate-900 dark:text-white">Finalização de Venda</h3><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Até 6 Formas de Pagamento • Cálculo de Troco</p></div>
-                 <button onClick={() => setShowCheckout(false)} className="size-12 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-2xl flex items-center justify-center transition-all hover:bg-rose-500 hover:text-white shadow-sm"><span className="material-symbols-outlined">close</span></button>
-              </div>
-              
-              <div className="p-8 grid grid-cols-1 lg:grid-cols-12 gap-10">
-                 
-                 <div className="lg:col-span-4 space-y-6">
-                    <div className="grid grid-cols-2 gap-3">
-                       {['Dinheiro', 'Pix', 'Debito', 'Credito'].map(m => (
-                         <div key={m} className="flex flex-col gap-2">
-                           <button 
-                              onClick={() => {
-                                if (m === 'Pix') {
-                                  if (!paymentMethod.includes('Pix')) setPaymentMethod('Pix Online');
-                                } else {
-                                  setPaymentMethod(m);
-                                }
-                              }} 
-                              className={`p-5 rounded-3xl border-2 transition-all flex flex-col items-center gap-2 ${
-                                (m === paymentMethod || (m === 'Pix' && paymentMethod.includes('Pix')))
-                                ? 'border-primary bg-primary/5 text-primary shadow-lg' 
-                                : 'border-slate-100 dark:border-slate-800 text-slate-400 hover:border-primary/40'
-                              }`}
-                            >
-                              <span className="material-symbols-outlined text-3xl">{m === 'Dinheiro' ? 'payments' : m === 'Pix' ? 'qr_code_2' : 'credit_card'}</span>
-                              <span className="text-[10px] font-black uppercase tracking-widest">{m}</span>
-                           </button>
-                           
-                           {m === 'Pix' && paymentMethod.includes('Pix') && (
-                             <div className="flex gap-1 animate-in slide-in-from-top-2">
-                               <button 
-                                 onClick={() => setPaymentMethod('Pix Online')}
-                                 className={`flex-1 py-2 text-[8px] font-black uppercase rounded-lg border-2 transition-all ${paymentMethod === 'Pix Online' ? 'bg-primary text-white border-primary' : 'bg-white dark:bg-slate-800 text-slate-400 border-slate-100 dark:border-slate-700'}`}
-                               >
-                                 Online
-                               </button>
-                               <button 
-                                 onClick={() => setPaymentMethod('Pix Maquineta')}
-                                 className={`flex-1 py-2 text-[8px] font-black uppercase rounded-lg border-2 transition-all ${paymentMethod === 'Pix Maquineta' ? 'bg-primary text-white border-primary' : 'bg-white dark:bg-slate-800 text-slate-400 border-slate-100 dark:border-slate-700'}`}
-                               >
-                                 Maquineta
-                               </button>
-                             </div>
-                           )}
-                         </div>
-                       ))}
-                    </div>
-
-                    <div className="space-y-4 p-6 bg-slate-50 dark:bg-slate-800/50 rounded-[2.5rem] border border-slate-100 dark:border-slate-800">
-                       <div className="space-y-1">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Valor a Receber (R$)</label>
-                          <input 
-                            type="number" 
-                            step="0.01"
-                            value={currentPaymentValue}
-                            onChange={e => setCurrentPaymentValue(parseFloat(e.target.value) || 0)}
-                            className="w-full h-16 bg-white dark:bg-slate-900 border-none rounded-2xl px-6 text-2xl font-black text-primary outline-none focus:ring-4 focus:ring-primary/10"
-                          />
-                       </div>
-
-                       {(paymentMethod === 'Debito' || paymentMethod === 'Credito' || paymentMethod === 'Pix Maquineta') && (
-                          <div className="space-y-3 animate-in slide-in-from-top-2">
-                             <div className="grid grid-cols-2 gap-2">
-                                <select value={selectedOperatorId} onChange={e => { setSelectedOperatorId(e.target.value); setSelectedBrandId(''); }} className="w-full h-11 bg-white dark:bg-slate-900 border-none rounded-xl px-4 text-[9px] font-black uppercase text-slate-900 dark:text-white shadow-sm"><option value="">Operadora</option>{cardOperators.map(op => <option key={op.id} value={op.id}>{op.name}</option>)}</select>
-                                <select value={selectedBrandId} onChange={e => setSelectedBrandId(e.target.value)} className="w-full h-11 bg-white dark:bg-slate-900 border-none rounded-xl px-4 text-[9px] font-black uppercase text-slate-900 dark:text-white shadow-sm"><option value="">Bandeira</option>{filteredBrands.map(br => <option key={br.id} value={br.id}>{br.name}</option>)}</select>
-                             </div>
-                             
-                             <div className="grid grid-cols-2 gap-2">
-                                <div className="space-y-0.5">
-                                   <label className="text-[8px] font-black text-slate-400 uppercase px-1">NSU / Comprovante</label>
-                                   <input value={cardNsu} onChange={e => setCardNsu(e.target.value)} placeholder="000000" className="w-full h-11 bg-white dark:bg-slate-900 border-none rounded-xl px-4 text-[10px] font-black uppercase text-slate-900 dark:text-white shadow-sm" />
-                                </div>
-                                <div className="space-y-0.5">
-                                   <label className="text-[8px] font-black text-slate-400 uppercase px-1">Autorização</label>
-                                   <input value={cardAuthNumber} onChange={e => setCardAuthNumber(e.target.value)} placeholder="AUTORIZ" className="w-full h-11 bg-white dark:bg-slate-900 border-none rounded-xl px-4 text-[10px] font-black uppercase text-slate-900 dark:text-white shadow-sm" />
-                                </div>
-                             </div>
-
-                             {paymentMethod === 'Credito' && (
-                                <div className="grid grid-cols-6 gap-1">
-                                   {[1,2,3,4,5,6].map(p => (<button key={p} onClick={() => setCardInstallments(p)} className={`h-8 rounded-lg text-[9px] font-black border-2 transition-all ${cardInstallments === p ? 'border-primary bg-primary text-white' : 'border-slate-200 dark:border-slate-700 text-slate-400'}`}>{p}X</button>))}
-                                </div>
-                             )}
-                          </div>
-                       )}
-
-                       <button 
-                          onClick={handleAddPayment}
-                          className="w-full h-14 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-3"
-                       >
-                          <span className="material-symbols-outlined">add_circle</span>
-                          ADICIONAR PAGAMENTO
-                       </button>
-                    </div>
-                 </div>
-
-                 <div className="lg:col-span-5 flex flex-col space-y-6">
-                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b pb-2">Pagamentos Adicionados ({payments.length}/6)</h4>
-                    <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar pr-2 min-h-[300px]">
-                       {payments.length === 0 ? (
-                          <div className="h-full flex flex-col items-center justify-center opacity-10">
-                             <span className="material-symbols-outlined text-8xl text-slate-400">payments</span>
-                             <p className="text-xs font-black uppercase mt-4 text-slate-400">Nenhum pagamento adicionado</p>
-                          </div>
-                       ) : payments.map((p, idx) => (
-                          <div key={idx} className="bg-white dark:bg-slate-800 p-4 rounded-3xl border border-slate-100 dark:border-slate-700 flex justify-between items-center animate-in slide-in-from-right-4 text-slate-900 dark:text-white">
-                             <div className="flex items-center gap-4">
-                                <div className="size-10 bg-slate-50 dark:bg-slate-700 rounded-xl flex items-center justify-center text-slate-400"><span className="material-symbols-outlined">{p.method === 'Dinheiro' ? 'payments' : 'qr_code_2'}</span></div>
-                                <div>
-                                   <p className="text-xs font-black uppercase text-slate-800 dark:text-white leading-none">{p.method} {p.details?.installments > 1 ? `(${p.details.installments}x)` : ''}</p>
-                                   <p className="text-[9px] text-slate-400 font-bold mt-1 uppercase">{p.details?.operatorName} {p.details?.brandName} {p.details?.transactionSku ? `• NSU: ${p.details.transactionSku}` : ''}</p>
-                                </div>
-                             </div>
-                             <div className="flex items-center gap-6">
-                                <span className="text-lg font-black text-primary tabular-nums">R$ {p.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                                <button onClick={() => setPayments(payments.filter((_, i) => i !== idx))} className="size-8 bg-rose-500/10 text-rose-500 rounded-lg hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center"><span className="material-symbols-outlined text-lg">delete</span></button>
-                             </div>
-                          </div>
-                       ))}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                       <div className="bg-blue-500/5 p-5 rounded-3xl border border-blue-500/10"><p className="text-[9px] font-black text-blue-400 uppercase mb-1">Restante a Pagar</p><p className={`text-2xl font-black tabular-nums ${remainingValue > 0 ? 'text-blue-600' : 'text-slate-300'}`}>R$ {remainingValue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p></div>
-                       <div className="bg-emerald-500/5 p-5 rounded-3xl border border-emerald-500/10"><p className="text-[9px] font-black text-emerald-500 uppercase mb-1">Valor de Troco</p><p className={`text-2xl font-black tabular-nums ${changeValue > 0 ? 'text-emerald-600' : 'text-slate-300'}`}>R$ {changeValue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p></div>
-                    </div>
-                 </div>
-
-                 <div className="lg:col-span-3 space-y-6">
-                    <div className="bg-slate-900 text-white p-8 rounded-[3rem] space-y-6 shadow-2xl relative overflow-hidden">
-                       <div className="absolute top-0 right-0 size-32 bg-primary/20 blur-3xl"></div>
-                       <h4 className="text-[10px] font-black text-primary uppercase tracking-[0.2em] relative z-10">Resumo da Venda</h4>
-                       <div className="space-y-3 relative z-10">
-                          <div className="flex justify-between items-center text-[10px] font-bold text-slate-400"><span>Itens ({cart.length})</span><span>R$ {subtotal.toLocaleString('pt-BR')}</span></div>
-                          <div className="flex justify-between items-center text-[10px] font-bold text-blue-400"><span>Frete (+)</span><span>R$ {shippingValue.toLocaleString('pt-BR')}</span></div>
-                          <div className="flex justify-between items-center text-[10px] font-bold text-rose-500"><span>Desconto (-)</span><span>R$ {globalDiscount.toLocaleString('pt-BR')}</span></div>
-                          <div className="pt-4 border-t border-white/10 flex justify-between items-baseline"><span className="text-xs font-black uppercase text-slate-500">Total</span><span className="text-3xl font-black text-white tabular-nums">R$ {totalGeral.toLocaleString('pt-BR')}</span></div>
-                       </div>
-                       
-                       <div className="pt-6 border-t border-white/10 space-y-4 relative z-10">
-                          <div className="flex justify-between items-center text-[11px] font-black">
-                             <span className="text-slate-500 uppercase">Total Recebido</span>
-                             <span className="text-emerald-400 tabular-nums">R$ {totalPaid.toLocaleString('pt-BR')}</span>
-                          </div>
-                          
-                          <button 
-                             disabled={totalPaid < totalGeral || isFinalizing} 
-                             onClick={handleFinalizeSale}
-                             className="w-full h-16 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-500/20 transition-all flex items-center justify-center gap-3"
-                          >
-                             {isFinalizing ? <span className="material-symbols-outlined animate-spin">sync</span> : <span className="material-symbols-outlined">verified</span>}
-                             {isFinalizing ? 'Processando...' : 'FINALIZAR VENDA'}
-                          </button>
-                       </div>
-                    </div>
-                 </div>
-              </div>
-           </div>
-        </div>
-      )}
-
-      {/* MODAL: Sucesso */}
-      {showSuccessModal && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/90 backdrop-blur-2xl p-4 animate-in fade-in print:hidden">
-           <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[4rem] shadow-2xl overflow-hidden text-center animate-in zoom-in-95">
-              <div className="p-12 space-y-8">
-                 <div className="size-24 bg-emerald-500 text-white rounded-[2rem] flex items-center justify-center mx-auto shadow-2xl shadow-emerald-500/30 animate-bounce"><span className="material-symbols-outlined text-5xl">check</span></div>
-                 <h2 className="text-3xl font-black uppercase tracking-tighter text-slate-900 dark:text-white">Operação Realizada!</h2>
-                 {lastSaleData && successType === 'SALE' && (
-                    <div className="bg-slate-50 dark:bg-slate-800 p-6 rounded-3xl text-left space-y-3 border border-slate-100 dark:border-slate-700">
-                       <div className="flex justify-between text-sm font-black text-slate-800 dark:text-white uppercase"><span>Total Pago</span><span className="text-emerald-500 text-xl">R$ {lastSaleData.totalPaid.toLocaleString('pt-BR')}</span></div>
-                       {lastSaleData.change > 0 && <div className="flex justify-between text-[10px] font-black text-rose-500 uppercase border-t border-slate-200 dark:border-slate-700 pt-2"><span>Troco a Devolver</span><span className="text-base text-rose-600">R$ {lastSaleData.change.toLocaleString('pt-BR')}</span></div>}
-                    </div>
-                 )}
-                 <div className="grid grid-cols-2 gap-3 pt-4">
-                    <button onClick={() => { if(successType === 'SALE') window.print(); setShowSuccessModal(false); }} className={`py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg flex items-center justify-center gap-2 hover:bg-black transition-all ${successType === 'CANCEL' ? 'opacity-20 pointer-events-none' : ''}`}><span className="material-symbols-outlined text-lg">print</span> Imprimir Recibo</button>
-                    <button onClick={() => setShowSuccessModal(false)} className="py-4 bg-primary text-white rounded-2xl font-black text-[10px] uppercase shadow-lg hover:bg-blue-600 transition-all">Concluir</button>
-                 </div>
-              </div>
-           </div>
-        </div>
-      )}
-
-      {/* MODAL: Cadastro de Cliente Rápido - AGORA COMPLETO */}
+      {/* MODAL: CADASTRO DE CLIENTE COMPLETO NO PDV (MANTIDO) */}
       {showCustomerModal && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/90 backdrop-blur-2xl p-4 animate-in fade-in">
            <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 flex flex-col max-h-[90vh]">
               <div className="p-8 bg-primary text-white flex justify-between items-center shrink-0">
                  <div className="flex items-center gap-4">
-                    <div className="size-12 bg-white/20 rounded-2xl flex items-center justify-center">
-                       <span className="material-symbols-outlined text-3xl">person_add</span>
-                    </div>
-                    <div>
-                       <h3 className="text-2xl font-black uppercase tracking-tight">CADASTRO DE CLIENTE</h3>
-                       <p className="text-[10px] font-bold text-white/70 uppercase">Insira os dados completos para o registro</p>
-                    </div>
+                   <span className="material-symbols-outlined text-3xl">person_add</span>
+                   <div>
+                     <h3 className="text-2xl font-black uppercase tracking-tight">Novo Registro de Cliente</h3>
+                     <p className="text-[10px] font-bold text-white/70 uppercase">Preencha os dados completos para faturamento</p>
+                   </div>
                  </div>
-                 <button onClick={() => setShowCustomerModal(false)} className="size-12 bg-white/10 rounded-full flex items-center justify-center hover:bg-white/20 transition-all"><span className="material-symbols-outlined">close</span></button>
+                 <button onClick={() => setShowCustomerModal(false)} className="material-symbols-outlined text-4xl">close</button>
               </div>
-              
               <form onSubmit={handleSaveCustomer} className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar">
-                 {/* DADOS BÁSICOS */}
                  <div className="space-y-6">
-                    <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
-                       <span className="material-symbols-outlined text-primary text-lg">person</span>
-                       <h4 className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Informações Pessoais</h4>
-                    </div>
+                    <h4 className="text-[10px] font-black uppercase text-slate-500 border-b pb-2">Informações Pessoais</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                       <div className="space-y-1">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Nome Completo / Razão Social <span className="text-rose-500">*</span></label>
-                          <input required value={customerForm.name} onChange={e => setCustomerForm({...customerForm, name: e.target.value.toUpperCase()})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold uppercase text-slate-900 dark:text-white" />
-                       </div>
-                       <div className="space-y-1">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">CPF / CNPJ</label>
-                          <input value={customerForm.cpfCnpj} onChange={e => setCustomerForm({...customerForm, cpfCnpj: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold text-slate-900 dark:text-white" />
-                       </div>
-                       <div className="space-y-1">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">WhatsApp / Celular <span className="text-rose-500">*</span></label>
-                          <input required value={customerForm.phone} onChange={e => setCustomerForm({...customerForm, phone: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold text-slate-900 dark:text-white" placeholder="(00) 00000-0000" />
-                       </div>
-                       <div className="space-y-1">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">E-mail</label>
-                          <input type="email" value={customerForm.email} onChange={e => setCustomerForm({...customerForm, email: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold text-slate-900 dark:text-white" placeholder="exemplo@email.com" />
-                       </div>
-                       <div className="space-y-1">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Data de Nascimento</label>
-                          <input type="date" value={customerForm.birthDate} onChange={e => setCustomerForm({...customerForm, birthDate: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold text-slate-900 dark:text-white" />
-                       </div>
+                       <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 px-2 uppercase">Nome Completo / Razão Social *</label><input required value={customerForm.name} onChange={e => setCustomerForm({...customerForm, name: e.target.value.toUpperCase()})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold uppercase" /></div>
+                       <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 px-2 uppercase">CPF / CNPJ</label><input value={customerForm.cpfCnpj} onChange={e => setCustomerForm({...customerForm, cpfCnpj: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold" /></div>
+                       <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 px-2 uppercase">WhatsApp / Celular *</label><input required value={customerForm.phone} onChange={e => setCustomerForm({...customerForm, phone: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold" placeholder="(00) 00000-0000" /></div>
+                       <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 px-2 uppercase">E-mail</label><input type="email" value={customerForm.email} onChange={e => setCustomerForm({...customerForm, email: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold" /></div>
                     </div>
                  </div>
-
-                 {/* ENDEREÇO */}
                  <div className="space-y-6">
-                    <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
-                       <span className="material-symbols-outlined text-primary text-lg">location_on</span>
-                       <h4 className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Localização / Endereço</h4>
-                    </div>
+                    <h4 className="text-[10px] font-black uppercase text-slate-500 border-b pb-2">Endereço de Entrega / Localização</h4>
                     <div className="grid grid-cols-1 md:grid-cols-6 gap-6">
-                       <div className="md:col-span-2 space-y-1">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">CEP</label>
-                          <input value={customerForm.zipCode} onChange={e => setCustomerForm({...customerForm, zipCode: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold text-slate-900 dark:text-white" placeholder="00000-000" />
-                       </div>
-                       <div className="md:col-span-3 space-y-1">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Endereço / Rua</label>
-                          <input value={customerForm.address} onChange={e => setCustomerForm({...customerForm, address: e.target.value.toUpperCase()})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold text-slate-900 dark:text-white uppercase" />
-                       </div>
-                       <div className="md:col-span-1 space-y-1">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Nº</label>
-                          <input value={customerForm.number} onChange={e => setCustomerForm({...customerForm, number: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold text-slate-900 dark:text-white" />
-                       </div>
-                       <div className="md:col-span-2 space-y-1">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Complemento</label>
-                          <input value={customerForm.complement} onChange={e => setCustomerForm({...customerForm, complement: e.target.value.toUpperCase()})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold text-slate-900 dark:text-white uppercase" />
-                       </div>
-                       <div className="md:col-span-2 space-y-1">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Bairro</label>
-                          <input value={customerForm.neighborhood} onChange={e => setCustomerForm({...customerForm, neighborhood: e.target.value.toUpperCase()})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold text-slate-900 dark:text-white uppercase" />
-                       </div>
-                       <div className="md:col-span-1 space-y-1">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Cidade</label>
-                          <input value={customerForm.city} onChange={e => setCustomerForm({...customerForm, city: e.target.value.toUpperCase()})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold text-slate-900 dark:text-white uppercase" />
-                       </div>
-                       <div className="md:col-span-1 space-y-1">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Estado (UF)</label>
-                          <input value={customerForm.state} onChange={e => setCustomerForm({...customerForm, state: e.target.value.toUpperCase()})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold text-slate-900 dark:text-white uppercase" maxLength={2} />
-                       </div>
+                       <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 px-2 uppercase">CEP</label><input value={customerForm.zipCode} onChange={e => setCustomerForm({...customerForm, zipCode: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold" /></div>
+                       <div className="md:col-span-3 space-y-1"><label className="text-[10px] font-black text-slate-400 px-2 uppercase">Rua / Logradouro</label><input value={customerForm.address} onChange={e => setCustomerForm({...customerForm, address: e.target.value.toUpperCase()})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold uppercase" /></div>
+                       <div className="md:col-span-1 space-y-1"><label className="text-[10px] font-black text-slate-400 px-2 uppercase">Nº</label><input value={customerForm.number} onChange={e => setCustomerForm({...customerForm, number: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold" /></div>
+                       <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 px-2 uppercase">Bairro</label><input value={customerForm.neighborhood} onChange={e => setCustomerForm({...customerForm, neighborhood: e.target.value.toUpperCase()})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold uppercase" /></div>
+                       <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 px-2 uppercase">Cidade</label><input value={customerForm.city} onChange={e => setCustomerForm({...customerForm, city: e.target.value.toUpperCase()})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold uppercase" /></div>
+                       <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 px-2 uppercase">Estado (UF)</label><input value={customerForm.state} onChange={e => setCustomerForm({...customerForm, state: e.target.value.toUpperCase()})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-6 text-sm font-bold uppercase" maxLength={2} /></div>
                     </div>
                  </div>
-
-                 {/* NOTAS */}
                  <div className="space-y-6">
-                    <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
-                       <span className="material-symbols-outlined text-primary text-lg">description</span>
-                       <h4 className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Observações</h4>
-                    </div>
-                    <textarea 
-                       value={customerForm.notes} 
-                       onChange={e => setCustomerForm({...customerForm, notes: e.target.value})} 
-                       className="w-full h-32 bg-slate-50 dark:bg-slate-800 border-none rounded-3xl p-6 text-sm font-bold outline-none focus:ring-4 focus:ring-primary/10 transition-all text-slate-900 dark:text-white uppercase" 
-                       placeholder="Anotações sobre preferências do cliente ou observações técnicas..."
-                    />
+                    <h4 className="text-[10px] font-black uppercase text-slate-500 border-b pb-2">Observações Técnicas / Notas</h4>
+                    <textarea value={customerForm.notes} onChange={e => setCustomerForm({...customerForm, notes: e.target.value})} className="w-full h-32 bg-slate-50 dark:bg-slate-800 border-none rounded-3xl p-6 text-sm font-bold outline-none focus:ring-4 focus:ring-primary/10 transition-all uppercase" placeholder="Anotações sobre o cliente..." />
                  </div>
-
-                 <div className="pt-6 shrink-0">
-                    <button type="submit" className="w-full h-20 bg-primary text-white rounded-[2.5rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 transition-all active:scale-95">CONCLUIR E VINCULAR À VENDA</button>
-                 </div>
+                 <button type="submit" className="w-full h-20 bg-primary text-white rounded-[2.5rem] font-black text-xs uppercase shadow-xl hover:scale-105 active:scale-95 transition-all">CONCLUIR E VINCULAR AO PDV</button>
               </form>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL: CHECKOUT MÚLTIPLOS PAGAMENTOS (RESTAURADO) */}
+      {showCheckout && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 animate-in fade-in">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-6xl rounded-[3.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+              <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+                 <div><h3 className="text-2xl font-black uppercase tracking-tight text-slate-900 dark:text-white">Pagamento da Venda</h3><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Multi-Pagamentos • Restante: R$ {remainingValue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p></div>
+                 <button onClick={() => setShowCheckout(false)} className="material-symbols-outlined text-4xl">close</button>
+              </div>
+              <div className="p-8 grid grid-cols-1 lg:grid-cols-12 gap-10">
+                 <div className="lg:col-span-4 space-y-6">
+                    <div className="grid grid-cols-2 gap-3">
+                       {['Dinheiro', 'Pix', 'Debito', 'Credito'].map(m => (
+                          <button key={m} onClick={() => setPaymentMethod(m)} className={`p-5 rounded-3xl border-2 transition-all flex flex-col items-center gap-2 ${paymentMethod === m ? 'border-primary bg-primary/5 text-primary shadow-lg' : 'border-slate-100 dark:border-slate-800 text-slate-400'}`}>
+                             <span className="material-symbols-outlined text-3xl">{m === 'Dinheiro' ? 'payments' : m === 'Pix' ? 'qr_code_2' : 'credit_card'}</span>
+                             <span className="text-[10px] font-black uppercase">{m}</span>
+                          </button>
+                       ))}
+                    </div>
+                    <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-[2rem] border border-slate-100 dark:border-slate-800 space-y-4">
+                       <label className="text-[10px] font-black text-slate-400 uppercase px-2">Valor do Lançamento</label>
+                       <input type="number" step="0.01" value={currentPaymentValue} onChange={e => setCurrentPaymentValue(parseFloat(e.target.value) || 0)} className="w-full h-16 bg-white dark:bg-slate-900 border-none rounded-2xl px-6 text-2xl font-black text-primary" />
+                       <button onClick={() => { if(currentPaymentValue <= 0) return; setPayments([...payments, {method: paymentMethod, value: currentPaymentValue}]); setCurrentPaymentValue(Math.max(0, totalGeral - (totalPaid + currentPaymentValue))); }} className="w-full h-14 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-xs uppercase">ADICIONAR PAGAMENTO</button>
+                    </div>
+                 </div>
+                 <div className="lg:col-span-5 flex flex-col">
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b pb-2 mb-4">Itens Lançados</h4>
+                    <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar pr-2 min-h-[300px]">
+                       {payments.map((p, idx) => (
+                          <div key={idx} className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 flex justify-between items-center text-slate-900 dark:text-white animate-in slide-in-from-right-4">
+                             <span className="text-xs font-black uppercase">{p.method}</span>
+                             <div className="flex items-center gap-4"><span className="text-lg font-black tabular-nums">R$ {p.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span><button onClick={() => setPayments(payments.filter((_, i) => i !== idx))} className="text-rose-500 material-symbols-outlined">delete</button></div>
+                          </div>
+                       ))}
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 mt-6">
+                       <div className="bg-blue-500/5 p-4 rounded-2xl"><p className="text-[9px] font-black text-blue-400 uppercase">Restante</p><p className="text-xl font-black text-blue-600">R$ {remainingValue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p></div>
+                       <div className="bg-emerald-500/5 p-4 rounded-2xl"><p className="text-[9px] font-black text-emerald-500 uppercase">Troco</p><p className="text-xl font-black text-emerald-600">R$ {changeValue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p></div>
+                    </div>
+                 </div>
+                 <div className="lg:col-span-3">
+                    <div className="bg-slate-900 text-white p-8 rounded-[2.5rem] space-y-6 shadow-2xl">
+                       <h4 className="text-[10px] font-black text-primary uppercase tracking-widest">Resumo Final</h4>
+                       <div className="space-y-2">
+                          <div className="flex justify-between text-[10px]"><span>SUBTOTAL</span><span>R$ {subtotal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
+                          <div className="flex justify-between text-[10px] text-rose-500"><span>DESCONTOS</span><span>- R$ {discountValueCalculated.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
+                          <div className="pt-2 border-t border-white/10 flex justify-between font-black"><span>TOTAL</span><span className="text-2xl">R$ {totalGeral.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
+                       </div>
+                       <button disabled={totalPaid < totalGeral || isFinalizing} onClick={handleFinalizeSale} className="w-full h-16 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-800 text-white rounded-2xl font-black text-xs uppercase shadow-xl transition-all">FINALIZAR VENDA</button>
+                    </div>
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL: SUCESSO */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/90 backdrop-blur-2xl p-4 animate-in fade-in">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[3rem] shadow-2xl p-12 text-center animate-in zoom-in-95">
+              <div className="size-20 bg-emerald-500 text-white rounded-full flex items-center justify-center mx-auto mb-8 shadow-xl shadow-emerald-500/20 animate-bounce"><span className="material-symbols-outlined text-4xl">check</span></div>
+              <h2 className="text-2xl font-black uppercase text-slate-900 dark:text-white">Concluído!</h2>
+              <div className="mt-6 flex flex-col gap-3">
+                 <button onClick={() => { window.print(); setShowSuccessModal(false); }} className="w-full py-4 bg-primary text-white rounded-2xl font-black text-xs uppercase shadow-xl">Imprimir e Fechar</button>
+                 <button onClick={() => setShowSuccessModal(false)} className="w-full py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-2xl font-black text-xs uppercase">Apenas Fechar</button>
+              </div>
            </div>
         </div>
       )}
@@ -1051,10 +559,8 @@ const PDV: React.FC = () => {
         @media print {
           body * { visibility: hidden !important; }
           #root { display: block !important; }
-          aside, header, main, .print\\:hidden, div[class*="fixed"], div[class*="backdrop-blur"] { display: none !important; opacity: 0 !important; }
           #receipt-print-area, #receipt-print-area * { visibility: visible !important; display: block !important; }
-          #receipt-print-area { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; max-width: 80mm !important; padding: 10px !important; margin: 0 !important; background: white !important; color: black !important; border: none !important; }
-          @page { size: auto; margin: 0mm; }
+          #receipt-print-area { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; max-width: 80mm !important; }
         }
       `}</style>
     </div>
