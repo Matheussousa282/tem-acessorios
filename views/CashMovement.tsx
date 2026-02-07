@@ -10,6 +10,7 @@ const CashMovement: React.FC = () => {
   const [filter, setFilter] = useState('');
   
   const isAdmin = currentUser?.role === UserRole.ADMIN;
+  const todayStr = useMemo(() => new Date().toLocaleDateString('pt-BR'), []);
   
   const [viewingSession, setViewingSession] = useState<CashSession | null>(null);
   const [activeTab, setActiveTab] = useState<'lançamentos' | 'auditoria'>('lançamentos');
@@ -24,6 +25,15 @@ const CashMovement: React.FC = () => {
   useEffect(() => {
     refreshData();
   }, []);
+
+  // Verificar se já houve abertura hoje para esta unidade
+  const alreadyOpenedToday = useMemo(() => {
+    return cashSessions.some(s => {
+      const isThisStore = s.storeId === currentUser?.storeId;
+      const sessionDate = s.openingTime?.split(',')[0].split(' ')[0].trim();
+      return isThisStore && sessionDate === todayStr;
+    });
+  }, [cashSessions, currentUser, todayStr]);
 
   useEffect(() => {
     if (showOpeningModal) {
@@ -142,6 +152,11 @@ const CashMovement: React.FC = () => {
 
   const handleOpenCash = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (alreadyOpenedToday && !isAdmin) {
+      alert("Atenção: Já foi realizado um movimento de caixa hoje nesta unidade. O sistema permite apenas um movimento por dia.");
+      return;
+    }
+
     const cashier = users.find(u => u.name === selectedRegister.split(' - ')[1]);
     const newSession: CashSession = {
       id: `${Date.now()}`,
@@ -273,7 +288,6 @@ const CashMovement: React.FC = () => {
                  </tr>
               </thead>
               <tbody>
-                 {/* Fixed type errors: cast entries to any to avoid unknown type issues */}
                  {(Object.entries(sessionData?.resumoCartoes || {}) as any).map(([key, data]: [string, any]) => (
                     <tr key={key} className="border-b border-black font-bold">
                        <td className="p-1 uppercase border-r border-black">{key}</td>
@@ -385,7 +399,6 @@ const CashMovement: React.FC = () => {
                    <div className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700">
                       <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Cartões e Outros Meios</h4>
                       <div className="space-y-4">
-                         {/* Fixed type errors: cast entries to any to avoid unknown type issues */}
                          {(Object.entries(sessionData?.resumoCartoes || {}) as any).map(([key, data]: [string, any]) => (
                             <div key={key} className="flex justify-between items-center border-b border-slate-200 dark:border-slate-700 pb-2">
                                <div className="flex flex-col"><span className="text-xs font-black uppercase">{key}</span><span className="text-[9px] font-bold text-slate-400">{data.count} Transações</span></div>
@@ -447,7 +460,14 @@ const CashMovement: React.FC = () => {
           <p className="text-slate-500 text-[10px] font-black uppercase mt-1">Controle de abertura, fechamento e conferência</p>
         </div>
         <div className="flex gap-3">
-           <button onClick={() => setShowOpeningModal(true)} className="px-6 py-3 bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase flex items-center gap-2 shadow-lg shadow-emerald-500/20 hover:scale-105 transition-all"><span className="material-symbols-outlined text-sm">add_circle</span> Abrir Novo Movimento</button>
+           <button 
+             onClick={() => setShowOpeningModal(true)} 
+             disabled={alreadyOpenedToday && !isAdmin}
+             className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase flex items-center gap-2 shadow-lg transition-all ${alreadyOpenedToday && !isAdmin ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-emerald-500 text-white shadow-emerald-500/20 hover:scale-105'}`}
+           >
+             <span className="material-symbols-outlined text-sm">{alreadyOpenedToday && !isAdmin ? 'lock' : 'add_circle'}</span> 
+             {alreadyOpenedToday && !isAdmin ? 'Movimento já Realizado Hoje' : 'Abrir Novo Movimento'}
+           </button>
            <button onClick={() => navigate('/relatorios?type=conferencia_caixa')} className="px-6 py-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase flex items-center gap-2 shadow-lg hover:bg-black"><span className="material-symbols-outlined text-sm">monitoring</span> Auditoria Global</button>
         </div>
       </div>
@@ -493,7 +513,6 @@ const CashMovement: React.FC = () => {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
            <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95">
               <div className="p-6 bg-primary text-white flex justify-between items-center">
-                 {/* Fixed malformed h3 tag: added opening bracket */}
                  <h3 className="font-black uppercase tracking-tight">Abertura de Terminal</h3>
                  <button onClick={() => setShowOpeningModal(false)}><span className="material-symbols-outlined">close</span></button>
               </div>
