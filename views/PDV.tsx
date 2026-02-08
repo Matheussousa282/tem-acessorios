@@ -84,7 +84,13 @@ const PDV: React.FC = () => {
   const [selectedVendorId, setSelectedVendorId] = useState('');
   const [lastSaleData, setLastSaleData] = useState<any>(null);
   const [isFinalizing, setIsFinalizing] = useState(false);
+  
+  // Novos Estados para o Desconto Inteligente
   const [globalDiscount, setGlobalDiscount] = useState(0);
+  const [discountType, setDiscountType] = useState<'VALUE' | 'PERCENT'>('VALUE');
+  const [tempDiscount, setTempDiscount] = useState(0);
+  const [tempDiscountType, setTempDiscountType] = useState<'VALUE' | 'PERCENT'>('VALUE');
+  
   const [shippingValue, setShippingValue] = useState(0);
 
   // Estados de Pagamento Múltiplo
@@ -155,8 +161,15 @@ const PDV: React.FC = () => {
     return cardBrands.filter(b => b.operatorId === selectedOperatorId);
   }, [cardBrands, selectedOperatorId]);
 
+  // Lógica de Totais com Desconto Inteligente
   const subtotal = useMemo(() => cart.reduce((acc, item) => acc + (item.salePrice * item.quantity), 0), [cart]);
-  const totalGeral = useMemo(() => Math.max(0, subtotal + (Number(shippingValue) || 0) - (Number(globalDiscount) || 0)), [subtotal, shippingValue, globalDiscount]);
+  
+  const discountCalculated = useMemo(() => {
+    if (discountType === 'PERCENT') return (subtotal * (globalDiscount / 100));
+    return globalDiscount;
+  }, [subtotal, globalDiscount, discountType]);
+
+  const totalGeral = useMemo(() => Math.max(0, subtotal + (Number(shippingValue) || 0) - (Number(discountCalculated) || 0)), [subtotal, shippingValue, discountCalculated]);
   
   const totalPaid = useMemo(() => payments.reduce((acc, p) => acc + p.value, 0), [payments]);
   const remainingValue = useMemo(() => Math.max(0, totalGeral - totalPaid), [totalGeral, totalPaid]);
@@ -267,7 +280,7 @@ const PDV: React.FC = () => {
         id: saleId, 
         items: [...cart], 
         subtotal, 
-        discount: globalDiscount,
+        discount: discountCalculated,
         shipping: shippingValue, 
         total: totalGeral,
         totalPaid,
@@ -311,6 +324,19 @@ const PDV: React.FC = () => {
   const openItemEdit = (item: CartItem, index: number) => {
     setEditingItem({ index, item });
     setTempItemPrice(item.salePrice);
+  };
+
+  // Lógica para abrir modal de desconto
+  const handleOpenDiscountModal = () => {
+    setTempDiscount(globalDiscount);
+    setTempDiscountType(discountType);
+    setShowGlobalDiscountModal(true);
+  };
+
+  const handleApplyDiscount = () => {
+    setGlobalDiscount(tempDiscount);
+    setDiscountType(tempDiscountType);
+    setShowGlobalDiscountModal(false);
   };
 
   const handleCreateOS = async () => {
@@ -591,8 +617,11 @@ const PDV: React.FC = () => {
                 </div>
 
                 <div className="flex justify-between items-center group">
-                  <button onClick={() => setShowGlobalDiscountModal(true)} className="flex items-center gap-1.5 text-rose-500 hover:bg-rose-500/10 px-3 py-1 rounded-lg transition-all"><span className="material-symbols-outlined text-sm">local_offer</span><span className="text-[9px] font-black uppercase tracking-widest">Desconto Geral (-)</span></button>
-                  <span className="text-sm font-black tabular-nums text-rose-500">- R$ {globalDiscount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                  <button onClick={handleOpenDiscountModal} className="flex items-center gap-1.5 text-rose-500 hover:bg-rose-500/10 px-3 py-1 rounded-lg transition-all group">
+                    <span className="material-symbols-outlined text-sm group-hover:rotate-12 transition-transform">local_offer</span>
+                    <span className="text-[9px] font-black uppercase tracking-widest">Desconto Geral (-)</span>
+                  </button>
+                  <span className="text-sm font-black tabular-nums text-rose-500">- R$ {discountCalculated.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                 </div>
                 <div className="flex justify-between pt-4 border-t border-slate-100 dark:border-slate-800 items-baseline"><span className="text-xs font-black uppercase opacity-50 tracking-widest">Total Líquido</span><span className="text-4xl font-black text-slate-900 dark:text-white tabular-nums">R$ {totalGeral.toLocaleString('pt-BR')}</span></div>
              </div>
@@ -750,6 +779,64 @@ const PDV: React.FC = () => {
         </div>
       )}
 
+      {/* MODAL: DESCONTO GERAL (FIXED) */}
+      {showGlobalDiscountModal && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 animate-in fade-in">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+              <div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-rose-500 text-white flex justify-between items-center">
+                 <div className="flex items-center gap-3">
+                    <span className="material-symbols-outlined text-3xl">local_offer</span>
+                    <h3 className="text-xl font-black uppercase tracking-tight">Aplicar Desconto Geral</h3>
+                 </div>
+                 <button onClick={() => setShowGlobalDiscountModal(false)} className="material-symbols-outlined hover:rotate-90 transition-transform">close</button>
+              </div>
+              <div className="p-10 space-y-8 text-center">
+                 {/* Seletor de Tipo de Desconto */}
+                 <div className="flex bg-slate-50 dark:bg-slate-800 p-1.5 rounded-2xl mb-4">
+                    <button onClick={() => setTempDiscountType('VALUE')} className={`flex-1 py-3 text-[10px] font-black uppercase rounded-xl transition-all ${tempDiscountType === 'VALUE' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-400'}`}>Em Reais (R$)</button>
+                    <button onClick={() => setTempDiscountType('PERCENT')} className={`flex-1 py-3 text-[10px] font-black uppercase rounded-xl transition-all ${tempDiscountType === 'PERCENT' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-400'}`}>Porcentagem (%)</button>
+                 </div>
+                 
+                 <div className="space-y-1.5 text-left">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Valor do Desconto</label>
+                    <div className="relative">
+                       <span className="absolute left-6 top-1/2 -translate-y-1/2 text-rose-500 font-black text-lg">{tempDiscountType === 'VALUE' ? 'R$' : '%'}</span>
+                       <input 
+                         autoFocus 
+                         type="number" 
+                         step="0.01" 
+                         value={tempDiscount || ''} 
+                         onChange={e => setTempDiscount(parseFloat(e.target.value) || 0)} 
+                         className="w-full h-20 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl pl-16 pr-6 text-3xl font-black text-rose-500 text-center outline-none focus:ring-4 focus:ring-rose-500/10" 
+                         placeholder="0,00"
+                       />
+                    </div>
+                 </div>
+
+                 <div className="grid grid-cols-2 gap-4">
+                    <div className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl">
+                       <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Subtotal Bruto</p>
+                       <p className="text-lg font-black text-slate-800 dark:text-white">R$ {subtotal.toLocaleString('pt-BR')}</p>
+                    </div>
+                    <div className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl">
+                       <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Valor Final Líquido</p>
+                       <p className="text-lg font-black text-emerald-500">R$ {
+                         (subtotal - (tempDiscountType === 'PERCENT' ? (subtotal * (tempDiscount/100)) : tempDiscount)).toLocaleString('pt-BR', {minimumFractionDigits: 2})
+                       }</p>
+                    </div>
+                 </div>
+
+                 <button 
+                   onClick={handleApplyDiscount} 
+                   className="w-full h-16 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase shadow-xl hover:scale-105 active:scale-95 transition-all"
+                 >
+                   APLICAR DESCONTO AGORA
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
+
       {/* MODAL: Checkout Múltiplos Pagamentos */}
       {showCheckout && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 print:hidden">
@@ -889,7 +976,7 @@ const PDV: React.FC = () => {
                        <div className="space-y-3 relative z-10">
                           <div className="flex justify-between items-center text-[10px] font-bold text-slate-400"><span>Itens ({cart.length})</span><span>R$ {subtotal.toLocaleString('pt-BR')}</span></div>
                           <div className="flex justify-between items-center text-[10px] font-bold text-blue-400"><span>Frete (+)</span><span>R$ {shippingValue.toLocaleString('pt-BR')}</span></div>
-                          <div className="flex justify-between items-center text-[10px] font-bold text-rose-500"><span>Desconto (-)</span><span>R$ {globalDiscount.toLocaleString('pt-BR')}</span></div>
+                          <div className="flex justify-between items-center text-[10px] font-bold text-rose-500"><span>Desconto (-)</span><span>R$ {discountCalculated.toLocaleString('pt-BR')}</span></div>
                           <div className="pt-4 border-t border-white/10 flex justify-between items-baseline"><span className="text-xs font-black uppercase text-slate-500">Total</span><span className="text-3xl font-black text-white tabular-nums">R$ {totalGeral.toLocaleString('pt-BR')}</span></div>
                        </div>
                        
