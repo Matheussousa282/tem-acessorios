@@ -8,9 +8,10 @@ interface TransactionsProps {
 }
 
 const Transactions: React.FC<TransactionsProps> = ({ type }) => {
-  const { transactions, addTransaction, currentUser, establishments, cashSessions, cashEntries } = useApp();
+  const { transactions, addTransaction, currentUser, establishments, cashSessions, cashEntries, refreshData } = useApp();
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
   
   const todayStr = new Date().toLocaleDateString('en-CA');
   const isAdmin = currentUser?.role === UserRole.ADMIN;
@@ -24,7 +25,7 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
     category: '',
     status: TransactionStatus.PENDING,
     value: 0,
-    method: 'Dinheiro', // Default para facilitar conferência de gaveta
+    method: 'Dinheiro',
     client: ''
   });
 
@@ -32,22 +33,19 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
     return transactions.filter(t => t.type === type && (isAdmin || t.store === currentStore?.name));
   }, [transactions, type, isAdmin, currentStore]);
 
-  // Cálculo de Saldo Disponível em Dinheiro (Gaveta) para a unidade logada
+  // Motor de cálculo de saldo em tempo real
   const drawerCashBalance = useMemo(() => {
     const storeName = currentStore?.name;
     if (!storeName) return 0;
 
-    // Apenas transações da loja atual que foram em Dinheiro
-    const storeTransactions = transactions.filter(t => t.store === storeName && t.method === 'Dinheiro');
+    const storeTransactions = transactions.filter(t => t.store === storeName && t.method === 'Dinheiro' && t.status === TransactionStatus.PAID);
     
     const incomes = storeTransactions.filter(t => t.type === 'INCOME').reduce((acc, t) => acc + t.value, 0);
     const expenses = storeTransactions.filter(t => t.type === 'EXPENSE').reduce((acc, t) => acc + t.value, 0);
 
-    // Considerar também o Fundo de Caixa da sessão aberta (se houver)
     const activeSession = cashSessions.find(s => s.storeName === storeName && s.status === CashSessionStatus.OPEN);
     const openingValue = activeSession?.openingValue || 0;
 
-    // Entradas/Saídas manuais do caixa
     const sessionManualEntries = cashEntries.filter(e => e.sessionId === activeSession?.id);
     const manualIncomes = sessionManualEntries.filter(e => e.type === 'INCOME').reduce((acc, e) => acc + e.value, 0);
     const manualExpenses = sessionManualEntries.filter(e => e.type === 'EXPENSE').reduce((acc, e) => acc + e.value, 0);
@@ -62,7 +60,7 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
       dueDate: todayStr,
       description: '',
       store: currentStore?.name || 'Geral',
-      category: '',
+      category: type === 'INCOME' ? 'Receita Extra' : 'Despesa Operacional',
       status: type === 'INCOME' ? TransactionStatus.PAID : TransactionStatus.PENDING,
       value: 0,
       method: 'Dinheiro',
@@ -72,11 +70,12 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
     setShowModal(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // TRAVA DE SALDO: Se for despesa em dinheiro, verifica saldo
-    if (type === 'EXPENSE' && form.method === 'Dinheiro') {
+    if (isProcessing) return;
+
+    // TRAVA DE SALDO INFALÍVEL
+    if (type === 'EXPENSE' && form.method === 'Dinheiro' && form.status === TransactionStatus.PAID) {
       const valueToSpend = Number(form.value) || 0;
       if (valueToSpend > drawerCashBalance && !isAdmin) {
         alert(`Saldo insuficiente no caixa para lançar, vamos vender mais! 😊\n\nSaldo atual em dinheiro: R$ ${drawerCashBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`);
@@ -84,13 +83,36 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
       }
     }
 
-    addTransaction({
-      ...form as Transaction,
-      id: editingId || `TRX-${Date.now()}`,
-      type: type,
-      store: currentStore?.name || 'Principal'
-    });
-    setShowModal(false);
+    setIsProcessing(true);
+    try {
+      await addTransaction({
+        ...form as Transaction,
+        id: editingId || `TRX-${Date.now()}`,
+        type: type,
+        store: currentStore?.name || 'Principal'
+      });
+      setShowModal(false);
+      await refreshData();
+    } catch (err) {
+      alert("Erro ao salvar lançamento.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleMarkAsPaid = async (t: Transaction) => {
+    // Se for despesa em dinheiro, valida saldo antes de marcar como pago
+    if (t.type === 'EXPENSE' && t.method === 'Dinheiro') {
+      if (t.value > drawerCashBalance && !isAdmin) {
+        alert(`Saldo insuficiente no caixa para pagar este lançamento, vamos vender mais! 😊`);
+        return;
+      }
+    }
+
+    if(confirm(`Confirmar o pagamento de R$ ${t.value.toLocaleString('pt-BR')}?`)) {
+      await addTransaction({ ...t, status: TransactionStatus.PAID });
+      await refreshData();
+    }
   };
 
   const totalValue = filteredTransactions.reduce((acc, t) => acc + t.value, 0);
@@ -133,6 +155,7 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
               <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Meio</th>
               <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
               <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Valor</th>
+              <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Ações</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
@@ -147,9 +170,19 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
                    <span className="text-[10px] font-black uppercase text-slate-500">{t.method}</span>
                 </td>
                 <td className="px-8 py-5">
-                   <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase ${t.status === TransactionStatus.APPROVED || t.status === TransactionStatus.PAID ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}>{t.status}</span>
+                   <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase ${t.status === TransactionStatus.PAID ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>{t.status}</span>
                 </td>
                 <td className="px-8 py-5 text-right font-black text-sm tabular-nums text-slate-900 dark:text-white">R$ {t.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                <td className="px-8 py-5 text-right">
+                   {t.status === TransactionStatus.PENDING && (
+                     <button 
+                       onClick={() => handleMarkAsPaid(t)}
+                       className="px-4 py-2 bg-emerald-500 text-white rounded-xl text-[9px] font-black uppercase hover:scale-105 transition-all shadow-lg shadow-emerald-500/20"
+                     >
+                        Quitar
+                     </button>
+                   )}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -165,28 +198,50 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
             </div>
             <form onSubmit={handleSave} className="p-10 space-y-6">
               <div className="grid grid-cols-2 gap-4">
-                <input type="date" value={form.date} onChange={e => setForm({...form, date: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none outline-none focus:ring-2 focus:ring-primary/20" required />
-                <input type="date" value={form.dueDate} onChange={e => setForm({...form, dueDate: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none outline-none focus:ring-2 focus:ring-primary/20" required />
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase px-2">Data Emissão</label>
+                  <input type="date" value={form.date} onChange={e => setForm({...form, date: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none outline-none focus:ring-2 focus:ring-primary/20" required />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase px-2">Vencimento</label>
+                  <input type="date" value={form.dueDate} onChange={e => setForm({...form, dueDate: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none outline-none focus:ring-2 focus:ring-primary/20" required />
+                </div>
               </div>
-              <input type="text" placeholder="Descrição" value={form.description} onChange={e => setForm({...form, description: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none outline-none focus:ring-2 focus:ring-primary/20 uppercase" required />
+              <div className="space-y-1">
+                <label className="text-[9px] font-black text-slate-400 uppercase px-2">Descrição / Fornecedor</label>
+                <input type="text" placeholder="EX: ALUGUEL, COMPRA DE PEÇAS..." value={form.description} onChange={e => setForm({...form, description: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none outline-none focus:ring-2 focus:ring-primary/20 uppercase" required />
+              </div>
               <div className="grid grid-cols-2 gap-4">
-                 <select value={form.method} onChange={e => setForm({...form, method: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none">
-                    <option value="Dinheiro">Dinheiro (Gaveta)</option>
-                    <option value="Pix">Pix</option>
-                    <option value="Debito">Débito</option>
-                    <option value="Credito">Crédito</option>
-                 </select>
-                 <select value={form.status} onChange={e => setForm({...form, status: e.target.value as TransactionStatus})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none">
-                  <option value={TransactionStatus.PENDING}>Pendente</option>
-                  <option value={TransactionStatus.PAID}>Pago</option>
-                </select>
+                 <div className="space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase px-2">Meio de Pagamento</label>
+                  <select value={form.method} onChange={e => setForm({...form, method: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none">
+                      <option value="Dinheiro">Dinheiro (Gaveta)</option>
+                      <option value="Pix">Pix</option>
+                      <option value="Debito">Débito</option>
+                      <option value="Credito">Crédito</option>
+                  </select>
+                 </div>
+                 <div className="space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase px-2">Situação</label>
+                  <select value={form.status} onChange={e => setForm({...form, status: e.target.value as TransactionStatus})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none">
+                    <option value={TransactionStatus.PENDING}>A Pagar (Pendente)</option>
+                    <option value={TransactionStatus.PAID}>Pago (Efetivado)</option>
+                  </select>
+                 </div>
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase px-2">Valor do Lançamento (R$)</label>
-                <input type="number" step="0.01" placeholder="0,00" value={form.value} onChange={e => setForm({...form, value: parseFloat(e.target.value) || 0})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-xl font-black border-none outline-none focus:ring-2 focus:ring-primary/20" required />
+                <input type="number" step="0.01" placeholder="0,00" value={form.value || ''} onChange={e => setForm({...form, value: parseFloat(e.target.value) || 0})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-xl font-black border-none outline-none focus:ring-2 focus:ring-primary/20" required />
               </div>
               
-              <button type="submit" className="w-full h-16 bg-primary text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-xl hover:scale-105 transition-all">Confirmar Lançamento</button>
+              <button 
+                type="submit" 
+                disabled={isProcessing}
+                className="w-full h-16 bg-primary text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-xl hover:scale-105 transition-all flex items-center justify-center gap-2"
+              >
+                {isProcessing ? <span className="material-symbols-outlined animate-spin">sync</span> : null}
+                {isProcessing ? 'PROCESSANDO...' : 'Confirmar Lançamento'}
+              </button>
             </form>
           </div>
         </div>
