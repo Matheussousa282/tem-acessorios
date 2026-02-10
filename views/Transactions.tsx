@@ -33,11 +33,12 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
     return transactions.filter(t => t.type === type && (isAdmin || t.store === currentStore?.name));
   }, [transactions, type, isAdmin, currentStore]);
 
-  // Motor de cálculo de saldo em tempo real
+  // Motor de cálculo de saldo em tempo real (Dinheiro em Espécie)
   const drawerCashBalance = useMemo(() => {
     const storeName = currentStore?.name;
     if (!storeName) return 0;
 
+    // Apenas o que já foi PAGO em dinheiro entra no cálculo do saldo disponível
     const storeTransactions = transactions.filter(t => t.store === storeName && t.method === 'Dinheiro' && t.status === TransactionStatus.PAID);
     
     const incomes = storeTransactions.filter(t => t.type === 'INCOME').reduce((acc, t) => acc + t.value, 0);
@@ -74,11 +75,12 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
     e.preventDefault();
     if (isProcessing) return;
 
-    // TRAVA DE SALDO INFALÍVEL
-    if (type === 'EXPENSE' && form.method === 'Dinheiro' && form.status === TransactionStatus.PAID) {
-      const valueToSpend = Number(form.value) || 0;
-      if (valueToSpend > drawerCashBalance && !isAdmin) {
-        alert(`Saldo insuficiente no caixa para lançar, vamos vender mais! 😊\n\nSaldo atual em dinheiro: R$ ${drawerCashBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`);
+    const valueToSpend = Number(form.value) || 0;
+
+    // TRAVA RIGOROSA: Bloqueia se for despesa em dinheiro, independente de ser Pendente ou Paga
+    if (type === 'EXPENSE' && form.method === 'Dinheiro') {
+      if (valueToSpend > drawerCashBalance) {
+        alert(`Saldo insuficiente no caixa para lançar, vamos vender mais! 😊\n\nSaldo atual: R$ ${drawerCashBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`);
         return;
       }
     }
@@ -101,10 +103,10 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
   };
 
   const handleMarkAsPaid = async (t: Transaction) => {
-    // Se for despesa em dinheiro, valida saldo antes de marcar como pago
+    // Valida saldo antes de permitir a quitação de uma despesa em dinheiro
     if (t.type === 'EXPENSE' && t.method === 'Dinheiro') {
-      if (t.value > drawerCashBalance && !isAdmin) {
-        alert(`Saldo insuficiente no caixa para pagar este lançamento, vamos vender mais! 😊`);
+      if (t.value > drawerCashBalance) {
+        alert(`Saldo insuficiente no caixa para pagar este lançamento, vamos vender mais! 😊\n\nSaldo atual: R$ ${drawerCashBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`);
         return;
       }
     }
@@ -138,7 +140,7 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
         </div>
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 rounded-[2.5rem] shadow-sm">
           <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-2">Saldo em Dinheiro (Gaveta)</p>
-          <p className={`text-3xl font-black ${drawerCashBalance < 0 ? 'text-rose-500' : 'text-emerald-500'}`}>R$ {drawerCashBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+          <p className={`text-3xl font-black ${drawerCashBalance <= 0 ? 'text-rose-500' : 'text-emerald-500'}`}>R$ {drawerCashBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
         </div>
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 rounded-[2.5rem] shadow-sm">
           <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-2">Unidade Logada</p>
@@ -231,7 +233,7 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase px-2">Valor do Lançamento (R$)</label>
-                <input type="number" step="0.01" placeholder="0,00" value={form.value || ''} onChange={e => setForm({...form, value: parseFloat(e.target.value) || 0})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-xl font-black border-none outline-none focus:ring-2 focus:ring-primary/20" required />
+                <input type="number" step="0.01" placeholder="0,00" value={form.value || ''} onChange={e => setForm({...form, value: parseFloat(e.target.value) || 0})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-xl font-black border-none outline-none focus:ring-4 focus:ring-primary/10" required />
               </div>
               
               <button 
