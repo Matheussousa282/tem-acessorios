@@ -25,39 +25,50 @@ const CashMovement: React.FC = () => {
     refreshData();
   }, []);
 
-  // 1. CÁLCULO DO SALDO ACUMULADO (TUDO QUE ENTROU - TUDO QUE SAIU NA HISTÓRIA DA UNIDADE)
+  // 1. CÁLCULO DO SALDO ACUMULADO (TODO O HISTÓRICO DO BANCO)
+  // Soma todas as entradas e saídas em dinheiro da unidade desde sempre
   const totalCumulativeBalance = useMemo(() => {
     const storeName = currentStore?.name;
     if (!storeName) return 0;
 
-    // Entradas Totais (Vendas + Manual)
-    const allCashIncomes = transactions.filter(t => 
-      t.store === storeName && t.method === 'Dinheiro' && t.status === TransactionStatus.PAID && t.type === 'INCOME'
+    // Vendas em Dinheiro (PAGAS) de todo o histórico
+    const allCashSales = transactions.filter(t => 
+      t.store === storeName && 
+      t.method === 'Dinheiro' && 
+      t.status === TransactionStatus.PAID &&
+      t.type === 'INCOME'
     ).reduce((acc, t) => acc + t.value, 0);
 
+    // Entradas Manuais (Suprimentos) de todo o histórico
     const allManualIncomes = cashEntries.filter(e => {
        const session = cashSessions.find(s => s.id === e.sessionId);
        return session?.storeName === storeName && e.type === 'INCOME';
     }).reduce((acc, e) => acc + e.value, 0);
 
-    // Saídas Totais (Despesas + Manual/Sangria)
+    // Despesas em Dinheiro (PAGAS) de todo o histórico
     const allCashExpenses = transactions.filter(t => 
-      t.store === storeName && t.method === 'Dinheiro' && t.status === TransactionStatus.PAID && t.type === 'EXPENSE'
+      t.store === storeName && 
+      t.method === 'Dinheiro' && 
+      t.status === TransactionStatus.PAID &&
+      t.type === 'EXPENSE'
     ).reduce((acc, t) => acc + t.value, 0);
 
+    // Saídas Manuais (Sangrias) de todo o histórico
     const allManualExpenses = cashEntries.filter(e => {
        const session = cashSessions.find(s => s.id === e.sessionId);
        return session?.storeName === storeName && e.type === 'EXPENSE';
     }).reduce((acc, e) => acc + e.value, 0);
 
-    // Pegamos o valor de abertura do PRIMEIRO caixa de todos como base inicial
-    const firstSession = [...cashSessions].filter(s => s.storeName === storeName).sort((a,b) => a.id.localeCompare(b.id))[0];
-    const baseInitial = firstSession?.openingValue || 0;
+    // Fundo Inicial (O primeiro valor de abertura registrado para esta loja)
+    const firstSession = [...cashSessions]
+      .filter(s => s.storeName === storeName)
+      .sort((a, b) => a.id.localeCompare(b.id))[0];
+    const initialFund = firstSession?.openingValue || 0;
 
-    return (baseInitial + allCashIncomes + allManualIncomes) - (allCashExpenses + allManualExpenses);
+    return (initialFund + allCashSales + allManualIncomes) - (allCashExpenses + allManualExpenses);
   }, [transactions, cashSessions, cashEntries, currentStore]);
 
-  // 2. CÁLCULO DO SALDO DIÁRIO (APENAS O QUE ACONTECEU HOJE NO TURNO)
+  // 2. CÁLCULO DO SALDO DO TURNO ATUAL (APENAS HOJE)
   const dailyDrawerBalance = useMemo(() => {
     const storeName = currentStore?.name;
     if (!storeName) return 0;
@@ -70,19 +81,29 @@ const CashMovement: React.FC = () => {
 
     const sessionOpening = activeSession.openingValue || 0;
 
+    // Vendas de hoje em dinheiro
     const todayCashSales = transactions.filter(t => 
-      t.store === storeName && t.date === todayISO && t.method === 'Dinheiro' && t.status === TransactionStatus.PAID && t.type === 'INCOME'
+      t.store === storeName && 
+      t.date === todayISO && 
+      t.method === 'Dinheiro' && 
+      t.status === TransactionStatus.PAID && 
+      t.type === 'INCOME'
     ).reduce((acc, t) => acc + t.value, 0);
 
-    const todayManualIn = cashEntries.filter(e => e.sessionId === activeSession.id && e.type === 'INCOME').reduce((acc, e) => acc + e.value, 0);
-    const todayManualOut = cashEntries.filter(e => e.sessionId === activeSession.id && e.type === 'EXPENSE').reduce((acc, e) => acc + e.value, 0);
+    // Movimentações manuais vinculadas a esta sessão aberta
+    const sessionIn = cashEntries.filter(e => e.sessionId === activeSession.id && e.type === 'INCOME').reduce((acc, e) => acc + e.value, 0);
+    const sessionOut = cashEntries.filter(e => e.sessionId === activeSession.id && e.type === 'EXPENSE').reduce((acc, e) => acc + e.value, 0);
     
-    // Despesas de hoje lançadas no financeiro
+    // Despesas de hoje pagas em dinheiro via financeiro
     const todayFinanceExpenses = transactions.filter(t =>
-      t.store === storeName && t.date === todayISO && t.method === 'Dinheiro' && t.status === TransactionStatus.PAID && t.type === 'EXPENSE'
+      t.store === storeName && 
+      t.date === todayISO && 
+      t.method === 'Dinheiro' && 
+      t.status === TransactionStatus.PAID && 
+      t.type === 'EXPENSE'
     ).reduce((acc, t) => acc + t.value, 0);
 
-    return (sessionOpening + todayCashSales + todayManualIn) - (todayManualOut + todayFinanceExpenses);
+    return (sessionOpening + todayCashSales + sessionIn) - (sessionOut + todayFinanceExpenses);
   }, [transactions, cashSessions, cashEntries, currentStore, todayISO]);
 
   const alreadyOpenedToday = useMemo(() => {
@@ -98,9 +119,10 @@ const CashMovement: React.FC = () => {
       const lastClosed = [...cashSessions]
         .filter(s => s.storeId === currentUser?.storeId && s.status === CashSessionStatus.CLOSED)
         .sort((a, b) => b.id.localeCompare(a.id))[0];
-      setOpeningValue(lastClosed?.closingValue || 0);
+      // Sugerimos o saldo acumulado como abertura para manter a continuidade física
+      setOpeningValue(lastClosed?.closingValue || totalCumulativeBalance || 0);
     }
-  }, [showOpeningModal, cashSessions, currentUser]);
+  }, [showOpeningModal, cashSessions, currentUser, totalCumulativeBalance]);
 
   const availableCashiers = useMemo(() => {
     return users.filter(u => (u.role === UserRole.CASHIER || u.role === UserRole.ADMIN || u.role === UserRole.MANAGER) && (isAdmin || u.storeId === currentUser?.storeId));
@@ -485,7 +507,7 @@ const CashMovement: React.FC = () => {
               </div>
               <form onSubmit={handleOpenCash} className="p-8 space-y-6">
                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase px-2">Operador Responsável</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Operador Responsável</label>
                     <select required value={selectedRegister} onChange={e => setSelectedRegister(e.target.value)} className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-[11px] font-black uppercase">
                        <option value="">Selecione o Operador...</option>
                        {availableCashiers.map((u, idx) => (<option key={u.id} value={`CX ${idx + 1} - ${u.name}`}>CAIXA {idx + 1} - {u.name}</option>))}
