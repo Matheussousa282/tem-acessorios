@@ -149,6 +149,7 @@ export interface RolePermissions {
   settings: boolean;
   serviceOrders: boolean;
   cardManagement: boolean;
+  editProducts: boolean;
 }
 
 export interface Customer {

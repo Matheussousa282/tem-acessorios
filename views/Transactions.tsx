@@ -1,14 +1,14 @@
 
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../AppContext';
-import { Transaction, TransactionStatus, UserRole } from '../types';
+import { Transaction, TransactionStatus, UserRole, CashSessionStatus } from '../types';
 
 interface TransactionsProps {
   type: 'INCOME' | 'EXPENSE';
 }
 
 const Transactions: React.FC<TransactionsProps> = ({ type }) => {
-  const { transactions, addTransaction, currentUser, establishments } = useApp();
+  const { transactions, addTransaction, currentUser, establishments, cashSessions, cashEntries } = useApp();
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   
@@ -24,13 +24,36 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
     category: '',
     status: TransactionStatus.PENDING,
     value: 0,
-    method: '',
+    method: 'Dinheiro', // Default para facilitar conferência de gaveta
     client: ''
   });
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter(t => t.type === type && (isAdmin || t.store === currentStore?.name));
   }, [transactions, type, isAdmin, currentStore]);
+
+  // Cálculo de Saldo Disponível em Dinheiro (Gaveta) para a unidade logada
+  const drawerCashBalance = useMemo(() => {
+    const storeName = currentStore?.name;
+    if (!storeName) return 0;
+
+    // Apenas transações da loja atual que foram em Dinheiro
+    const storeTransactions = transactions.filter(t => t.store === storeName && t.method === 'Dinheiro');
+    
+    const incomes = storeTransactions.filter(t => t.type === 'INCOME').reduce((acc, t) => acc + t.value, 0);
+    const expenses = storeTransactions.filter(t => t.type === 'EXPENSE').reduce((acc, t) => acc + t.value, 0);
+
+    // Considerar também o Fundo de Caixa da sessão aberta (se houver)
+    const activeSession = cashSessions.find(s => s.storeName === storeName && s.status === CashSessionStatus.OPEN);
+    const openingValue = activeSession?.openingValue || 0;
+
+    // Entradas/Saídas manuais do caixa
+    const sessionManualEntries = cashEntries.filter(e => e.sessionId === activeSession?.id);
+    const manualIncomes = sessionManualEntries.filter(e => e.type === 'INCOME').reduce((acc, e) => acc + e.value, 0);
+    const manualExpenses = sessionManualEntries.filter(e => e.type === 'EXPENSE').reduce((acc, e) => acc + e.value, 0);
+
+    return (openingValue + incomes + manualIncomes) - (expenses + manualExpenses);
+  }, [transactions, cashSessions, cashEntries, currentStore]);
 
   const handleOpenAdd = () => {
     setEditingId(null);
@@ -42,7 +65,7 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
       category: '',
       status: type === 'INCOME' ? TransactionStatus.PAID : TransactionStatus.PENDING,
       value: 0,
-      method: '',
+      method: 'Dinheiro',
       client: '',
       type: type
     });
@@ -51,9 +74,19 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // TRAVA DE SALDO: Se for despesa em dinheiro, verifica saldo
+    if (type === 'EXPENSE' && form.method === 'Dinheiro') {
+      const valueToSpend = Number(form.value) || 0;
+      if (valueToSpend > drawerCashBalance && !isAdmin) {
+        alert(`Saldo insuficiente no caixa para lançar, vamos vender mais! 😊\n\nSaldo atual em dinheiro: R$ ${drawerCashBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`);
+        return;
+      }
+    }
+
     addTransaction({
       ...form as Transaction,
-      id: editingId || `TRX-${Date.now()}`, // Inclui timestamp para o Dashboard
+      id: editingId || `TRX-${Date.now()}`,
       type: type,
       store: currentStore?.name || 'Principal'
     });
@@ -76,14 +109,18 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 rounded-[2.5rem] shadow-sm">
           <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-2">Total Consolidado</p>
           <p className="text-3xl font-black text-primary">R$ {totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
         </div>
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 rounded-[2.5rem] shadow-sm">
+          <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-2">Saldo em Dinheiro (Gaveta)</p>
+          <p className={`text-3xl font-black ${drawerCashBalance < 0 ? 'text-rose-500' : 'text-emerald-500'}`}>R$ {drawerCashBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+        </div>
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 rounded-[2.5rem] shadow-sm">
           <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-2">Unidade Logada</p>
-          <p className="text-3xl font-black text-slate-700 dark:text-white uppercase">{currentStore?.name || 'Local'}</p>
+          <p className="text-3xl font-black text-slate-700 dark:text-white uppercase truncate">{currentStore?.name || 'Local'}</p>
         </div>
       </div>
 
@@ -93,6 +130,7 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
             <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
               <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Data</th>
               <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Descrição</th>
+              <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Meio</th>
               <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
               <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Valor</th>
             </tr>
@@ -104,6 +142,9 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
                 <td className="px-8 py-5">
                    <p className="text-xs font-black text-slate-800 dark:text-white uppercase">{t.description}</p>
                    <p className="text-[9px] text-slate-400 font-bold uppercase">{t.category}</p>
+                </td>
+                <td className="px-8 py-5">
+                   <span className="text-[10px] font-black uppercase text-slate-500">{t.method}</span>
                 </td>
                 <td className="px-8 py-5">
                    <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase ${t.status === TransactionStatus.APPROVED || t.status === TransactionStatus.PAID ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}>{t.status}</span>
@@ -124,18 +165,28 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
             </div>
             <form onSubmit={handleSave} className="p-10 space-y-6">
               <div className="grid grid-cols-2 gap-4">
-                <input type="date" value={form.date} onChange={e => setForm({...form, date: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none" required />
-                <input type="date" value={form.dueDate} onChange={e => setForm({...form, dueDate: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none" required />
+                <input type="date" value={form.date} onChange={e => setForm({...form, date: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none outline-none focus:ring-2 focus:ring-primary/20" required />
+                <input type="date" value={form.dueDate} onChange={e => setForm({...form, dueDate: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none outline-none focus:ring-2 focus:ring-primary/20" required />
               </div>
-              <input type="text" placeholder="Descrição" value={form.description} onChange={e => setForm({...form, description: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none" required />
+              <input type="text" placeholder="Descrição" value={form.description} onChange={e => setForm({...form, description: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none outline-none focus:ring-2 focus:ring-primary/20 uppercase" required />
               <div className="grid grid-cols-2 gap-4">
-                <input type="number" placeholder="Valor (R$)" value={form.value} onChange={e => setForm({...form, value: parseFloat(e.target.value)})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-black border-none" required />
-                <select value={form.status} onChange={e => setForm({...form, status: e.target.value as TransactionStatus})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none">
+                 <select value={form.method} onChange={e => setForm({...form, method: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none">
+                    <option value="Dinheiro">Dinheiro (Gaveta)</option>
+                    <option value="Pix">Pix</option>
+                    <option value="Debito">Débito</option>
+                    <option value="Credito">Crédito</option>
+                 </select>
+                 <select value={form.status} onChange={e => setForm({...form, status: e.target.value as TransactionStatus})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none">
                   <option value={TransactionStatus.PENDING}>Pendente</option>
                   <option value={TransactionStatus.PAID}>Pago</option>
                 </select>
               </div>
-              <button type="submit" className="w-full h-16 bg-primary text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-xl">Confirmar Lançamento</button>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase px-2">Valor do Lançamento (R$)</label>
+                <input type="number" step="0.01" placeholder="0,00" value={form.value} onChange={e => setForm({...form, value: parseFloat(e.target.value) || 0})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-xl font-black border-none outline-none focus:ring-2 focus:ring-primary/20" required />
+              </div>
+              
+              <button type="submit" className="w-full h-16 bg-primary text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-xl hover:scale-105 transition-all">Confirmar Lançamento</button>
             </form>
           </div>
         </div>

@@ -1,15 +1,22 @@
 
 import React, { useState, useMemo, useRef } from 'react';
-import { useApp } from '../AppContext';
-import { Product } from '../types';
+import { useApp, INITIAL_PERMS } from '../AppContext';
+import { Product, UserRole } from '../types';
 
 const Inventory: React.FC = () => {
-  const { products, addProduct, deleteProduct, currentUser, establishments, refreshData } = useApp();
+  const { products, addProduct, deleteProduct, currentUser, rolePermissions, refreshData } = useApp();
   const [filter, setFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('Todas');
   const [showProductModal, setShowProductModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Verificação de permissão de edição
+  const canEdit = useMemo(() => {
+    if (!currentUser) return false;
+    const perms = rolePermissions[currentUser.role] || INITIAL_PERMS[currentUser.role];
+    return perms.editProducts;
+  }, [currentUser, rolePermissions]);
 
   const initialForm: Partial<Product> = {
     name: '', sku: '', barcode: '', category: 'Geral', brand: '', costPrice: 0, salePrice: 0, stock: 0, unit: 'UN', location: 'GERAL', image: '', isService: false,
@@ -49,11 +56,22 @@ const Inventory: React.FC = () => {
 
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canEdit) {
+      alert("Você não tem permissão para alterar produtos.");
+      return;
+    }
+
+    // Validação de campos obrigatórios
+    if (!form.name || !form.sku || !form.costPrice || !form.salePrice) {
+      alert("Por favor, preencha todos os campos obrigatórios (Nome, SKU, Preços)!");
+      return;
+    }
+
     setIsSaving(true);
     const productData: Product = {
       id: editingId || `prod-${Date.now()}`,
       name: String(form.name || '').toUpperCase(),
-      sku: String(form.sku || '').toUpperCase() || `SKU-${Date.now()}`,
+      sku: String(form.sku || '').toUpperCase(),
       barcode: String(form.barcode || ''),
       category: String(form.category || 'Geral'),
       costPrice: Number(form.costPrice) || 0,
@@ -65,7 +83,6 @@ const Inventory: React.FC = () => {
       location: String(form.location || 'GERAL'),
       isService: !!form.isService,
       minStock: Number(form.minStock) || 0,
-      // Fix: Corrected property name from margin_percent to marginPercent to match Product interface
       marginPercent: Number(form.marginPercent) || 0
     };
     
@@ -85,7 +102,9 @@ const Inventory: React.FC = () => {
     <div className="p-4 sm:p-8 space-y-6 animate-in fade-in duration-500 pb-24">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-tight">Estoque & Produtos</h2>
-        <button onClick={() => { setEditingId(null); setForm(initialForm); setShowProductModal(true); }} className="w-full sm:w-auto bg-primary text-white px-8 py-4 rounded-2xl font-black text-xs uppercase shadow-xl hover:scale-105 transition-all">Novo Produto</button>
+        {canEdit && (
+          <button onClick={() => { setEditingId(null); setForm(initialForm); setShowProductModal(true); }} className="w-full sm:w-auto bg-primary text-white px-8 py-4 rounded-2xl font-black text-xs uppercase shadow-xl hover:scale-105 transition-all">Novo Produto</button>
+        )}
       </div>
 
       <div className="bg-white dark:bg-slate-900/50 p-4 sm:p-6 rounded-3xl sm:rounded-[2rem] border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row gap-4">
@@ -121,7 +140,11 @@ const Inventory: React.FC = () => {
                   <td className="hidden sm:table-cell px-8 py-6 text-center font-black text-sm">{p.stock} {p.unit}</td>
                   <td className="px-4 sm:px-8 py-4 sm:py-6 text-right font-black text-primary text-xs sm:text-sm whitespace-nowrap">R$ {p.salePrice.toLocaleString('pt-BR')}</td>
                   <td className="px-4 sm:px-8 py-4 sm:py-6 text-right">
-                    <button onClick={() => { setEditingId(p.id); setForm(p); setShowProductModal(true); }} className="size-8 sm:size-10 bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center justify-center mx-auto sm:ml-auto"><span className="material-symbols-outlined text-base sm:text-lg">edit</span></button>
+                    {canEdit ? (
+                      <button onClick={() => { setEditingId(p.id); setForm(p); setShowProductModal(true); }} className="size-8 sm:size-10 bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center justify-center mx-auto sm:ml-auto transition-all hover:bg-primary hover:text-white"><span className="material-symbols-outlined text-base sm:text-lg">edit</span></button>
+                    ) : (
+                      <span className="material-symbols-outlined text-slate-300">lock</span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -134,7 +157,6 @@ const Inventory: React.FC = () => {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 sm:bg-black/90 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in">
           <div className="bg-[#101822] w-full max-w-5xl h-full sm:h-auto sm:max-h-[95vh] sm:rounded-[3rem] shadow-2xl overflow-hidden border-none sm:border border-slate-800 animate-in zoom-in-95 flex flex-col">
             
-            {/* HEADER FIXO NO MOBILE */}
             <div className="sticky top-0 z-50 p-5 sm:p-6 bg-primary flex justify-between items-center text-white shrink-0">
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-2xl sm:text-3xl">inventory_2</span>
@@ -145,7 +167,6 @@ const Inventory: React.FC = () => {
 
             <form onSubmit={handleSaveProduct} className="flex-1 overflow-y-auto custom-scrollbar p-6 sm:p-10 space-y-8 sm:space-y-10 pb-32 sm:pb-10">
               
-              {/* SEÇÃO DA FOTO - GRANDE NO MOBILE */}
               <div className="flex flex-col sm:grid sm:grid-cols-4 gap-6 sm:gap-8">
                  <div className="sm:col-span-1 flex flex-col items-center">
                     <div 
@@ -166,7 +187,7 @@ const Inventory: React.FC = () => {
                       ref={fileInputRef} 
                       className="hidden" 
                       accept="image/*" 
-                      capture="environment" // Ativa câmera traseira em celulares
+                      capture="environment"
                       onChange={e => {
                         const f = e.target.files?.[0];
                         if(f){ 
@@ -175,14 +196,11 @@ const Inventory: React.FC = () => {
                           r.readAsDataURL(f); 
                         }
                     }} />
-                    <button type="button" onClick={() => fileInputRef.current?.click()} className="mt-4 sm:hidden text-primary font-black text-xs uppercase tracking-widest flex items-center gap-2">
-                       <span className="material-symbols-outlined text-sm">photo_camera</span> Alterar Imagem
-                    </button>
                  </div>
                  
                  <div className="sm:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                     <div className="sm:col-span-2 space-y-2">
-                       <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Descrição do Produto</label>
+                       <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Descrição do Produto <span className="text-rose-500">*</span></label>
                        <input required value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full h-14 sm:h-14 bg-slate-800/40 border border-slate-700 rounded-2xl px-6 text-sm font-bold text-white uppercase focus:ring-2 focus:ring-primary outline-none" placeholder="Ex: CAPINHA IPHONE 15 SILICONE" />
                     </div>
                     <div className="space-y-2">
@@ -199,9 +217,7 @@ const Inventory: React.FC = () => {
                  </div>
               </div>
 
-              {/* GRIDS DE INFORMAÇÕES - EMPILHAM NO MOBILE */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8">
-                 {/* ESTOQUE */}
                  <div className="bg-slate-800/20 p-6 sm:p-8 rounded-[2rem] sm:rounded-[3rem] border border-slate-800 space-y-6">
                     <h4 className="text-[10px] font-black text-primary uppercase tracking-widest border-b border-slate-800 pb-3">Controle de Estoque</h4>
                     <div className="space-y-4">
@@ -214,36 +230,33 @@ const Inventory: React.FC = () => {
                     </div>
                  </div>
 
-                 {/* PREÇOS */}
                  <div className="bg-slate-800/20 p-6 sm:p-8 rounded-[2rem] sm:rounded-[3rem] border border-slate-800 space-y-6">
                     <h4 className="text-[10px] font-black text-primary uppercase tracking-widest border-b border-slate-800 pb-3">Financeiro</h4>
                     <div className="space-y-4">
-                       <div className="flex justify-between items-center"><label className="text-[10px] font-black text-slate-400 uppercase">Custo R$</label><input type="number" step="0.01" value={form.costPrice} onChange={e => handlePriceChange('costPrice', parseFloat(e.target.value) || 0)} className="w-24 h-10 bg-slate-800 rounded-xl border-none text-right font-black text-rose-500" /></div>
+                       <div className="flex justify-between items-center"><label className="text-[10px] font-black text-slate-400 uppercase">Custo R$ <span className="text-rose-500">*</span></label><input required type="number" step="0.01" value={form.costPrice} onChange={e => handlePriceChange('costPrice', parseFloat(e.target.value) || 0)} className="w-24 h-10 bg-slate-800 rounded-xl border-none text-right font-black text-rose-500 focus:ring-2 focus:ring-primary" /></div>
                        <div className="flex justify-between items-center"><label className="text-[10px] font-black text-slate-400 uppercase">Margem %</label><input type="number" step="0.1" value={form.marginPercent} onChange={e => handlePriceChange('marginPercent', parseFloat(e.target.value) || 0)} className="w-24 h-10 bg-slate-800 rounded-xl border-none text-right font-black text-amber-500" /></div>
                     </div>
                     <div className="pt-4 border-t border-slate-800 flex justify-between items-center">
-                       <span className="text-[10px] font-black text-primary uppercase">Venda R$</span>
-                       <input type="number" step="0.01" value={form.salePrice} onChange={e => handlePriceChange('salePrice', parseFloat(e.target.value) || 0)} className="w-32 h-12 bg-primary/10 rounded-xl border border-primary/20 text-right font-black text-lg text-primary tabular-nums focus:ring-2 focus:ring-primary outline-none" />
+                       <span className="text-[10px] font-black text-primary uppercase">Venda R$ <span className="text-rose-500">*</span></span>
+                       <input required type="number" step="0.01" value={form.salePrice} onChange={e => handlePriceChange('salePrice', parseFloat(e.target.value) || 0)} className="w-32 h-12 bg-primary/10 rounded-xl border border-primary/20 text-right font-black text-lg text-primary tabular-nums focus:ring-2 focus:ring-primary outline-none" />
                     </div>
                  </div>
 
-                 {/* CÓDIGO */}
                  <div className="bg-slate-800/20 p-6 sm:p-8 rounded-[2rem] sm:rounded-[3rem] border border-slate-800 space-y-6">
                     <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-800 pb-3">Identificação</h4>
                     <div className="space-y-4">
                        <div className="space-y-1">
-                          <label className="text-[8px] font-black uppercase text-slate-500 px-2">Código de Barras / SKU</label>
-                          <input value={form.barcode} onChange={e => setForm({...form, barcode: e.target.value})} placeholder="EAN13" className="w-full h-14 bg-slate-800 rounded-2xl border-none text-white font-mono text-center text-lg font-black focus:ring-2 focus:ring-primary outline-none" />
+                          <label className="text-[8px] font-black uppercase text-slate-500 px-2">Código SKU <span className="text-rose-500">*</span></label>
+                          <input required value={form.sku} onChange={e => setForm({...form, sku: e.target.value})} placeholder="SKU-XXXX" className="w-full h-14 bg-slate-800 rounded-2xl border-none text-white font-mono text-center text-lg font-black focus:ring-2 focus:ring-primary outline-none" />
                        </div>
                        <div className="space-y-1">
-                          <label className="text-[8px] font-black uppercase text-slate-500 px-2">Marca / Fabricante</label>
-                          <input value={form.brand} onChange={e => setForm({...form, brand: e.target.value})} placeholder="Ex: APPLE, SAMSUNG" className="w-full h-12 bg-slate-800 rounded-2xl border-none text-white text-center text-xs font-black uppercase focus:ring-2 focus:ring-primary outline-none" />
+                          <label className="text-[8px] font-black uppercase text-slate-500 px-2">Código de Barras</label>
+                          <input value={form.barcode} onChange={e => setForm({...form, barcode: e.target.value})} placeholder="EAN13" className="w-full h-10 bg-slate-800 rounded-xl border-none text-white font-mono text-center text-sm font-bold" />
                        </div>
                     </div>
                  </div>
               </div>
 
-              {/* FOOTER - BOTÕES */}
               <div className="fixed sm:relative bottom-0 left-0 right-0 p-4 sm:p-0 sm:pt-10 flex flex-col sm:flex-row justify-end gap-3 sm:gap-4 bg-[#101822] sm:bg-transparent border-t border-slate-800 sm:border-t shadow-[0_-20px_40px_rgba(0,0,0,0.5)] sm:shadow-none z-[60]">
                  <button type="button" onClick={() => setShowProductModal(false)} className="hidden sm:block px-12 py-5 bg-slate-800/50 text-slate-400 rounded-full font-black text-xs uppercase hover:bg-slate-800 transition-all">CANCELAR</button>
                  <button type="submit" disabled={isSaving} className="w-full sm:w-auto px-16 py-6 sm:py-5 bg-primary text-white rounded-2xl sm:rounded-full font-black text-sm sm:text-xs uppercase shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-3">

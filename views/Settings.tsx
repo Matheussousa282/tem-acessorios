@@ -32,11 +32,10 @@ const Settings: React.FC = () => {
     name: '', cnpj: '', location: '', hasStockAccess: true, active: true
   });
 
-  // Lista definitiva de chaves de permissão para garantir que todas apareçam na UI
   const ALL_PERM_KEYS: (keyof RolePermissions)[] = [
     'dashboard', 'pdv', 'cashControl', 'customers', 'reports', 
     'inventory', 'balance', 'incomes', 'expenses', 
-    'financial', 'settings', 'serviceOrders', 'cardManagement'
+    'financial', 'settings', 'serviceOrders', 'cardManagement', 'editProducts'
   ];
 
   useEffect(() => {
@@ -45,7 +44,6 @@ const Settings: React.FC = () => {
 
   useEffect(() => {
     if (rolePermissions[selectedRolePerm]) {
-      // Garante que o objeto local tenha todas as chaves, mesmo que falte no DB
       const current = rolePermissions[selectedRolePerm] as any;
       const merged: any = {};
       ALL_PERM_KEYS.forEach(key => {
@@ -373,7 +371,8 @@ const getLabelForModule = (key: string) => {
     financial: 'DRE / Resultado',
     settings: 'Configurações Sistema',
     serviceOrders: 'Ordens de Serviço',
-    cardManagement: 'Gestão de Cartões'
+    cardManagement: 'Gestão de Cartões',
+    editProducts: 'Habilitar Alteração de Produtos'
   };
   return labels[key] || key;
 };
@@ -392,7 +391,8 @@ const getIconForModule = (key: string) => {
     financial: 'account_balance',
     settings: 'settings',
     serviceOrders: 'build',
-    cardManagement: 'credit_card'
+    cardManagement: 'credit_card',
+    editProducts: 'edit_square'
   };
   return icons[key] || 'label';
 };

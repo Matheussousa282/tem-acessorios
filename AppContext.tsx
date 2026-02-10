@@ -67,10 +67,10 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const INITIAL_PERMS: Record<string, RolePermissions> = {
-  [UserRole.ADMIN]: { dashboard: true, pdv: true, cashControl: true, customers: true, reports: true, inventory: true, balance: true, incomes: true, expenses: true, financial: true, settings: true, serviceOrders: true, cardManagement: true },
-  [UserRole.MANAGER]: { dashboard: true, pdv: true, cashControl: true, customers: true, reports: true, inventory: true, balance: true, incomes: true, expenses: true, financial: true, settings: false, serviceOrders: true, cardManagement: true },
-  [UserRole.CASHIER]: { dashboard: true, pdv: true, cashControl: true, customers: true, reports: false, inventory: false, balance: false, incomes: true, expenses: false, financial: false, settings: false, serviceOrders: true, cardManagement: false },
-  [UserRole.VENDOR]: { dashboard: true, pdv: true, cashControl: false, customers: true, reports: false, inventory: false, balance: false, incomes: false, expenses: false, financial: false, settings: false, serviceOrders: true, cardManagement: false },
+  [UserRole.ADMIN]: { dashboard: true, pdv: true, cashControl: true, customers: true, reports: true, inventory: true, balance: true, incomes: true, expenses: true, financial: true, settings: true, serviceOrders: true, cardManagement: true, editProducts: true },
+  [UserRole.MANAGER]: { dashboard: true, pdv: true, cashControl: true, customers: true, reports: true, inventory: true, balance: true, incomes: true, expenses: true, financial: true, settings: false, serviceOrders: true, cardManagement: true, editProducts: true },
+  [UserRole.CASHIER]: { dashboard: true, pdv: true, cashControl: true, customers: true, reports: false, inventory: false, balance: false, incomes: true, expenses: false, financial: false, settings: false, serviceOrders: true, cardManagement: false, editProducts: false },
+  [UserRole.VENDOR]: { dashboard: true, pdv: true, cashControl: false, customers: true, reports: false, inventory: false, balance: false, incomes: false, expenses: false, financial: false, settings: false, serviceOrders: true, cardManagement: false, editProducts: false },
 };
 
 const SESSION_KEY = 'tem_acessorios_user_session';
@@ -100,15 +100,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (!res.ok) return null;
       return await res.json();
     } catch (e) {
-      console.error(`Erro ao carregar ${url}:`, e);
       return null;
     }
   };
-
-  const logout = useCallback(() => {
-    setCurrentUser(null);
-    localStorage.removeItem(SESSION_KEY);
-  }, []);
 
   const refreshData = async () => {
     try {
@@ -154,41 +148,37 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         } catch (e) {}
       }
     } catch (error) {
-      console.error("Erro geral na sincronização:", error);
+      console.error("Erro na sincronização:", error);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetch('/api/init-db').finally(() => refreshData());
+    refreshData();
   }, []);
 
-  const login = async (username: string, pass: string) => {
-    const user = users.find(u => u.name.toLowerCase() === username.toLowerCase() && u.password === pass);
+  const login = async (input: string, pass: string) => {
+    const user = users.find(u => 
+      (u.name.toLowerCase() === input.toLowerCase() || u.email.toLowerCase() === input.toLowerCase()) 
+      && u.password === pass
+    );
+    
     if (user && user.active) {
       setCurrentUser(user);
       localStorage.setItem(SESSION_KEY, JSON.stringify(user));
-      // Força refresh imediato após login para carregar as sessões abertas
       await refreshData();
       return true;
     }
     return false;
   };
 
-  const addProduct = async (p: Product) => { 
-    const res = await fetch('/api/products', { 
-      method: 'POST', 
-      headers: {'Content-Type': 'application/json'}, 
-      body: JSON.stringify(p)
-    }); 
-    if (!res.ok) {
-       const err = await res.json().catch(() => ({ error: 'Falha no servidor' }));
-       throw new Error(err.error || 'Erro ao salvar produto');
-    }
-    await refreshData(); 
-  };
+  const logout = useCallback(() => {
+    setCurrentUser(null);
+    localStorage.removeItem(SESSION_KEY);
+  }, []);
 
+  const addProduct = async (p: Product) => { await fetch('/api/products', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(p)}); await refreshData(); };
   const addTransaction = async (t: Transaction) => { await fetch('/api/transactions', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(t)}); await refreshData(); };
   const addCustomer = async (c: Customer) => { await fetch('/api/customers', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(c)}); await refreshData(); };
   const addUser = async (u: User) => { await fetch('/api/users', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(u)}); await refreshData(); };
@@ -240,11 +230,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     await Promise.all([
       ...stockUpdates,
-      fetch('/api/transactions', { 
-        method: 'POST', 
-        headers: {'Content-Type': 'application/json'}, 
-        body: JSON.stringify(transactionData)
-      })
+      fetch('/api/transactions', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(transactionData)})
     ]);
     
     await refreshData();
@@ -253,13 +239,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const bulkUpdateStock = async (adjustments: Record<string, number>) => {
     const updates = Object.entries(adjustments).map(([id, newStock]) => {
       const p = products.find(x => x.id === id);
-      if (p) {
-        return fetch('/api/products', { 
-          method: 'POST', 
-          headers: {'Content-Type': 'application/json'}, 
-          body: JSON.stringify({ ...p, stock: newStock })
-        });
-      }
+      if (p) return fetch('/api/products', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ ...p, stock: newStock })});
       return Promise.resolve();
     });
     await Promise.all(updates);
