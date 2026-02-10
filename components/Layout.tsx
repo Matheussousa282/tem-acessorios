@@ -39,6 +39,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   if (!currentUser) return null;
   if (isPDV) return <div className="h-screen w-full overflow-hidden">{children}</div>;
 
+  const hasFinancialAccess = perms.financial || perms.incomes || perms.expenses;
+
   return (
     <div className="flex h-screen overflow-hidden bg-background-light dark:bg-background-dark font-display transition-colors duration-300">
       <aside className="w-64 flex-shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-background-dark flex flex-col justify-between p-4 z-50 overflow-y-auto no-scrollbar print:hidden">
@@ -91,7 +93,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               <SidebarItem to="/servicos" icon="build" label="Serviços (OS)" />
             )}
 
-            {perms.financial && (
+            {hasFinancialAccess && (
               <div className="flex flex-col">
                 <button onClick={() => setIsFinancialOpen(!isFinancialOpen)} className="flex items-center justify-between px-3 py-2.5 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
                   <div className="flex items-center gap-3"><span className="material-symbols-outlined text-xl">account_balance</span><span className="text-xs font-black uppercase tracking-widest">Financeiro</span></div>
@@ -99,9 +101,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 </button>
                 {isFinancialOpen && (
                   <div className="flex flex-col ml-9 mt-1 border-l dark:border-slate-800 gap-1">
-                    <SidebarSubItem to="/entradas" label="Receitas" />
-                    <SidebarSubItem to="/saidas" label="Despesas" />
-                    <SidebarSubItem to="/dre" label="DRE" />
+                    {perms.incomes && <SidebarSubItem to="/entradas" label="Receitas" />}
+                    {perms.expenses && <SidebarSubItem to="/saidas" label="Despesas" />}
+                    {perms.financial && <SidebarSubItem to="/dre" label="DRE" />}
                   </div>
                 )}
               </div>

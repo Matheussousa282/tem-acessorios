@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../AppContext';
 import { Transaction, TransactionStatus, UserRole, CashSessionStatus } from '../types';
 
@@ -17,11 +17,15 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
   const isAdmin = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.MANAGER;
   const currentStore = establishments.find(e => e.id === currentUser?.storeId);
 
+  useEffect(() => {
+    refreshData();
+  }, []);
+
   const [form, setForm] = useState<Partial<Transaction>>({
     date: todayStr, 
     dueDate: todayStr, 
     description: '', 
-    store: currentStore?.name || 'Geral', 
+    store: currentStore?.name || 'MATRIZ TEM ACESSÓRIOS', 
     category: type === 'INCOME' ? 'Receita Extra' : 'Despesa Operacional', 
     status: TransactionStatus.PENDING, 
     value: 0, 
@@ -34,40 +38,67 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
   }, [transactions, type, isAdmin, currentStore]);
 
   /**
-   * CÁLCULO DE SALDO ACUMULADO (Geral da Gaveta)
-   * Soma tudo o que entrou e subtrai o que saiu (Dinheiro) na história da unidade.
+   * CÁLCULO DE SALDO ACUMULADO (TODO O HISTÓRICO)
+   * Busca em todo o array de transações do sistema
    */
   const calculateStoreBalance = (storeName: string) => {
     if (!storeName) return 0;
     
-    // Entradas em Dinheiro (Vendas + Entradas Manuais)
-    const cashIn = transactions.filter(t => t.store === storeName && t.method === 'Dinheiro' && t.status === TransactionStatus.PAID && t.type === 'INCOME').reduce((acc, t) => acc + t.value, 0);
-    const manIn = cashEntries.filter(e => {
-       const session = cashSessions.find(s => s.id === e.sessionId);
-       return session?.storeName === storeName && e.type === 'INCOME';
-    }).reduce((acc, e) => acc + e.value, 0);
+    const normalizedStoreName = storeName.trim().toUpperCase();
 
-    // Saídas em Dinheiro (Despesas + Sangrias Manuais)
-    const cashOut = transactions.filter(t => t.store === storeName && t.method === 'Dinheiro' && t.status === TransactionStatus.PAID && t.type === 'EXPENSE').reduce((acc, t) => acc + t.value, 0);
-    const manOut = cashEntries.filter(e => {
-       const session = cashSessions.find(s => s.id === e.sessionId);
-       return session?.storeName === storeName && e.type === 'EXPENSE';
-    }).reduce((acc, e) => acc + e.value, 0);
+    // 1. Vendas em Dinheiro Pagas (Histórico Completo)
+    const totalCashSales = transactions
+      .filter(t => 
+        t.store.trim().toUpperCase() === normalizedStoreName && 
+        t.method === 'Dinheiro' && 
+        t.status === TransactionStatus.PAID && 
+        t.type === 'INCOME'
+      )
+      .reduce((acc, t) => acc + Number(t.value || 0), 0);
 
-    // Saldo Inicial do primeiro caixa aberto
-    const firstSess = [...cashSessions].filter(s => s.storeName === storeName).sort((a,b) => a.id.localeCompare(b.id))[0];
-    const initial = firstSess?.openingValue || 0;
+    // 2. Entradas Manuais (Suprimentos)
+    const totalManualIn = cashEntries
+      .filter(e => {
+        const session = cashSessions.find(s => s.id === e.sessionId);
+        return session?.storeName.trim().toUpperCase() === normalizedStoreName && e.type === 'INCOME';
+      })
+      .reduce((acc, e) => acc + Number(e.value || 0), 0);
 
-    return (initial + cashIn + manIn) - (cashOut + manOut);
+    // 3. Despesas em Dinheiro Pagas (Histórico Completo)
+    const totalCashExpenses = transactions
+      .filter(t => 
+        t.store.trim().toUpperCase() === normalizedStoreName && 
+        t.method === 'Dinheiro' && 
+        t.status === TransactionStatus.PAID && 
+        t.type === 'EXPENSE'
+      )
+      .reduce((acc, t) => acc + Number(t.value || 0), 0);
+
+    // 4. Saídas Manuais (Sangrias)
+    const totalManualOut = cashEntries
+      .filter(e => {
+        const session = cashSessions.find(s => s.id === e.sessionId);
+        return session?.storeName.trim().toUpperCase() === normalizedStoreName && e.type === 'EXPENSE';
+      })
+      .reduce((acc, e) => acc + Number(e.value || 0), 0);
+
+    // 5. Saldo de Abertura Inicial (do primeiríssimo caixa da história dessa loja)
+    const firstSess = [...cashSessions]
+      .filter(s => s.storeName.trim().toUpperCase() === normalizedStoreName)
+      .sort((a, b) => a.id.localeCompare(b.id))[0];
+    const initialFund = Number(firstSess?.openingValue || 0);
+
+    return (initialFund + totalCashSales + totalManualIn) - (totalCashExpenses + totalManualOut);
   };
 
-  // Se for Admin, calcula o saldo de cada loja. Se for Caixa, só o da unidade dele.
   const storeBalances = useMemo(() => {
-    if (isAdmin) {
-      return establishments.map(e => ({ name: e.name, balance: calculateStoreBalance(e.name) }));
-    }
-    return [{ name: currentStore?.name || 'Unidade Atual', balance: calculateStoreBalance(currentStore?.name || '') }];
-  }, [transactions, cashSessions, cashEntries, establishments, isAdmin, currentStore]);
+    const list = isAdmin ? establishments : establishments.filter(e => e.id === currentUser?.storeId);
+    return list.map(e => ({ name: e.name, balance: calculateStoreBalance(e.name) }));
+  }, [transactions, cashSessions, cashEntries, establishments, isAdmin, currentUser]);
+
+  const groupTotalBalance = useMemo(() => {
+    return storeBalances.reduce((acc, sb) => acc + sb.balance, 0);
+  }, [storeBalances]);
 
   const handleOpenAdd = () => {
     setEditingId(null);
@@ -75,7 +106,7 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
       date: todayStr, 
       dueDate: todayStr, 
       description: '', 
-      store: currentStore?.name || 'Geral', 
+      store: currentStore?.name || (establishments.length > 0 ? establishments[0].name : 'MATRIZ TEM ACESSÓRIOS'), 
       category: type === 'INCOME' ? 'Receita Extra' : 'Despesa Operacional', 
       status: type === 'INCOME' ? TransactionStatus.PAID : TransactionStatus.PENDING, 
       value: 0, 
@@ -91,12 +122,13 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
     if (isProcessing) return;
 
     const valueToSpend = Number(form.value) || 0;
-    const targetStoreBalance = calculateStoreBalance(form.store || '');
+    const targetStoreName = form.store || '';
+    const targetStoreBalance = calculateStoreBalance(targetStoreName);
 
-    // TRAVA DE SALDO: Não deixa lançar despesa em dinheiro se não houver saldo na unidade escolhida
+    // TRAVA DE SALDO: Só se for despesa em dinheiro
     if (type === 'EXPENSE' && form.method === 'Dinheiro') {
       if (valueToSpend > targetStoreBalance) {
-        alert(`❌ SALDO INSUFICIENTE NA GAVETA!\n\nA unidade "${form.store}" possui apenas R$ ${targetStoreBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} em dinheiro disponível.`);
+        alert(`❌ SALDO INSUFICIENTE NA GAVETA!\n\nA unidade "${targetStoreName}" possui apenas R$ ${targetStoreBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} em dinheiro disponível.`);
         return;
       }
     }
@@ -129,7 +161,7 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
     }
   };
 
-  const totalValue = filteredTransactions.reduce((acc, t) => acc + t.value, 0);
+  const totalValueInList = filteredTransactions.reduce((acc, t) => acc + Number(t.value || 0), 0);
 
   return (
     <div className="p-8 space-y-8 animate-in fade-in duration-500 pb-24">
@@ -157,21 +189,24 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 rounded-[2.5rem] shadow-sm flex flex-col justify-center">
            <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest mb-2">Total na Listagem</p>
-           <p className={`text-3xl font-black tabular-nums ${type === 'INCOME' ? 'text-emerald-500' : 'text-rose-500'}`}>R$ {totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+           <p className={`text-3xl font-black tabular-nums ${type === 'INCOME' ? 'text-emerald-500' : 'text-rose-500'}`}>R$ {totalValueInList.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
         </div>
         
-        {/* CARD DE SALDOS POR UNIDADE - O "CORAÇÃO" DA TELA */}
         <div className="md:col-span-3 bg-slate-900 p-8 rounded-[2.5rem] text-white flex flex-col justify-center relative overflow-hidden group">
            <div className="absolute top-0 right-0 size-48 bg-primary/10 blur-[80px] rounded-full group-hover:bg-primary/20 transition-all"></div>
-           <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest mb-4 relative z-10">Saldos Disponíveis em Dinheiro (Gaveta)</p>
+           <div className="flex justify-between items-center mb-4 relative z-10">
+              <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest">Saldos Disponíveis em Dinheiro (Gaveta)</p>
+              {isAdmin && <span className="text-[10px] font-black bg-primary/20 text-primary px-3 py-1 rounded-full">Grupo Total: R$ {groupTotalBalance.toLocaleString('pt-BR')}</span>}
+           </div>
            <div className="flex gap-10 overflow-x-auto no-scrollbar relative z-10">
               {storeBalances.map(sb => (
                  <div key={sb.name} className="flex flex-col border-r border-white/10 pr-10 last:border-none min-w-fit">
                     <span className="text-[10px] font-black uppercase text-primary mb-1 tracking-tighter">{sb.name}</span>
                     <span className={`text-2xl font-black tabular-nums ${sb.balance <= 0 ? 'text-rose-500' : 'text-emerald-400'}`}>R$ {sb.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                    <p className="text-[8px] font-bold text-slate-500 uppercase mt-1">Disponível para Pagto</p>
+                    <p className="text-[8px] font-bold text-slate-500 uppercase mt-1">Livre para Pagto</p>
                  </div>
               ))}
+              {storeBalances.length === 0 && <p className="text-xs opacity-30 font-black uppercase">Nenhum saldo calculado</p>}
            </div>
         </div>
       </div>
@@ -206,7 +241,7 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
                   <td className="px-10 py-6">
                     <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase ${t.status === TransactionStatus.PAID ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>{t.status}</span>
                   </td>
-                  <td className="px-10 py-6 text-right font-black text-sm tabular-nums text-slate-900 dark:text-white">R$ {t.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                  <td className="px-10 py-6 text-right font-black text-sm tabular-nums text-slate-900 dark:text-white">R$ {Number(t.value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
                   <td className="px-10 py-6 text-right">
                      {t.status === TransactionStatus.PENDING && (
                        <button onClick={() => handleMarkAsPaid(t)} className="px-6 py-2.5 bg-emerald-500 text-white rounded-xl text-[9px] font-black uppercase hover:scale-105 transition-all shadow-xl shadow-emerald-500/20">Quitar</button>
