@@ -25,7 +25,7 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
     date: todayStr, 
     dueDate: todayStr, 
     description: '', 
-    store: currentStore?.name || 'MATRIZ TEM ACESSÓRIOS', 
+    store: currentStore?.name || (establishments.length > 0 ? establishments[0].name : 'GERAL'), 
     category: type === 'INCOME' ? 'Receita Extra' : 'Despesa Operacional', 
     status: TransactionStatus.PENDING, 
     value: 0, 
@@ -38,57 +38,48 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
   }, [transactions, type, isAdmin, currentStore]);
 
   /**
-   * CÁLCULO DE SALDO ACUMULADO (TODO O HISTÓRICO)
-   * Busca em todo o array de transações do sistema
+   * MOTOR DE CÁLCULO DE SALDO ROBUSTO
+   * Garante que a comparação de nomes ignore espaços e maiúsculas
    */
   const calculateStoreBalance = (storeName: string) => {
     if (!storeName) return 0;
     
-    const normalizedStoreName = storeName.trim().toUpperCase();
+    const normalize = (s: string) => s.trim().toUpperCase();
+    const target = normalize(storeName);
 
-    // 1. Vendas em Dinheiro Pagas (Histórico Completo)
-    const totalCashSales = transactions
-      .filter(t => 
-        t.store.trim().toUpperCase() === normalizedStoreName && 
-        t.method === 'Dinheiro' && 
-        t.status === TransactionStatus.PAID && 
-        t.type === 'INCOME'
-      )
+    // 1. Vendas e Receitas em Dinheiro (PAGAS)
+    const cashIn = transactions
+      .filter(t => normalize(t.store) === target && t.method === 'Dinheiro' && t.status === TransactionStatus.PAID && t.type === 'INCOME')
       .reduce((acc, t) => acc + Number(t.value || 0), 0);
 
     // 2. Entradas Manuais (Suprimentos)
-    const totalManualIn = cashEntries
+    const manualIn = cashEntries
       .filter(e => {
         const session = cashSessions.find(s => s.id === e.sessionId);
-        return session?.storeName.trim().toUpperCase() === normalizedStoreName && e.type === 'INCOME';
+        return session && normalize(session.storeName) === target && e.type === 'INCOME';
       })
       .reduce((acc, e) => acc + Number(e.value || 0), 0);
 
-    // 3. Despesas em Dinheiro Pagas (Histórico Completo)
-    const totalCashExpenses = transactions
-      .filter(t => 
-        t.store.trim().toUpperCase() === normalizedStoreName && 
-        t.method === 'Dinheiro' && 
-        t.status === TransactionStatus.PAID && 
-        t.type === 'EXPENSE'
-      )
+    // 3. Despesas e Saídas em Dinheiro (PAGAS)
+    const cashOut = transactions
+      .filter(t => normalize(t.store) === target && t.method === 'Dinheiro' && t.status === TransactionStatus.PAID && t.type === 'EXPENSE')
       .reduce((acc, t) => acc + Number(t.value || 0), 0);
 
     // 4. Saídas Manuais (Sangrias)
-    const totalManualOut = cashEntries
+    const manualOut = cashEntries
       .filter(e => {
         const session = cashSessions.find(s => s.id === e.sessionId);
-        return session?.storeName.trim().toUpperCase() === normalizedStoreName && e.type === 'EXPENSE';
+        return session && normalize(session.storeName) === target && e.type === 'EXPENSE';
       })
       .reduce((acc, e) => acc + Number(e.value || 0), 0);
 
-    // 5. Saldo de Abertura Inicial (do primeiríssimo caixa da história dessa loja)
+    // 5. Saldo de Abertura do primeiro caixa histórico dessa loja
     const firstSess = [...cashSessions]
-      .filter(s => s.storeName.trim().toUpperCase() === normalizedStoreName)
+      .filter(s => normalize(s.storeName) === target)
       .sort((a, b) => a.id.localeCompare(b.id))[0];
-    const initialFund = Number(firstSess?.openingValue || 0);
+    const initial = Number(firstSess?.openingValue || 0);
 
-    return (initialFund + totalCashSales + totalManualIn) - (totalCashExpenses + totalManualOut);
+    return (initial + cashIn + manualIn) - (cashOut + manualOut);
   };
 
   const storeBalances = useMemo(() => {
@@ -106,7 +97,7 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
       date: todayStr, 
       dueDate: todayStr, 
       description: '', 
-      store: currentStore?.name || (establishments.length > 0 ? establishments[0].name : 'MATRIZ TEM ACESSÓRIOS'), 
+      store: currentStore?.name || (establishments.length > 0 ? establishments[0].name : 'GERAL'), 
       category: type === 'INCOME' ? 'Receita Extra' : 'Despesa Operacional', 
       status: type === 'INCOME' ? TransactionStatus.PAID : TransactionStatus.PENDING, 
       value: 0, 
@@ -161,7 +152,7 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
     }
   };
 
-  const totalValueInList = filteredTransactions.reduce((acc, t) => acc + Number(t.value || 0), 0);
+  const totalInList = filteredTransactions.reduce((acc, t) => acc + Number(t.value || 0), 0);
 
   return (
     <div className="p-8 space-y-8 animate-in fade-in duration-500 pb-24">
@@ -176,37 +167,36 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
             </h1>
             <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mt-1 flex items-center gap-2">
               <span className="size-2 bg-primary rounded-full animate-pulse"></span>
-              {isAdmin ? 'Controle Consolidado do Grupo' : `Unidade: ${currentStore?.name}`}
+              {isAdmin ? 'Gestão Financeira Consolidada' : `Unidade: ${currentStore?.name}`}
             </p>
           </div>
         </div>
         <button onClick={handleOpenAdd} className="bg-primary hover:bg-blue-600 text-white font-black py-4 px-10 rounded-[1.5rem] text-[11px] uppercase tracking-widest shadow-2xl transition-all active:scale-95 flex items-center gap-2">
           <span className="material-symbols-outlined text-sm">add_circle</span>
-          Lançar {type === 'INCOME' ? 'Receita' : 'Despesa'}
+          Novo Registro {type === 'INCOME' ? 'Entrada' : 'Saída'}
         </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 rounded-[2.5rem] shadow-sm flex flex-col justify-center">
-           <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest mb-2">Total na Listagem</p>
-           <p className={`text-3xl font-black tabular-nums ${type === 'INCOME' ? 'text-emerald-500' : 'text-rose-500'}`}>R$ {totalValueInList.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+           <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest mb-2">Total Exibido</p>
+           <p className={`text-3xl font-black tabular-nums ${type === 'INCOME' ? 'text-emerald-500' : 'text-rose-500'}`}>R$ {totalInList.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
         </div>
         
         <div className="md:col-span-3 bg-slate-900 p-8 rounded-[2.5rem] text-white flex flex-col justify-center relative overflow-hidden group">
            <div className="absolute top-0 right-0 size-48 bg-primary/10 blur-[80px] rounded-full group-hover:bg-primary/20 transition-all"></div>
            <div className="flex justify-between items-center mb-4 relative z-10">
-              <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest">Saldos Disponíveis em Dinheiro (Gaveta)</p>
-              {isAdmin && <span className="text-[10px] font-black bg-primary/20 text-primary px-3 py-1 rounded-full">Grupo Total: R$ {groupTotalBalance.toLocaleString('pt-BR')}</span>}
+              <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest">Disponível em Dinheiro (Saldo Real de Gaveta)</p>
+              {isAdmin && <span className="text-[10px] font-black bg-primary text-white px-4 py-1.5 rounded-full shadow-lg">Grupo Total: R$ {groupTotalBalance.toLocaleString('pt-BR')}</span>}
            </div>
            <div className="flex gap-10 overflow-x-auto no-scrollbar relative z-10">
               {storeBalances.map(sb => (
                  <div key={sb.name} className="flex flex-col border-r border-white/10 pr-10 last:border-none min-w-fit">
                     <span className="text-[10px] font-black uppercase text-primary mb-1 tracking-tighter">{sb.name}</span>
                     <span className={`text-2xl font-black tabular-nums ${sb.balance <= 0 ? 'text-rose-500' : 'text-emerald-400'}`}>R$ {sb.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                    <p className="text-[8px] font-bold text-slate-500 uppercase mt-1">Livre para Pagto</p>
+                    <p className="text-[8px] font-bold text-slate-500 uppercase mt-1">Livre para Utilizar</p>
                  </div>
               ))}
-              {storeBalances.length === 0 && <p className="text-xs opacity-30 font-black uppercase">Nenhum saldo calculado</p>}
            </div>
         </div>
       </div>
@@ -216,8 +206,8 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
           <table className="w-full text-left">
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
-                <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Data / Loja</th>
-                <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Descrição / Fornecedor</th>
+                <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Data / Unidade</th>
+                <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Descrição</th>
                 <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Meio</th>
                 <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
                 <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Valor</th>
@@ -263,20 +253,19 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
             <div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-primary text-white flex justify-between items-center shadow-lg">
               <div className="flex items-center gap-3">
                  <span className="material-symbols-outlined text-3xl">post_add</span>
-                 <h3 className="text-2xl font-black uppercase tracking-tight">Novo Lançamento</h3>
+                 <h3 className="text-2xl font-black uppercase tracking-tight">Novo Registro</h3>
               </div>
               <button onClick={() => setShowModal(false)} className="size-10 flex items-center justify-center hover:bg-white/10 rounded-full transition-all"><span className="material-symbols-outlined">close</span></button>
             </div>
             <form onSubmit={handleSave} className="p-10 space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Data Emissão</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Data</label>
                   <input type="date" value={form.date} onChange={e => setForm({...form, date: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none outline-none focus:ring-2 focus:ring-primary/20" required />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Unidade Responsável</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Loja / Unidade</label>
                   <select 
-                    disabled={!isAdmin} 
                     value={form.store} 
                     onChange={e => setForm({...form, store: e.target.value})} 
                     className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-[11px] font-black uppercase border-none focus:ring-2 focus:ring-primary/20"
@@ -287,13 +276,13 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Descrição do Lançamento / Fornecedor</label>
-                <input type="text" required value={form.description} onChange={e => setForm({...form, description: e.target.value.toUpperCase()})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none uppercase focus:ring-2 focus:ring-primary/20" placeholder="EX: PAGAMENTO DE ALUGUEL, COMPRA DE PEÇAS..." />
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Descrição / Fornecedor</label>
+                <input type="text" required value={form.description} onChange={e => setForm({...form, description: e.target.value.toUpperCase()})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-sm font-bold border-none uppercase focus:ring-2 focus:ring-primary/20" placeholder="EX: ALUGUEL, MANUTENÇÃO, FORNECEDOR PEÇAS..." />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Meio de Movimentação</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Forma de Movimentação</label>
                     <select value={form.method} onChange={e => setForm({...form, method: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-[11px] font-black uppercase border-none focus:ring-2 focus:ring-primary/20">
                       <option value="Dinheiro">Dinheiro (Gaveta)</option>
                       <option value="Pix">Pix (Banco)</option>
@@ -302,16 +291,16 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
                     </select>
                  </div>
                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Status Situacional</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Status</label>
                     <select value={form.status} onChange={e => setForm({...form, status: e.target.value as TransactionStatus})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 text-[11px] font-black uppercase border-none focus:ring-2 focus:ring-primary/20">
-                      <option value={TransactionStatus.PENDING}>Pendente (Aguardando)</option>
-                      <option value={TransactionStatus.PAID}>Pago (Efetivado)</option>
+                      <option value={TransactionStatus.PENDING}>Aguardando (Pendente)</option>
+                      <option value={TransactionStatus.PAID}>Confirmado (Efetivado)</option>
                     </select>
                  </div>
               </div>
 
               <div className="space-y-1.5 p-6 bg-primary/5 rounded-[2rem] border border-primary/10">
-                <label className="text-[10px] font-black text-primary uppercase tracking-[0.2em] px-2 text-center block mb-2">Valor do Documento (R$)</label>
+                <label className="text-[10px] font-black text-primary uppercase tracking-[0.2em] px-2 text-center block mb-2">Valor do Lançamento (R$)</label>
                 <input type="number" step="0.01" required value={form.value || ''} onChange={e => setForm({...form, value: parseFloat(e.target.value) || 0})} className="w-full h-16 bg-white dark:bg-slate-800 rounded-2xl px-6 text-3xl font-black text-primary text-center border-none shadow-inner focus:ring-4 focus:ring-primary/10 tabular-nums" placeholder="0,00" />
               </div>
               
@@ -321,7 +310,7 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
                 className="w-full h-20 bg-primary text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-2xl hover:scale-105 transition-all flex items-center justify-center gap-3 shadow-primary/30"
               >
                 {isProcessing ? <span className="material-symbols-outlined animate-spin">sync</span> : <span className="material-symbols-outlined">check_circle</span>}
-                {isProcessing ? 'PROCESSANDO...' : 'Confirmar Registro Financeiro'}
+                {isProcessing ? 'PROCESSANDO...' : 'Efetivar Lançamento'}
               </button>
             </form>
           </div>
