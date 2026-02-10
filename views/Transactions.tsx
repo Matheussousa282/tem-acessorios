@@ -33,26 +33,41 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
     return transactions.filter(t => t.type === type && (isAdmin || t.store === currentStore?.name));
   }, [transactions, type, isAdmin, currentStore]);
 
-  // Motor de cálculo de saldo em tempo real (Dinheiro em Espécie)
+  // Motor de cálculo de saldo em tempo real (Consistente com CashMovement)
   const drawerCashBalance = useMemo(() => {
     const storeName = currentStore?.name;
     if (!storeName) return 0;
 
-    // Apenas o que já foi PAGO em dinheiro entra no cálculo do saldo disponível
-    const storeTransactions = transactions.filter(t => t.store === storeName && t.method === 'Dinheiro' && t.status === TransactionStatus.PAID);
+    const activeSession = cashSessions.find(s => 
+      (s.storeId === currentUser?.storeId || s.storeName === storeName) && 
+      s.status === CashSessionStatus.OPEN
+    );
+    const fundoCaixa = activeSession?.openingValue || 0;
+
+    const cashSales = transactions.filter(t => 
+      t.store === storeName && 
+      t.method === 'Dinheiro' && 
+      t.status === TransactionStatus.PAID &&
+      t.type === 'INCOME'
+    ).reduce((acc, t) => acc + t.value, 0);
+
+    const storeManualEntries = cashEntries.filter(e => {
+       const session = cashSessions.find(s => s.id === e.sessionId);
+       return session?.storeName === storeName;
+    });
     
-    const incomes = storeTransactions.filter(t => t.type === 'INCOME').reduce((acc, t) => acc + t.value, 0);
-    const expenses = storeTransactions.filter(t => t.type === 'EXPENSE').reduce((acc, t) => acc + t.value, 0);
+    const manualIncomes = storeManualEntries.filter(e => e.type === 'INCOME').reduce((acc, e) => acc + e.value, 0);
+    const manualExpenses = storeManualEntries.filter(e => e.type === 'EXPENSE').reduce((acc, e) => acc + e.value, 0);
 
-    const activeSession = cashSessions.find(s => s.storeName === storeName && s.status === CashSessionStatus.OPEN);
-    const openingValue = activeSession?.openingValue || 0;
+    const financeExpenses = transactions.filter(t =>
+      t.store === storeName &&
+      t.method === 'Dinheiro' &&
+      t.status === TransactionStatus.PAID &&
+      t.type === 'EXPENSE'
+    ).reduce((acc, t) => acc + t.value, 0);
 
-    const sessionManualEntries = cashEntries.filter(e => e.sessionId === activeSession?.id);
-    const manualIncomes = sessionManualEntries.filter(e => e.type === 'INCOME').reduce((acc, e) => acc + e.value, 0);
-    const manualExpenses = sessionManualEntries.filter(e => e.type === 'EXPENSE').reduce((acc, e) => acc + e.value, 0);
-
-    return (openingValue + incomes + manualIncomes) - (expenses + manualExpenses);
-  }, [transactions, cashSessions, cashEntries, currentStore]);
+    return (fundoCaixa + cashSales + manualIncomes) - (manualExpenses + financeExpenses);
+  }, [transactions, cashSessions, cashEntries, currentStore, currentUser]);
 
   const handleOpenAdd = () => {
     setEditingId(null);
@@ -77,7 +92,6 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
 
     const valueToSpend = Number(form.value) || 0;
 
-    // TRAVA RIGOROSA: Bloqueia se for despesa em dinheiro, independente de ser Pendente ou Paga
     if (type === 'EXPENSE' && form.method === 'Dinheiro') {
       if (valueToSpend > drawerCashBalance) {
         alert(`Saldo insuficiente no caixa para lançar, vamos vender mais! 😊\n\nSaldo atual: R$ ${drawerCashBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`);
@@ -103,7 +117,6 @@ const Transactions: React.FC<TransactionsProps> = ({ type }) => {
   };
 
   const handleMarkAsPaid = async (t: Transaction) => {
-    // Valida saldo antes de permitir a quitação de uma despesa em dinheiro
     if (t.type === 'EXPENSE' && t.method === 'Dinheiro') {
       if (t.value > drawerCashBalance) {
         alert(`Saldo insuficiente no caixa para pagar este lançamento, vamos vender mais! 😊\n\nSaldo atual: R$ ${drawerCashBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`);
