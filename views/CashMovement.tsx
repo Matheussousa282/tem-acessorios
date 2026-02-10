@@ -11,12 +11,11 @@ const CashMovement: React.FC = () => {
   
   const isAdmin = currentUser?.role === UserRole.ADMIN;
   const todayStr = useMemo(() => new Date().toLocaleDateString('pt-BR'), []);
+  const todayISO = new Date().toISOString().split('T')[0];
   
   const [viewingSession, setViewingSession] = useState<CashSession | null>(null);
   const [activeTab, setActiveTab] = useState<'lançamentos' | 'auditoria'>('lançamentos');
-
   const [showOpeningModal, setShowOpeningModal] = useState(false);
-  
   const [openingValue, setOpeningValue] = useState(0);
   const [selectedRegister, setSelectedRegister] = useState('');
 
@@ -26,47 +25,66 @@ const CashMovement: React.FC = () => {
     refreshData();
   }, []);
 
-  // Cálculo do Saldo Total da Gaveta (Dinheiro) da Unidade Atual
-  const totalDrawerBalance = useMemo(() => {
+  // 1. CÁLCULO DO SALDO ACUMULADO (TUDO QUE ENTROU - TUDO QUE SAIU NA HISTÓRIA DA UNIDADE)
+  const totalCumulativeBalance = useMemo(() => {
     const storeName = currentStore?.name;
     if (!storeName) return 0;
 
-    // 1. Abertura do Caixa Atual (se houver um aberto hoje)
+    // Entradas Totais (Vendas + Manual)
+    const allCashIncomes = transactions.filter(t => 
+      t.store === storeName && t.method === 'Dinheiro' && t.status === TransactionStatus.PAID && t.type === 'INCOME'
+    ).reduce((acc, t) => acc + t.value, 0);
+
+    const allManualIncomes = cashEntries.filter(e => {
+       const session = cashSessions.find(s => s.id === e.sessionId);
+       return session?.storeName === storeName && e.type === 'INCOME';
+    }).reduce((acc, e) => acc + e.value, 0);
+
+    // Saídas Totais (Despesas + Manual/Sangria)
+    const allCashExpenses = transactions.filter(t => 
+      t.store === storeName && t.method === 'Dinheiro' && t.status === TransactionStatus.PAID && t.type === 'EXPENSE'
+    ).reduce((acc, t) => acc + t.value, 0);
+
+    const allManualExpenses = cashEntries.filter(e => {
+       const session = cashSessions.find(s => s.id === e.sessionId);
+       return session?.storeName === storeName && e.type === 'EXPENSE';
+    }).reduce((acc, e) => acc + e.value, 0);
+
+    // Pegamos o valor de abertura do PRIMEIRO caixa de todos como base inicial
+    const firstSession = [...cashSessions].filter(s => s.storeName === storeName).sort((a,b) => a.id.localeCompare(b.id))[0];
+    const baseInitial = firstSession?.openingValue || 0;
+
+    return (baseInitial + allCashIncomes + allManualIncomes) - (allCashExpenses + allManualExpenses);
+  }, [transactions, cashSessions, cashEntries, currentStore]);
+
+  // 2. CÁLCULO DO SALDO DIÁRIO (APENAS O QUE ACONTECEU HOJE NO TURNO)
+  const dailyDrawerBalance = useMemo(() => {
+    const storeName = currentStore?.name;
+    if (!storeName) return 0;
+
     const activeSession = cashSessions.find(s => 
       (s.storeId === currentUser?.storeId || s.storeName === storeName) && 
       s.status === CashSessionStatus.OPEN
     );
-    const fundoCaixa = activeSession?.openingValue || 0;
+    if (!activeSession) return 0;
 
-    // 2. Vendas em Dinheiro (PAGAS)
-    const cashSales = transactions.filter(t => 
-      t.store === storeName && 
-      t.method === 'Dinheiro' && 
-      t.status === TransactionStatus.PAID &&
-      t.type === 'INCOME'
+    const sessionOpening = activeSession.openingValue || 0;
+
+    const todayCashSales = transactions.filter(t => 
+      t.store === storeName && t.date === todayISO && t.method === 'Dinheiro' && t.status === TransactionStatus.PAID && t.type === 'INCOME'
     ).reduce((acc, t) => acc + t.value, 0);
 
-    // 3. Entradas e Saídas Manuais (Suprimentos e Sangrias)
-    const storeManualEntries = cashEntries.filter(e => {
-       const session = cashSessions.find(s => s.id === e.sessionId);
-       return session?.storeName === storeName;
-    });
+    const todayManualIn = cashEntries.filter(e => e.sessionId === activeSession.id && e.type === 'INCOME').reduce((acc, e) => acc + e.value, 0);
+    const todayManualOut = cashEntries.filter(e => e.sessionId === activeSession.id && e.type === 'EXPENSE').reduce((acc, e) => acc + e.value, 0);
     
-    const manualIncomes = storeManualEntries.filter(e => e.type === 'INCOME').reduce((acc, e) => acc + e.value, 0);
-    const manualExpenses = storeManualEntries.filter(e => e.type === 'EXPENSE').reduce((acc, e) => acc + e.value, 0);
-
-    // 4. Despesas pagas em dinheiro lançadas no financeiro
-    const financeExpenses = transactions.filter(t =>
-      t.store === storeName &&
-      t.method === 'Dinheiro' &&
-      t.status === TransactionStatus.PAID &&
-      t.type === 'EXPENSE'
+    // Despesas de hoje lançadas no financeiro
+    const todayFinanceExpenses = transactions.filter(t =>
+      t.store === storeName && t.date === todayISO && t.method === 'Dinheiro' && t.status === TransactionStatus.PAID && t.type === 'EXPENSE'
     ).reduce((acc, t) => acc + t.value, 0);
 
-    return (fundoCaixa + cashSales + manualIncomes) - (manualExpenses + financeExpenses);
-  }, [transactions, cashSessions, cashEntries, currentStore, currentUser]);
+    return (sessionOpening + todayCashSales + todayManualIn) - (todayManualOut + todayFinanceExpenses);
+  }, [transactions, cashSessions, cashEntries, currentStore, todayISO]);
 
-  // Verificar se já houve abertura hoje para esta unidade
   const alreadyOpenedToday = useMemo(() => {
     return cashSessions.some(s => {
       const isThisStore = s.storeId === currentUser?.storeId;
@@ -80,12 +98,7 @@ const CashMovement: React.FC = () => {
       const lastClosed = [...cashSessions]
         .filter(s => s.storeId === currentUser?.storeId && s.status === CashSessionStatus.CLOSED)
         .sort((a, b) => b.id.localeCompare(a.id))[0];
-      
-      if (lastClosed) {
-        setOpeningValue(lastClosed.closingValue || 0);
-      } else {
-        setOpeningValue(0);
-      }
+      setOpeningValue(lastClosed?.closingValue || 0);
     }
   }, [showOpeningModal, cashSessions, currentUser]);
 
@@ -96,36 +109,29 @@ const CashMovement: React.FC = () => {
   const filteredSessions = useMemo(() => {
     return cashSessions.filter(s => {
       const belongsToStore = isAdmin || s.storeId === currentUser?.storeId;
-      const matchesFilter = filter === '' || 
-        s.registerName.toLowerCase().includes(filter.toLowerCase()) ||
-        s.openingOperatorName?.toLowerCase().includes(filter.toLowerCase());
+      const matchesFilter = filter === '' || s.registerName.toLowerCase().includes(filter.toLowerCase());
       return belongsToStore && matchesFilter;
     });
   }, [cashSessions, filter, isAdmin, currentUser]);
 
   const sessionData = useMemo(() => {
     if (!viewingSession) return null;
-
-    // Converter data de abertura para formato ISO YYYY-MM-DD
-    const datePart = viewingSession.openingTime?.split(',')[0].trim(); // "DD/MM/YYYY"
+    const datePart = viewingSession.openingTime?.split(',')[0].trim();
     const [d, m, y] = datePart?.split('/') || [];
     const isoDate = `${y}-${m}-${d}`;
 
     const sessionVendas = transactions.filter(t => {
       const matchesStore = t.store === viewingSession.storeName;
-      // Filtra por data e se foi uma venda/serviço
       const isSale = t.type === 'INCOME' && (t.category === 'Venda' || t.category === 'Serviço');
       const matchesDate = t.date === isoDate;
-      // Adicionalmente, se tiver cashierId, usa ele para ser preciso
       const matchesOperator = t.cashierId ? t.cashierId === viewingSession.openingOperatorId : true;
       return matchesStore && isSale && matchesDate && matchesOperator;
     });
 
     const sessionManualEntries = cashEntries.filter(e => e.sessionId === viewingSession.id);
-
     const resumoCartoes: Record<string, { count: number, value: number }> = {};
     sessionVendas.forEach(v => {
-       if (v.method === 'Credito' || v.method === 'Debito' || v.method === 'Pix' || v.method === 'Pix Maquineta' || v.method?.includes('Múltiplo')) {
+       if (['Credito', 'Debito', 'Pix', 'Pix Maquineta'].some(m => v.method?.includes(m))) {
           const methodKey = v.method?.includes('Pix') ? 'PIX' : (v.method || 'CARTÃO').toUpperCase();
           if (!resumoCartoes[methodKey]) resumoCartoes[methodKey] = { count: 0, value: 0 };
           resumoCartoes[methodKey].count += 1;
@@ -137,54 +143,23 @@ const CashMovement: React.FC = () => {
     const vendasEmDinheiro = sessionVendas.filter(v => v.method?.toUpperCase() === 'DINHEIRO').reduce((acc, v) => acc + v.value, 0);
     const entradasManuaisDinheiro = sessionManualEntries.filter(e => e.type === 'INCOME').reduce((acc, e) => acc + e.value, 0);
     const saídasDinheiro = sessionManualEntries.filter(e => e.type === 'EXPENSE').reduce((acc, e) => acc + e.value, 0);
-
     const saldoAnterior = viewingSession.openingValue || 0;
     const saldoFinalCaixa = (saldoAnterior + vendasEmDinheiro + entradasManuaisDinheiro) - saídasDinheiro;
 
     const allRecords = [
-      ...sessionVendas.map(v => ({
-        id: v.id,
-        type: 'INCOME',
-        description: `Venda PDV - ${v.id.slice(-5)}`,
-        value: v.value,
-        timestamp: v.date,
-        method: v.method,
-        cat: 'VENDA',
-        client: v.client || 'Consumidor Final',
-        installments: v.installments || 1
-      })),
-      ...sessionManualEntries.map(e => ({
-        id: e.id,
-        type: e.type,
-        description: e.description,
-        value: e.value,
-        timestamp: e.timestamp,
-        method: e.method || 'CAIXA',
-        cat: e.category,
-        client: 'SISTEMA',
-        installments: 1
-      }))
+      ...sessionVendas.map(v => ({ id: v.id, type: 'INCOME', description: `Venda PDV - ${v.id.slice(-5)}`, value: v.value, timestamp: v.date, method: v.method, cat: 'VENDA', client: v.client || 'Consumidor Final', installments: v.installments || 1 })),
+      ...sessionManualEntries.map(e => ({ id: e.id, type: e.type, description: e.description, value: e.value, timestamp: e.timestamp, method: e.method || 'CAIXA', cat: e.category, client: 'SISTEMA', installments: 1 }))
     ].sort((a, b) => b.id.localeCompare(a.id));
 
-    return { 
-      allRecords, 
-      saldoAnterior, 
-      vendasEmDinheiro,
-      entradasManuaisDinheiro,
-      saídasDinheiro,
-      saldoFinalCaixa, 
-      resumoCartoes, 
-      totalVendasBruto
-    };
-  }, [viewingSession, transactions, cashEntries, cardOperators, cardBrands]);
+    return { allRecords, saldoAnterior, vendasEmDinheiro, entradasManuaisDinheiro, saídasDinheiro, saldoFinalCaixa, resumoCartoes, totalVendasBruto };
+  }, [viewingSession, transactions, cashEntries]);
 
   const handleOpenCash = async (e: React.FormEvent) => {
     e.preventDefault();
     if (alreadyOpenedToday && !isAdmin) {
-      alert("Atenção: Já foi realizado um movimento de caixa hoje nesta unidade. O sistema permite apenas um movimento por dia.");
+      alert("Atenção: Já existe um movimento de caixa hoje.");
       return;
     }
-
     const cashier = users.find(u => u.name === selectedRegister.split(' - ')[1]);
     const newSession: CashSession = {
       id: `${Date.now()}`,
@@ -205,17 +180,8 @@ const CashMovement: React.FC = () => {
 
   const handleCloseCash = async () => {
     if (!viewingSession || !sessionData) return;
-    const formattedBalance = Number(sessionData.saldoFinalCaixa).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
-    if (confirm(`DESEJA REALMENTE FECHAR ESTE CAIXA?\nSaldo Final em Dinheiro: R$ ${formattedBalance}`)) {
-      const closedSession: CashSession = {
-        ...viewingSession,
-        status: CashSessionStatus.CLOSED,
-        closingTime: new Date().toLocaleString('pt-BR'),
-        closingOperatorId: currentUser?.id,
-        closingOperatorName: currentUser?.name,
-        closingValue: sessionData.saldoFinalCaixa
-      };
-      await saveCashSession(closedSession);
+    if (confirm(`FECHAR CAIXA?\nSaldo Final: R$ ${sessionData.saldoFinalCaixa.toLocaleString('pt-BR')}`)) {
+      await saveCashSession({ ...viewingSession, status: CashSessionStatus.CLOSED, closingTime: new Date().toLocaleString('pt-BR'), closingOperatorId: currentUser?.id, closingOperatorName: currentUser?.name, closingValue: sessionData.saldoFinalCaixa });
       setViewingSession(null);
       await refreshData();
     }
@@ -427,19 +393,27 @@ const CashMovement: React.FC = () => {
 
   return (
     <div className="p-8 space-y-8 animate-in fade-in duration-500 pb-24">
-      {/* CARD DE SALDO GERAL DA GAVETA */}
+      {/* CARDS DE SALDO: ACUMULADO VS DIÁRIO */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
          <div className="md:col-span-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 rounded-[2.5rem] flex flex-col md:flex-row justify-between items-center gap-6 shadow-sm">
-            <div className="flex items-center gap-6">
-               <div className="size-16 bg-emerald-500 text-white rounded-3xl flex items-center justify-center shadow-lg shadow-emerald-500/20 animate-in zoom-in-95">
-                  <span className="material-symbols-outlined text-4xl">payments</span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 w-full md:w-auto">
+               <div className="flex items-center gap-4">
+                  <div className="size-14 bg-emerald-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                     <span className="material-symbols-outlined text-3xl">account_balance_wallet</span>
+                  </div>
+                  <div>
+                     <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest">Saldo Acumulado (Gaveta)</p>
+                     <h2 className="text-2xl font-black text-emerald-500 tabular-nums leading-none">R$ {totalCumulativeBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h2>
+                  </div>
                </div>
-               <div>
-                  <h2 className="text-3xl font-black text-slate-800 dark:text-white uppercase tracking-tighter">Gaveta: R$ {totalDrawerBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h2>
-                  <p className="text-slate-500 text-[10px] font-black uppercase mt-1 tracking-widest flex items-center gap-2">
-                     <span className="size-2 bg-emerald-500 rounded-full animate-pulse"></span>
-                     Saldo em espécie na unidade {currentStore?.name}
-                  </p>
+               <div className="flex items-center gap-4 border-l border-slate-100 dark:border-slate-800 pl-8">
+                  <div className="size-14 bg-primary text-white rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20">
+                     <span className="material-symbols-outlined text-3xl">today</span>
+                  </div>
+                  <div>
+                     <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest">Saldo Diário (Turno)</p>
+                     <h2 className="text-2xl font-black text-primary tabular-nums leading-none">R$ {dailyDrawerBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h2>
+                  </div>
                </div>
             </div>
             <div className="flex gap-3">
@@ -449,16 +423,17 @@ const CashMovement: React.FC = () => {
                 className={`px-8 py-4 rounded-2xl text-[11px] font-black uppercase flex items-center gap-2 shadow-xl transition-all ${alreadyOpenedToday && !isAdmin ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-emerald-500 text-white shadow-emerald-500/20 hover:scale-105'}`}
                >
                 <span className="material-symbols-outlined text-sm">{alreadyOpenedToday && !isAdmin ? 'lock' : 'add_circle'}</span> 
-                {alreadyOpenedToday && !isAdmin ? 'Caixa de Hoje já Iniciado' : 'Abrir Novo Caixa'}
+                {alreadyOpenedToday && !isAdmin ? 'Hoje Iniciado' : 'Abrir Turno'}
                </button>
             </div>
          </div>
          <div className="md:col-span-4 bg-slate-900 p-8 rounded-[2.5rem] text-white flex flex-col justify-center relative overflow-hidden group">
             <div className="absolute top-0 right-0 size-32 bg-primary/20 blur-3xl group-hover:bg-primary/40 transition-all"></div>
             <div className="relative z-10">
-               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Auditoria</p>
-               <h3 className="text-xl font-black uppercase leading-tight mb-4">Relatórios de <br/>Conferência</h3>
-               <button onClick={() => navigate('/relatorios?type=conferencia_caixa')} className="text-[10px] font-black uppercase text-primary hover:underline flex items-center gap-1">Acessar Histórico <span className="material-symbols-outlined text-sm">arrow_forward</span></button>
+               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Auditoria de Unidade</p>
+               <h3 className="text-xl font-black uppercase leading-tight mb-4">{currentStore?.name}</h3>
+               <p className="text-[9px] font-bold text-slate-400 mb-4 uppercase tracking-tighter">O saldo acumulado reflete todo o dinheiro que deve estar fisicamente na gaveta agora.</p>
+               <button onClick={() => navigate('/relatorios?type=conferencia_caixa')} className="text-[10px] font-black uppercase text-primary hover:underline flex items-center gap-1">Verificar Auditoria <span className="material-symbols-outlined text-sm">arrow_forward</span></button>
             </div>
          </div>
       </div>
@@ -496,9 +471,6 @@ const CashMovement: React.FC = () => {
                        </td>
                     </tr>
                   ))}
-                  {filteredSessions.length === 0 && (
-                    <tr><td colSpan={5} className="py-24 text-center opacity-30 font-black text-xs tracking-widest">NENHUM MOVIMENTO DE CAIXA LOCALIZADO</td></tr>
-                  )}
                </tbody>
             </table>
          </div>
@@ -519,8 +491,12 @@ const CashMovement: React.FC = () => {
                        {availableCashiers.map((u, idx) => (<option key={u.id} value={`CX ${idx + 1} - ${u.name}`}>CAIXA {idx + 1} - {u.name}</option>))}
                     </select>
                  </div>
+                 <div className="p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-xl">
+                    <p className="text-[9px] font-black text-emerald-600 uppercase mb-2">Fundo Sugerido (Saldo Acumulado)</p>
+                    <p className="text-sm font-black text-slate-900 dark:text-white">R$ {totalCumulativeBalance.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                 </div>
                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase px-2">Fundo de Reserva em Gaveta (R$)</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase px-2">Confirmar Fundo em Gaveta (R$)</label>
                     <input autoFocus type="number" step="0.01" required value={openingValue} onChange={e => setOpeningValue(parseFloat(e.target.value) || 0)} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-6 text-2xl font-black text-emerald-600 text-center" placeholder="0,00" />
                  </div>
                  <button type="submit" disabled={availableCashiers.length === 0} className="w-full h-16 bg-primary text-white rounded-xl font-black text-[11px] uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 transition-all">INICIAR TURNO AGORA</button>
