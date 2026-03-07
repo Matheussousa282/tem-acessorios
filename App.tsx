@@ -47,20 +47,11 @@ const AppRoutes: React.FC = () => {
     );
   }
 
-  if (!currentUser) {
-    return (
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
-    );
-  }
-
   return (
     <Routes>
-      <Route path="/" element={<Layout><Dashboard /></Layout>} />
+      <Route path="/" element={<ProtectedRoute perm="dashboard"><Layout><Dashboard /></Layout></ProtectedRoute>} />
       <Route path="/pdv" element={<ProtectedRoute perm="pdv"><PDV /></ProtectedRoute>} />
-      <Route path="/documentos" element={<Layout><SalesInquiry /></Layout>} />
+      <Route path="/documentos" element={<ProtectedRoute><Layout><SalesInquiry /></Layout></ProtectedRoute>} />
       <Route path="/caixa" element={<Layout><ProtectedRoute perm="cashControl"><CashMovement /></ProtectedRoute></Layout>} />
       <Route path="/clientes" element={<Layout><ProtectedRoute perm="customers"><Customers /></ProtectedRoute></Layout>} />
       <Route path="/relatorios" element={<Layout><ProtectedRoute perm="reports"><Reports /></ProtectedRoute></Layout>} />
@@ -72,7 +63,7 @@ const AppRoutes: React.FC = () => {
       <Route path="/cartoes" element={<Layout><ProtectedRoute perm="cardManagement"><CardManagement /></ProtectedRoute></Layout>} />
       <Route path="/dre" element={<Layout><ProtectedRoute perm="financial"><DRE /></ProtectedRoute></Layout>} />
       <Route path="/config" element={<Layout><ProtectedRoute perm="settings"><Settings /></ProtectedRoute></Layout>} />
-      <Route path="/login" element={<Navigate to="/" replace />} />
+      <Route path="/login" element={<Login />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

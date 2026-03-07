@@ -1,4 +1,5 @@
 
+// Componente PDV com correções de tipagem explícita para evitar erros de 'unknown'.
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '../AppContext';
 import { useNavigate } from 'react-router-dom';
@@ -175,11 +176,39 @@ const PDV: React.FC = () => {
   const remainingValue = useMemo(() => Math.max(0, totalGeral - totalPaid), [totalGeral, totalPaid]);
   const changeValue = useMemo(() => Math.max(0, totalPaid - totalGeral), [totalGeral, totalPaid]);
 
+  const isBirthdayMonth = useMemo(() => {
+    if (!selectedCustomerId) return false;
+    const customer = customers.find(c => c.id === selectedCustomerId);
+    if (!customer || !customer.birthDate) return false;
+    
+    try {
+      const parts = customer.birthDate.includes('-') ? customer.birthDate.split('-') : customer.birthDate.split('/');
+      // Se YYYY-MM-DD ou DD/MM/YYYY, o mês geralmente é a segunda parte (índice 1)
+      // No entanto, se for YYYY-MM-DD, parts[1] é o mês.
+      // Se for DD/MM/YYYY, parts[1] é o mês.
+      const birthMonth = parseInt(parts[1], 10);
+      const currentMonth = new Date().getMonth() + 1;
+      return birthMonth === currentMonth;
+    } catch (e) {
+      return false;
+    }
+  }, [selectedCustomerId, customers]);
+
   useEffect(() => {
     if (showCheckout) {
       setCurrentPaymentValue(remainingValue);
     }
   }, [showCheckout, remainingValue]);
+
+  // Lógica de Bipagem Automática: Adiciona ao carrinho se houver match exato com código de barras ou SKU
+  useEffect(() => {
+    if (!search || search.length < 3) return;
+
+    const exactMatch = products.find(p => p.barcode === search || p.sku === search);
+    if (exactMatch) {
+      addToCart(exactMatch);
+    }
+  }, [search, products]);
 
   const addToCart = (product: Product) => {
     if (!product.isService && product.stock <= 0) { alert('Produto sem estoque!'); return; }
@@ -468,7 +497,7 @@ const PDV: React.FC = () => {
            <div className="font-black uppercase border-b border-black/10 pb-1">PAGAMENTOS EFETUADOS:</div>
            {lastSaleData?.payments?.map((p: any, i: number) => (
              <div key={i} className="flex justify-between uppercase font-bold text-[10px]">
-               <span>{p.method} {p.details?.installments > 1 ? `(${p.details.installments}X)` : ''}:</span>
+               <span>{p.method} {(p.details?.installments ?? 0) > 1 ? `(${p.details?.installments}X)` : ''}:</span>
                <span>R$ {p.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
              </div>
            ))}
@@ -499,7 +528,8 @@ const PDV: React.FC = () => {
           </div>
           <div className="h-8 w-px bg-slate-200 dark:border-slate-800 mx-2"></div>
           <div className="flex gap-2 overflow-x-auto no-scrollbar max-w-[450px]">
-             {categories.map(cat => (
+             {/* Adicionado tipagem explícita para evitar erro de unknown */}
+             {categories.map((cat: string) => (
                <button key={cat} onClick={() => setCategory(cat)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all whitespace-nowrap ${category === cat ? 'bg-primary text-white shadow-lg' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200'}`}>{cat}</button>
              ))}
           </div>
@@ -546,27 +576,46 @@ const PDV: React.FC = () => {
           <div className="p-6 space-y-4 border-b border-slate-100 dark:border-slate-800">
              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-2">Vendedor <span className="text-rose-500">*</span></label>
+                   <div className="flex justify-between items-center px-2 h-4">
+                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Vendedor <span className="text-rose-500">*</span></label>
+                   </div>
                    <select 
                      value={selectedVendorId} 
                      onChange={e => setSelectedVendorId(e.target.value)} 
                      className={`w-full h-12 bg-slate-50 dark:bg-slate-800 border-2 rounded-xl px-4 text-[10px] font-black uppercase transition-all ${!selectedVendorId ? 'border-rose-500/20' : 'border-transparent focus:border-primary'}`}
                    >
                       <option value="">SELECIONE VENDEDOR</option>
-                      {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                      {/* Adicionado tipagem explícita para evitar erro de unknown */}
+                      {vendors.map((v: User) => <option key={v.id} value={v.id}>{v.name}</option>)}
                    </select>
                 </div>
                 <div className="space-y-1.5">
-                   <div className="flex justify-between items-center px-2">
+                   <div className="flex justify-between items-center px-2 h-4">
                       <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Cliente</label>
                       <button onClick={() => setShowCustomerModal(true)} className="text-[9px] font-black text-primary uppercase hover:underline flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">person_add</span> Novo</button>
                    </div>
-                   <select value={selectedCustomerId} onChange={e => setSelectedCustomerId(e.target.value)} className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-[10px] font-black uppercase">
+                   <select value={selectedCustomerId} onChange={e => setSelectedCustomerId(e.target.value)} className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-primary rounded-xl px-4 text-[10px] font-black uppercase">
                       <option value="">Consumidor Final</option>
-                      {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      {/* Adicionado tipagem explícita para evitar erro de unknown */}
+                      {customers.map((c: Customer) => <option key={c.id} value={c.id}>{c.name}</option>)}
                    </select>
                 </div>
              </div>
+
+             {isBirthdayMonth && (
+               <div className="bg-amber-500/10 border-2 border-dashed border-amber-500/20 p-4 rounded-2xl flex items-center gap-4 animate-in slide-in-from-top-2 duration-500 mt-4">
+                 <div className="size-12 bg-amber-500 text-white rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/20 shrink-0">
+                   <span className="material-symbols-outlined text-2xl animate-bounce">cake</span>
+                 </div>
+                 <div>
+                   <h4 className="text-[10px] font-black text-amber-800 dark:text-amber-400 uppercase tracking-widest">Aniversariante do Mês!</h4>
+                   <p className="text-[9px] font-bold text-amber-700/70 dark:text-amber-400/70 uppercase leading-tight mt-0.5">
+                     O cliente é aniversariante do mês. <br/>
+                     Não esqueça de parabenizá-lo!
+                   </p>
+                 </div>
+               </div>
+             )}
           </div>
           <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
              {cart.length === 0 ? (
@@ -601,7 +650,10 @@ const PDV: React.FC = () => {
           </div>
           <div className="p-8 border-t-2 border-slate-100 dark:border-slate-800 space-y-4 bg-white dark:bg-slate-900 shadow-[0_-20px_50px_rgba(0,0,0,0.05)] shrink-0">
              <div className="space-y-2">
-                <div className="flex justify-between text-slate-500 items-center"><span className="text-[10px] font-black uppercase tracking-widest">Subtotal Bruto</span><span className="text-sm font-black tabular-nums">R$ {subtotal.toLocaleString('pt-BR')}</span></div>
+                <div className="flex justify-between text-slate-500 items-center h-10 px-2">
+                   <span className="text-[10px] font-black uppercase tracking-widest">Subtotal Bruto</span>
+                   <span className="text-sm font-black tabular-nums">R$ {subtotal.toLocaleString('pt-BR')}</span>
+                </div>
                 
                 <div className="flex justify-between items-center group">
                   <div className="flex items-center gap-2">
@@ -667,7 +719,8 @@ const PDV: React.FC = () => {
                     <input autoFocus value={priceInquirySearch} onChange={e => setPriceInquirySearch(e.target.value)} placeholder="NOME DO PRODUTO OU SKU..." className="w-full h-20 bg-slate-50 dark:bg-slate-800 border-none rounded-[1.5rem] pl-20 pr-6 text-2xl font-black text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-primary/10 transition-all uppercase" />
                  </div>
                  <div className="space-y-4">
-                    {inquiryResults.map(p => (
+                    {/* Adicionado tipagem explícita para evitar erro de unknown */}
+                    {inquiryResults.map((p: Product) => (
                        <div key={p.id} className="flex items-center gap-6 p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 animate-in slide-in-from-bottom-2">
                           <img src={p.image} className="size-20 rounded-2xl object-cover" />
                           <div className="flex-1">
@@ -951,7 +1004,7 @@ const PDV: React.FC = () => {
                              <div className="flex items-center gap-4">
                                 <div className="size-10 bg-slate-50 dark:bg-slate-700 rounded-xl flex items-center justify-center text-slate-400"><span className="material-symbols-outlined">{p.method === 'Dinheiro' ? 'payments' : 'qr_code_2'}</span></div>
                                 <div>
-                                   <p className="text-xs font-black uppercase text-slate-800 dark:text-white leading-none">{p.method} {p.details?.installments > 1 ? `(${p.details.installments}x)` : ''}</p>
+                                   <p className="text-xs font-black uppercase text-slate-800 dark:text-white leading-none">{p.method} {(p.details?.installments ?? 0) > 1 ? `(${p.details?.installments}x)` : ''}</p>
                                    <p className="text-[9px] text-slate-400 font-bold mt-1 uppercase">{p.details?.operatorName} {p.details?.brandName} {p.details?.transactionSku ? `• NSU: ${p.details.transactionSku}` : ''}</p>
                                 </div>
                              </div>

@@ -151,7 +151,7 @@ const Customers: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <FormInput label="Nome Completo / Razão Social" required value={customerForm.name} onChange={v => setCustomerForm({...customerForm, name: v})} />
-                  <FormInput label="CPF ou CNPJ" value={customerForm.cpfCnpj} onChange={v => setCustomerForm({...customerForm, cpfCnpj: v})} />
+                  <FormInput label="CPF ou CNPJ" value={customerForm.cpfCnpj || ''} onChange={v => setCustomerForm({...customerForm, cpfCnpj: v})} />
                   <FormInput label="WhatsApp / Telefone" required value={customerForm.phone} onChange={v => setCustomerForm({...customerForm, phone: v})} placeholder="(00) 00000-0000" />
                   <FormInput label="E-mail" type="email" value={customerForm.email} onChange={v => setCustomerForm({...customerForm, email: v})} />
                   <FormInput label="Data de Nascimento" type="date" value={customerForm.birthDate} onChange={v => setCustomerForm({...customerForm, birthDate: v})} />
@@ -165,13 +165,13 @@ const Customers: React.FC = () => {
                    <h4 className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Endereço de Entrega / Cobrança</h4>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-6 gap-6">
-                  <div className="md:col-span-2"><FormInput label="CEP" value={customerForm.zipCode} onChange={v => setCustomerForm({...customerForm, zipCode: v})} /></div>
-                  <div className="md:col-span-3"><FormInput label="Logradouro" value={customerForm.address} onChange={v => setCustomerForm({...customerForm, address: v})} /></div>
-                  <div className="md:col-span-1"><FormInput label="Nº" value={customerForm.number} onChange={v => setCustomerForm({...customerForm, number: v})} /></div>
-                  <div className="md:col-span-2"><FormInput label="Complemento" value={customerForm.complement} onChange={v => setCustomerForm({...customerForm, complement: v})} /></div>
-                  <div className="md:col-span-2"><FormInput label="Bairro" value={customerForm.neighborhood} onChange={v => setCustomerForm({...customerForm, neighborhood: v})} /></div>
-                  <div className="md:col-span-1"><FormInput label="Cidade" value={customerForm.city} onChange={v => setCustomerForm({...customerForm, city: v})} /></div>
-                  <div className="md:col-span-1"><FormInput label="Estado (UF)" value={customerForm.state} onChange={v => setCustomerForm({...customerForm, state: v})} /></div>
+                  <div className="md:col-span-2"><FormInput label="CEP" value={customerForm.zipCode || ''} onChange={v => setCustomerForm({...customerForm, zipCode: v})} /></div>
+                  <div className="md:col-span-3"><FormInput label="Logradouro" value={customerForm.address || ''} onChange={v => setCustomerForm({...customerForm, address: v})} /></div>
+                  <div className="md:col-span-1"><FormInput label="Nº" value={customerForm.number || ''} onChange={v => setCustomerForm({...customerForm, number: v})} /></div>
+                  <div className="md:col-span-2"><FormInput label="Complemento" value={customerForm.complement || ''} onChange={v => setCustomerForm({...customerForm, complement: v})} /></div>
+                  <div className="md:col-span-2"><FormInput label="Bairro" value={customerForm.neighborhood || ''} onChange={v => setCustomerForm({...customerForm, neighborhood: v})} /></div>
+                  <div className="md:col-span-1"><FormInput label="Cidade" value={customerForm.city || ''} onChange={v => setCustomerForm({...customerForm, city: v})} /></div>
+                  <div className="md:col-span-1"><FormInput label="Estado (UF)" value={customerForm.state || ''} onChange={v => setCustomerForm({...customerForm, state: v})} /></div>
                 </div>
               </div>
 

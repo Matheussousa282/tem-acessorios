@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { useApp, CashEntry } from '../AppContext';
+import { useApp } from '../AppContext';
 import { CashSession, CashSessionStatus, UserRole, TransactionStatus } from '../types';
 import { useNavigate } from 'react-router-dom';
 
@@ -517,10 +517,21 @@ const CashMovement: React.FC = () => {
                     <p className="text-[9px] font-black text-emerald-600 uppercase mb-2">Fundo Sugerido (Saldo Acumulado)</p>
                     <p className="text-sm font-black text-slate-900 dark:text-white">R$ {totalCumulativeBalance.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
                  </div>
-                 <div className="space-y-1">
+                  <div className="space-y-1">
                     <label className="text-[10px] font-black text-slate-400 uppercase px-2">Confirmar Fundo em Gaveta (R$)</label>
-                    <input autoFocus type="number" step="0.01" required value={openingValue} onChange={e => setOpeningValue(parseFloat(e.target.value) || 0)} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-6 text-2xl font-black text-emerald-600 text-center" placeholder="0,00" />
-                 </div>
+                    <input 
+                      autoFocus={isAdmin}
+                      type="number" 
+                      step="0.01" 
+                      required 
+                      readOnly={!isAdmin}
+                      value={openingValue} 
+                      onChange={e => setOpeningValue(parseFloat(e.target.value) || 0)} 
+                      className={`w-full h-14 border-none rounded-xl px-6 text-2xl font-black text-emerald-600 text-center ${!isAdmin ? 'bg-slate-100 dark:bg-slate-800/50 cursor-not-allowed opacity-70' : 'bg-slate-50 dark:bg-slate-800'}`} 
+                      placeholder="0,00" 
+                    />
+                    {!isAdmin && <p className="text-[9px] text-slate-400 text-center mt-2 uppercase font-bold">O valor de abertura é definido pelo saldo de fechamento anterior.</p>}
+                  </div>
                  <button type="submit" disabled={availableCashiers.length === 0} className="w-full h-16 bg-primary text-white rounded-xl font-black text-[11px] uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 transition-all">INICIAR TURNO AGORA</button>
               </form>
            </div>

@@ -1,15 +1,98 @@
 
-import React, { useState, useMemo, useRef } from 'react';
+// Componente de Inventário com correções de tipagem explícita para evitar erros de 'unknown'.
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useApp, INITIAL_PERMS } from '../AppContext';
-import { Product, UserRole } from '../types';
+import { Product, TransactionStatus } from '../types';
 
 const Inventory: React.FC = () => {
-  const { products, addProduct, deleteProduct, currentUser, rolePermissions, refreshData } = useApp();
+  const { products, addProduct, currentUser, rolePermissions, bulkUpdateStock, addTransaction, establishments, transactions } = useApp();
   const [filter, setFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('Todas');
   const [showProductModal, setShowProductModal] = useState(false);
+  const [showMovementModal, setShowMovementModal] = useState(false);
+  const [movementItems, setMovementItems] = useState<{ product: Product; quantityToAdd: number }[]>([]);
+  const [movementSearch, setMovementSearch] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [historyStartDate, setHistoryStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [historyEndDate, setHistoryEndDate] = useState(new Date().toISOString().split('T')[0]);
+
+  const currentStore = establishments.find(e => e.id === currentUser?.storeId);
+
+  const stockHistory = useMemo(() => {
+    return transactions.filter(t => 
+      t.category === 'Compra de Mercadoria' && 
+      t.date >= historyStartDate && 
+      t.date <= historyEndDate &&
+      (currentUser?.role === 'ADMINISTRADOR' || t.store === currentStore?.name)
+    ).sort((a, b) => b.date.localeCompare(a.date));
+  }, [transactions, historyStartDate, historyEndDate, currentStore, currentUser]);
+
+  // Lógica de Bipagem Automática para Movimentação de Estoque
+  useEffect(() => {
+    if (!movementSearch || movementSearch.length < 3) return;
+
+    const exactMatch = products.find(p => p.barcode === movementSearch || p.sku === movementSearch);
+    if (exactMatch) {
+      handleAddToMovement(exactMatch);
+      setMovementSearch('');
+    }
+  }, [movementSearch, products]);
+
+  const handleAddToMovement = (product: Product) => {
+    if (product.isService) return;
+    setMovementItems(prev => {
+      const existing = prev.find(item => item.product.id === product.id);
+      if (existing) {
+        return prev.map(item => 
+          item.product.id === product.id 
+            ? { ...item, quantityToAdd: item.quantityToAdd + 1 } 
+            : item
+        );
+      }
+      return [...prev, { product, quantityToAdd: 1 }];
+    });
+  };
+
+  const handleSaveMovement = async () => {
+    if (movementItems.length === 0) return;
+    setIsSaving(true);
+    try {
+      const adjustments: Record<string, number> = {};
+      let totalCost = 0;
+      
+      movementItems.forEach(item => {
+        adjustments[item.product.id] = item.product.stock + item.quantityToAdd;
+        totalCost += (item.product.costPrice * item.quantityToAdd);
+      });
+
+      // Registrar como Despesa para atualizar a DRE
+      const transactionId = `STOCK-IN-${Date.now()}`;
+      await addTransaction({
+        id: transactionId,
+        date: new Date().toISOString().split('T')[0],
+        description: `Entrada de Estoque - ${movementItems.length} itens`,
+        store: currentStore?.name || 'Matriz',
+        category: 'Compra de Mercadoria',
+        status: TransactionStatus.PAID,
+        value: totalCost,
+        type: 'EXPENSE',
+        method: 'Saldo em Conta',
+        items: movementItems.map(item => ({ ...item.product, quantity: item.quantityToAdd }))
+      });
+
+      await bulkUpdateStock(adjustments);
+      setShowMovementModal(false);
+      setMovementItems([]);
+      alert("Estoque atualizado e registrado na DRE com sucesso!");
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao atualizar estoque.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   // Verificação de permissão de edição
   const canEdit = useMemo(() => {
@@ -102,15 +185,32 @@ const Inventory: React.FC = () => {
     <div className="p-4 sm:p-8 space-y-6 animate-in fade-in duration-500 pb-24">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-tight">Estoque & Produtos</h2>
-        {canEdit && (
-          <button onClick={() => { setEditingId(null); setForm(initialForm); setShowProductModal(true); }} className="w-full sm:w-auto bg-primary text-white px-8 py-4 rounded-2xl font-black text-xs uppercase shadow-xl hover:scale-105 transition-all">Novo Produto</button>
-        )}
+        <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+          <button 
+            onClick={() => setShowHistoryModal(true)} 
+            className="w-full sm:w-auto bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-6 py-4 rounded-2xl font-black text-xs uppercase shadow-sm hover:bg-slate-200 transition-all flex items-center justify-center gap-2"
+          >
+            <span className="material-symbols-outlined">history</span>
+            Histórico
+          </button>
+          <button 
+            onClick={() => { setMovementItems([]); setShowMovementModal(true); }} 
+            className="w-full sm:w-auto bg-slate-800 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase shadow-xl hover:bg-slate-700 transition-all flex items-center justify-center gap-2"
+          >
+            <span className="material-symbols-outlined">inventory</span>
+            Movimentar Estoque
+          </button>
+          {canEdit && (
+            <button onClick={() => { setEditingId(null); setForm(initialForm); setShowProductModal(true); }} className="w-full sm:w-auto bg-primary text-white px-8 py-4 rounded-2xl font-black text-xs uppercase shadow-xl hover:scale-105 transition-all">Novo Produto</button>
+          )}
+        </div>
       </div>
 
       <div className="bg-white dark:bg-slate-900/50 p-4 sm:p-6 rounded-3xl sm:rounded-[2rem] border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row gap-4">
         <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="Pesquisar..." className="flex-1 h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-sm font-bold uppercase" />
         <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-6 text-[10px] font-black uppercase">
-          {categories.map(c => <option key={c} value={c}>{c}</option>)}
+          {/* Adicionado tipagem explícita para evitar erro de unknown */}
+          {categories.map((c: string) => <option key={c} value={c}>{c}</option>)}
         </select>
       </div>
 
@@ -126,7 +226,8 @@ const Inventory: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {filteredProducts.map(p => (
+              {/* Adicionado tipagem explícita para evitar erro de unknown */}
+              {filteredProducts.map((p: Product) => (
                 <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/20">
                   <td className="px-4 sm:px-8 py-4 sm:py-6">
                     <div className="flex items-center gap-3 sm:gap-4">
@@ -153,6 +254,128 @@ const Inventory: React.FC = () => {
         </div>
       </div>
 
+      {showMovementModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 flex flex-col max-h-[90vh]">
+            <div className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-4">
+                <div className="size-12 bg-white/10 rounded-2xl flex items-center justify-center">
+                  <span className="material-symbols-outlined text-3xl">move_to_inbox</span>
+                </div>
+                <div>
+                  <h3 className="text-2xl font-black uppercase tracking-tight">Entrada de Mercadoria</h3>
+                  <p className="text-[10px] font-bold text-white/50 uppercase">Bipe ou pesquise para adicionar itens</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={() => window.print()} 
+                  className="size-12 bg-white/10 rounded-full flex items-center justify-center hover:bg-white/20 transition-all"
+                  title="Imprimir Lista de Entrada"
+                >
+                  <span className="material-symbols-outlined">print</span>
+                </button>
+                <button onClick={() => setShowMovementModal(false)} className="size-12 bg-white/10 rounded-full flex items-center justify-center hover:bg-white/20 transition-all"><span className="material-symbols-outlined">close</span></button>
+              </div>
+            </div>
+
+            <div className="p-8 space-y-6 flex-1 overflow-hidden flex flex-col">
+              <div className="relative">
+                <span className="absolute left-5 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400">barcode_scanner</span>
+                <input 
+                  autoFocus
+                  value={movementSearch}
+                  onChange={e => setMovementSearch(e.target.value)}
+                  placeholder="Bipe o código ou digite o nome do produto..."
+                  className="w-full h-16 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl pl-14 pr-6 text-sm font-bold uppercase outline-none focus:ring-4 focus:ring-primary/10"
+                />
+                
+                {movementSearch && movementSearch.length >= 2 && (
+                  <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-700 z-50 max-h-60 overflow-y-auto custom-scrollbar">
+                    {products
+                      .filter(p => !p.isService && (p.name.toLowerCase().includes(movementSearch.toLowerCase()) || p.sku.toLowerCase().includes(movementSearch.toLowerCase()) || p.barcode?.includes(movementSearch)))
+                      .map(p => (
+                        <button 
+                          key={p.id}
+                          onClick={() => { handleAddToMovement(p); setMovementSearch(''); }}
+                          className="w-full p-4 flex items-center gap-4 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all text-left border-b border-slate-100 dark:border-slate-700 last:border-none"
+                        >
+                          <img src={p.image} className="size-10 rounded-lg object-cover" />
+                          <div className="flex-1">
+                            <p className="text-xs font-black uppercase text-slate-900 dark:text-white">{p.name}</p>
+                            <p className="text-[9px] font-bold text-slate-400 uppercase">Estoque Atual: {p.stock} {p.unit}</p>
+                          </div>
+                          <span className="material-symbols-outlined text-primary">add_circle</span>
+                        </button>
+                      ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-2">
+                {movementItems.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center opacity-20 py-20">
+                    <span className="material-symbols-outlined text-8xl">inventory_2</span>
+                    <p className="text-xs font-black uppercase mt-4">Nenhum item na lista de entrada</p>
+                  </div>
+                ) : (
+                  movementItems.map((item, idx) => (
+                    <div key={idx} className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-3xl border border-slate-100 dark:border-slate-800 flex items-center gap-4 animate-in slide-in-from-right-4">
+                      <img src={item.product.image} className="size-12 rounded-xl object-cover" />
+                      <div className="flex-1">
+                        <p className="text-xs font-black uppercase text-slate-900 dark:text-white">{item.product.name}</p>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase">Atual: {item.product.stock} {item.product.unit}</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-1">
+                          <button 
+                            onClick={() => setMovementItems(prev => prev.map((it, i) => i === idx ? { ...it, quantityToAdd: Math.max(1, it.quantityToAdd - 1) } : it))}
+                            className="size-8 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-all"
+                          >
+                            <span className="material-symbols-outlined text-sm">remove</span>
+                          </button>
+                          <input 
+                            type="number"
+                            value={item.quantityToAdd}
+                            onChange={e => {
+                              const val = parseInt(e.target.value) || 0;
+                              setMovementItems(prev => prev.map((it, i) => i === idx ? { ...it, quantityToAdd: val } : it));
+                            }}
+                            className="w-12 text-center bg-transparent border-none text-sm font-black text-primary outline-none"
+                          />
+                          <button 
+                            onClick={() => setMovementItems(prev => prev.map((it, i) => i === idx ? { ...it, quantityToAdd: it.quantityToAdd + 1 } : it))}
+                            className="size-8 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-all"
+                          >
+                            <span className="material-symbols-outlined text-sm">add</span>
+                          </button>
+                        </div>
+                        <button 
+                          onClick={() => setMovementItems(prev => prev.filter((_, i) => i !== idx))}
+                          className="size-10 bg-rose-500/10 text-rose-500 rounded-xl hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center"
+                        >
+                          <span className="material-symbols-outlined">delete</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="pt-6 border-t border-slate-100 dark:border-slate-800">
+                <button 
+                  disabled={movementItems.length === 0 || isSaving}
+                  onClick={handleSaveMovement}
+                  className="w-full h-16 bg-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:pointer-events-none"
+                >
+                  {isSaving ? <span className="material-symbols-outlined animate-spin">sync</span> : <span className="material-symbols-outlined">task_alt</span>}
+                  {isSaving ? 'PROCESSANDO...' : 'CONFIRMAR ENTRADA DE ESTOQUE'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {showProductModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 sm:bg-black/90 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in">
           <div className="bg-[#101822] w-full max-w-5xl h-full sm:h-auto sm:max-h-[95vh] sm:rounded-[3rem] shadow-2xl overflow-hidden border-none sm:border border-slate-800 animate-in zoom-in-95 flex flex-col">
@@ -269,11 +492,198 @@ const Inventory: React.FC = () => {
         </div>
       )}
       
+      {showHistoryModal && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-5xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 flex flex-col max-h-[90vh]">
+            <div className="p-8 bg-slate-800 text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-4">
+                <div className="size-12 bg-white/10 rounded-2xl flex items-center justify-center">
+                  <span className="material-symbols-outlined text-3xl">history</span>
+                </div>
+                <div>
+                  <h3 className="text-2xl font-black uppercase tracking-tight">Histórico de Entradas</h3>
+                  <p className="text-[10px] font-bold text-white/50 uppercase">Controle de reposição por período</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={() => window.print()} 
+                  className="size-12 bg-white/10 rounded-full flex items-center justify-center hover:bg-white/20 transition-all"
+                  title="Imprimir Relatório"
+                >
+                  <span className="material-symbols-outlined">print</span>
+                </button>
+                <button onClick={() => setShowHistoryModal(false)} className="size-12 bg-white/10 rounded-full flex items-center justify-center hover:bg-white/20 transition-all"><span className="material-symbols-outlined">close</span></button>
+              </div>
+            </div>
+
+            <div className="p-6 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row gap-4 items-end shrink-0">
+              <div className="flex-1 space-y-1">
+                <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Data Inicial</label>
+                <input 
+                  type="date" 
+                  value={historyStartDate} 
+                  onChange={e => setHistoryStartDate(e.target.value)}
+                  className="w-full h-12 bg-white dark:bg-slate-900 border-none rounded-xl px-4 text-xs font-bold uppercase"
+                />
+              </div>
+              <div className="flex-1 space-y-1">
+                <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Data Final</label>
+                <input 
+                  type="date" 
+                  value={historyEndDate} 
+                  onChange={e => setHistoryEndDate(e.target.value)}
+                  className="w-full h-12 bg-white dark:bg-slate-900 border-none rounded-xl px-4 text-xs font-bold uppercase"
+                />
+              </div>
+              <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center min-w-[150px]">
+                <p className="text-[8px] font-black text-slate-400 uppercase">Total no Período</p>
+                <p className="text-lg font-black text-primary">R$ {stockHistory.reduce((acc, t) => acc + t.value, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+              {stockHistory.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center opacity-20 py-20">
+                  <span className="material-symbols-outlined text-8xl">search_off</span>
+                  <p className="text-xs font-black uppercase mt-4">Nenhuma entrada encontrada no período</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {stockHistory.map((t) => (
+                    <div key={t.id} className="bg-white dark:bg-slate-800 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-700 shadow-sm">
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <p className="text-[10px] font-black text-primary uppercase tracking-widest">{new Date(t.date).toLocaleDateString('pt-BR')}</p>
+                          <h4 className="text-sm font-black uppercase text-slate-900 dark:text-white mt-1">{t.description}</h4>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-black text-slate-900 dark:text-white">R$ {t.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                          <p className="text-[9px] font-bold text-slate-400 uppercase">{t.store}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-slate-50 dark:bg-slate-900/50 rounded-2xl p-4">
+                        <p className="text-[9px] font-black text-slate-400 uppercase mb-3 border-b border-slate-200 dark:border-slate-700 pb-2">Itens da Reposição</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {t.items?.map((item, idx) => (
+                            <div key={idx} className="flex items-center gap-3">
+                              <div className="size-8 bg-slate-200 dark:bg-slate-700 rounded-lg overflow-hidden shrink-0">
+                                <img src={item.image} className="size-full object-cover" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[10px] font-black uppercase truncate">{item.name}</p>
+                                <p className="text-[9px] font-bold text-slate-400 uppercase">{item.quantity} {item.unit} x R$ {item.costPrice.toLocaleString('pt-BR')}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Área de Impressão do Histórico de Entradas */}
+      <div id="history-print-area" className="hidden print:block p-8 text-black bg-white">
+        <div className="border-b-2 border-black pb-4 mb-6 flex justify-between items-end">
+          <div>
+            <h1 className="text-2xl font-bold uppercase">Relatório de Entradas de Estoque</h1>
+            <p className="text-sm">Período: {new Date(historyStartDate).toLocaleDateString('pt-BR')} até {new Date(historyEndDate).toLocaleDateString('pt-BR')}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-sm font-bold uppercase">Total Geral: R$ {stockHistory.reduce((acc, t) => acc + t.value, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+          </div>
+        </div>
+        
+        {stockHistory.map((t) => (
+          <div key={t.id} className="mb-8 border border-gray-300 p-4 rounded">
+            <div className="flex justify-between mb-2 border-b border-gray-200 pb-2">
+              <span className="font-bold uppercase text-xs">Data: {new Date(t.date).toLocaleDateString('pt-BR')}</span>
+              <span className="font-bold uppercase text-xs">Valor: R$ {t.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+            </div>
+            <table className="w-full text-[10px]">
+              <thead>
+                <tr className="text-left border-b border-gray-100">
+                  <th className="py-1 uppercase">Produto</th>
+                  <th className="py-1 uppercase text-center">Qtd</th>
+                  <th className="py-1 uppercase text-right">Custo Unit.</th>
+                  <th className="py-1 uppercase text-right">Subtotal</th>
+                </tr>
+              </thead>
+              <tbody>
+                {t.items?.map((item, idx) => (
+                  <tr key={idx}>
+                    <td className="py-1 uppercase">{item.name}</td>
+                    <td className="py-1 text-center">{item.quantity} {item.unit}</td>
+                    <td className="py-1 text-right">R$ {item.costPrice.toLocaleString('pt-BR')}</td>
+                    <td className="py-1 text-right">R$ {(item.costPrice * item.quantity).toLocaleString('pt-BR')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ))}
+      </div>
+
+      {/* Área de Impressão da Entrada de Estoque */}
+      <div id="stock-print-area" className="hidden print:block p-8 text-black bg-white">
+        <div className="border-b-2 border-black pb-4 mb-6">
+          <h1 className="text-2xl font-bold uppercase">Relatório de Entrada de Estoque</h1>
+          <p className="text-sm">Data: {new Date().toLocaleDateString('pt-BR')} - {new Date().toLocaleTimeString('pt-BR')}</p>
+          <p className="text-sm">Unidade: {currentStore?.name || 'Matriz'}</p>
+        </div>
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="border-b border-black">
+              <th className="py-2 text-xs uppercase">Produto</th>
+              <th className="py-2 text-xs uppercase text-center">Qtd. Entrada</th>
+              <th className="py-2 text-xs uppercase text-right">Custo Unit.</th>
+              <th className="py-2 text-xs uppercase text-right">Subtotal</th>
+            </tr>
+          </thead>
+          <tbody>
+            {movementItems.map((item, i) => (
+              <tr key={i} className="border-b border-gray-200">
+                <td className="py-2 text-xs uppercase">{item.product.name}</td>
+                <td className="py-2 text-xs text-center">{item.quantityToAdd} {item.product.unit}</td>
+                <td className="py-2 text-xs text-right">R$ {item.product.costPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                <td className="py-2 text-xs text-right">R$ {(item.product.costPrice * item.quantityToAdd).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="font-bold">
+              <td colSpan={3} className="py-4 text-right uppercase">Total da Entrada:</td>
+              <td className="py-4 text-right">R$ {movementItems.reduce((acc, item) => acc + (item.product.costPrice * item.quantityToAdd), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+            </tr>
+          </tfoot>
+        </table>
+        <div className="mt-20 flex justify-around">
+          <div className="text-center border-t border-black pt-2 w-64"><p className="text-[10px] uppercase font-bold">Assinatura Responsável</p></div>
+          <div className="text-center border-t border-black pt-2 w-64"><p className="text-[10px] uppercase font-bold">Conferência Estoque</p></div>
+        </div>
+      </div>
+
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 20px; }
         @media (max-width: 640px) {
            .custom-scrollbar::-webkit-scrollbar { width: 0px; }
+        }
+        @media print {
+          body * { visibility: hidden !important; }
+          #root { display: none !important; }
+          #stock-print-area, #stock-print-area *, #history-print-area, #history-print-area * { visibility: visible !important; display: block !important; }
+          #stock-print-area, #history-print-area { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; }
+          
+          /* Esconder o que não for o modal aberto no momento da impressão */
+          ${showHistoryModal ? '#stock-print-area { display: none !important; }' : ''}
+          ${showMovementModal ? '#history-print-area { display: none !important; }' : ''}
         }
       `}</style>
     </div>
