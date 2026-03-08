@@ -5,7 +5,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../AppContext';
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser, logout, rolePermissions } = useApp();
+  const { currentUser, logout, rolePermissions, systemConfig } = useApp();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -95,10 +95,14 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     <div className="flex h-screen bg-slate-50 dark:bg-[#0a0f16]">
       <aside className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-[#101822] text-slate-400 transition-all flex flex-col border-r border-slate-800`}>
         <div className="p-6 flex items-center gap-3">
-          <div className="size-8 bg-primary rounded flex items-center justify-center text-white shrink-0">
-            <span className="material-symbols-outlined text-xl">storefront</span>
+          <div className="size-8 bg-primary rounded flex items-center justify-center text-white shrink-0 overflow-hidden">
+            {systemConfig.logoUrl ? (
+              <img src={systemConfig.logoUrl} className="size-full object-cover" referrerPolicy="no-referrer" />
+            ) : (
+              <span className="material-symbols-outlined text-xl">storefront</span>
+            )}
           </div>
-          {sidebarOpen && <span className="font-bold text-sm uppercase tracking-widest text-white">Retail Pro</span>}
+          {sidebarOpen && <span className="font-bold text-sm uppercase tracking-widest text-white truncate">{systemConfig.companyName || 'Retail Pro'}</span>}
         </div>
 
         <nav className="flex-1 overflow-y-auto px-4 py-2 space-y-1 custom-scrollbar">

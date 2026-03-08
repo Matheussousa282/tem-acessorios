@@ -5,7 +5,7 @@ import { useApp, INITIAL_PERMS } from '../AppContext';
 
 const Settings: React.FC = () => {
   const { 
-    currentUser, systemConfig, updateConfig, 
+    currentUser, systemConfig, updateConfig, setSystemConfig,
     users, addUser, deleteUser, 
     establishments, addEstablishment, deleteEstablishment, 
     rolePermissions, updateRolePermissions, refreshData 
@@ -58,6 +58,13 @@ const Settings: React.FC = () => {
   const filteredUsers = users.filter(u => isAdmin || u.storeId === currentUser?.storeId);
   const filteredStores = establishments.filter(e => isAdmin || e.id === currentUser?.storeId);
 
+  const handleIdentityChange = (updates: any) => {
+    const newConfig = { ...localConfig, ...updates };
+    setLocalConfig(newConfig);
+    // Atualiza o estado global imediatamente para refletir no sidebar
+    setSystemConfig(newConfig);
+  };
+
   const handleSaveConfig = async () => {
     setIsSaving(true);
     try {
@@ -91,6 +98,7 @@ const Settings: React.FC = () => {
       id: storeForm.id || `est-${Date.now()}`
     };
     await addEstablishment(newStore);
+    setStoreForm({ name: '', cnpj: '', location: '', hasStockAccess: true, active: true });
     setShowStoreModal(false);
   };
 
@@ -151,7 +159,12 @@ const Settings: React.FC = () => {
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Nome Comercial</label>
-                           <input type="text" value={localConfig.companyName} onChange={e => setLocalConfig({...localConfig, companyName: e.target.value})} className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 font-black text-sm border-none outline-none focus:ring-2 focus:ring-primary uppercase" />
+                           <input 
+                             type="text" 
+                             value={localConfig.companyName} 
+                             onChange={e => handleIdentityChange({ companyName: e.target.value })} 
+                             className="w-full h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl px-6 font-black text-sm border-none outline-none focus:ring-2 focus:ring-primary uppercase" 
+                           />
                         </div>
                         <div className="space-y-1">
                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Prazo para Troca (Dias)</label>
@@ -163,7 +176,7 @@ const Settings: React.FC = () => {
                          const file = e.target.files?.[0];
                          if(file) {
                             const reader = new FileReader();
-                            reader.onloadend = () => setLocalConfig({...localConfig, logoUrl: reader.result as string});
+                            reader.onloadend = () => handleIdentityChange({ logoUrl: reader.result as string });
                             reader.readAsDataURL(file);
                          }
                       }} />
@@ -207,7 +220,7 @@ const Settings: React.FC = () => {
            <div className="space-y-6">
               <div className="flex justify-between items-center px-4">
                  <h3 className="text-xl font-black uppercase tracking-tight">Unidades do Grupo ({filteredStores.length})</h3>
-                 <button onClick={() => setShowStoreModal(true)} className="px-8 py-3 bg-primary text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg">Nova Loja</button>
+                 <button onClick={() => { setStoreForm({ name: '', cnpj: '', location: '', hasStockAccess: true, active: true }); setShowStoreModal(true); }} className="px-8 py-3 bg-primary text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg">Novo Cadastro</button>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                  {filteredStores.map(e => (

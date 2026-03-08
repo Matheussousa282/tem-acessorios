@@ -15,6 +15,7 @@ interface AppContextType {
   cardBrands: CardBrand[];
   serviceOrders: ServiceOrder[];
   systemConfig: any;
+  setSystemConfig: (config: any) => void;
   currentUser: User | null;
   rolePermissions: Record<string, RolePermissions>;
   loading: boolean;
@@ -299,7 +300,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   return (
     <AppContext.Provider value={{
-      products, customers, users, establishments, transactions, cashSessions, cashEntries, cardOperators, cardBrands, serviceOrders, systemConfig, currentUser, rolePermissions, loading, dbConnected,
+      products, customers, users, establishments, transactions, cashSessions, cashEntries, cardOperators, cardBrands, serviceOrders, systemConfig, setSystemConfig, currentUser, rolePermissions, loading, dbConnected,
       refreshData, login, logout, addProduct, deleteProduct, addCustomer, addUser, deleteUser, addEstablishment, deleteEstablishment, addTransaction, saveCashSession, addCashEntry,
       saveCardOperator, deleteCardOperator, saveCardBrand, deleteCardBrand, updateServiceOrder, addServiceOrder, updateConfig, processSale, bulkUpdateStock, updateRolePermissions
     }}>
