@@ -1,7 +1,7 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../AppContext';
-import { CashSession, CashSessionStatus, UserRole, TransactionStatus } from '../types';
+// Corrected CashEntry import to come from types.ts
+import { CashSession, CashSessionStatus, UserRole, TransactionStatus, CashEntry } from '../types';
 import { useNavigate } from 'react-router-dom';
 
 const CashMovement: React.FC = () => {
@@ -151,26 +151,72 @@ const CashMovement: React.FC = () => {
     });
 
     const sessionManualEntries = cashEntries.filter(e => e.sessionId === viewingSession.id);
+
+    // ─── RESUMO POR FORMA DE PAGAMENTO ───────────────────────────────────────
+    // Para vendas múltiplas (t.payments[]), desdobra cada forma individualmente.
+    // Para vendas simples usa t.method diretamente.
     const resumoCartoes: Record<string, { count: number, value: number }> = {};
+
+    const normalizeMethod = (raw: string): string => {
+      const u = (raw || 'DINHEIRO').trim().toUpperCase();
+      if (u === 'DINHEIRO' || u === 'ESPÉCIE' || u === 'ESPECIE') return 'DINHEIRO';
+      if (u === 'PIX' || u.startsWith('PIX')) return u;
+      if (u.includes('CRÉDITO') || u.includes('CREDITO')) return u;
+      if (u.includes('DÉBITO') || u.includes('DEBITO')) return u;
+      return u;
+    };
+
     sessionVendas.forEach(v => {
-       if (['Credito', 'Debito', 'Pix', 'Pix Maquineta'].some(m => v.method?.includes(m))) {
-          const methodKey = v.method?.includes('Pix') ? 'PIX' : (v.method || 'CARTÃO').toUpperCase();
-          if (!resumoCartoes[methodKey]) resumoCartoes[methodKey] = { count: 0, value: 0 };
-          resumoCartoes[methodKey].count += 1;
-          resumoCartoes[methodKey].value += v.value;
-       }
+      const paymentsArr: Array<{ method: string; value: number }> =
+        Array.isArray((v as any).payments) && (v as any).payments.length > 0
+          ? (v as any).payments
+          : [{ method: v.method || 'DINHEIRO', value: v.value }];
+
+      paymentsArr.forEach(p => {
+        const key = normalizeMethod(p.method);
+        if (!resumoCartoes[key]) resumoCartoes[key] = { count: 0, value: 0 };
+        resumoCartoes[key].count += 1;
+        resumoCartoes[key].value += Number(p.value) || 0;
+      });
     });
+    // ─────────────────────────────────────────────────────────────────────────
 
     const totalVendasBruto = sessionVendas.reduce((acc, t) => acc + t.value, 0);
-    const vendasEmDinheiro = sessionVendas.filter(v => v.method?.toUpperCase() === 'DINHEIRO').reduce((acc, v) => acc + v.value, 0);
+
+    // Vendas em dinheiro: soma parcelas de pagamento em dinheiro de cada venda
+    const vendasEmDinheiro = sessionVendas.reduce((acc, v) => {
+      const paymentsArr: Array<{ method: string; value: number }> =
+        Array.isArray((v as any).payments) && (v as any).payments.length > 0
+          ? (v as any).payments
+          : [{ method: v.method || 'DINHEIRO', value: v.value }];
+      return acc + paymentsArr
+        .filter(p => normalizeMethod(p.method) === 'DINHEIRO')
+        .reduce((s, p) => s + (Number(p.value) || 0), 0);
+    }, 0);
+
     const entradasManuaisDinheiro = sessionManualEntries.filter(e => e.type === 'INCOME').reduce((acc, e) => acc + e.value, 0);
     const saídasDinheiro = sessionManualEntries.filter(e => e.type === 'EXPENSE').reduce((acc, e) => acc + e.value, 0);
     const saldoAnterior = viewingSession.openingValue || 0;
     const saldoFinalCaixa = (saldoAnterior + vendasEmDinheiro + entradasManuaisDinheiro) - saídasDinheiro;
 
     const allRecords = [
-      ...sessionVendas.map(v => ({ id: v.id, type: 'INCOME', description: `Venda PDV - ${v.id.slice(-5)}`, value: v.value, timestamp: v.date, method: v.method, cat: 'VENDA', client: v.client || 'Consumidor Final', installments: v.installments || 1 })),
-      ...sessionManualEntries.map(e => ({ id: e.id, type: e.type, description: e.description, value: e.value, timestamp: e.timestamp, method: e.method || 'CAIXA', cat: e.category, client: 'SISTEMA', installments: 1 }))
+      ...sessionVendas.map(v => ({
+        id: v.id,
+        type: 'INCOME',
+        description: `Venda PDV - ${v.id.slice(-5)}`,
+        value: v.value,
+        timestamp: v.date,
+        method: v.method,
+        payments: Array.isArray((v as any).payments) ? (v as any).payments : [],
+        cat: 'VENDA',
+        client: v.client || 'Consumidor Final',
+        installments: v.installments || 1
+      })),
+      ...sessionManualEntries.map(e => ({
+        id: e.id, type: e.type, description: e.description, value: e.value,
+        timestamp: e.timestamp, method: e.method || 'CAIXA', payments: [],
+        cat: e.category, client: 'SISTEMA', installments: 1
+      }))
     ].sort((a, b) => b.id.localeCompare(a.id));
 
     return { allRecords, saldoAnterior, vendasEmDinheiro, entradasManuaisDinheiro, saídasDinheiro, saldoFinalCaixa, resumoCartoes, totalVendasBruto };
@@ -282,9 +328,9 @@ const CashMovement: React.FC = () => {
               </div>
            </div>
 
-           <div className="bg-[#136dec] text-white p-1.5 text-center font-black uppercase mb-2 text-[10px] print:bg-[#136dec] print:text-white">RESUMO POR MEIO DE PAGAMENTO (CARTÕES / OUTROS)</div>
+           <div className="bg-[#136dec] text-white p-1.5 text-center font-black uppercase mb-2 text-[10px] print:bg-[#136dec] print:text-white">RESUMO POR MEIO DE PAGAMENTO</div>
            <table className="w-full border-collapse border border-black mb-6">
-              <thead><tr className="border-b border-black"><th className="p-1 text-left uppercase border-r border-black font-black text-[9px]">Forma / Operadora</th><th className="p-1 text-center uppercase border-r border-black font-black text-[9px] w-28">Qtd. Notas</th><th className="p-1 text-right uppercase font-black text-[9px] w-36">Total Bruto</th></tr></thead>
+              <thead><tr className="border-b border-black"><th className="p-1 text-left uppercase border-r border-black font-black text-[9px]">Forma de Pagamento</th><th className="p-1 text-center uppercase border-r border-black font-black text-[9px] w-28">Qtd. Vendas</th><th className="p-1 text-right uppercase font-black text-[9px] w-36">Total Bruto</th></tr></thead>
               <tbody>
                  {(Object.entries(sessionData?.resumoCartoes || {}) as any).map(([key, data]: [string, any]) => (
                     <tr key={key} className="border-b border-black font-bold">
@@ -293,6 +339,11 @@ const CashMovement: React.FC = () => {
                        <td className="p-1 text-right tabular-nums">R$ {data.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                     </tr>
                  ))}
+                 <tr className="font-black border-t-2 border-black">
+                    <td className="p-1 border-r border-black uppercase">TOTAL GERAL</td>
+                    <td className="p-1 text-center border-r border-black">{(Object.values(sessionData?.resumoCartoes || {}) as any[]).reduce((a: number, d: any) => a + d.count, 0)}</td>
+                    <td className="p-1 text-right tabular-nums">R$ {Number(sessionData?.totalVendasBruto || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                 </tr>
               </tbody>
            </table>
 
@@ -373,8 +424,21 @@ const CashMovement: React.FC = () => {
                               <p className="text-[9px] text-slate-400 mt-1">{record.cat}</p>
                            </td>
                            <td className="px-4 py-3">
-                              <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded text-[9px] font-black">{record.method}</span>
-                              <p className="text-[9px] text-slate-400 mt-1">{record.installments}x PARCELADO</p>
+                              {record.payments && record.payments.length > 1 ? (
+                                <div className="space-y-1">
+                                  {record.payments.map((p: any, pi: number) => (
+                                    <div key={pi} className="flex items-center justify-between gap-2">
+                                      <span className="px-2 py-0.5 bg-primary/10 text-primary rounded text-[9px] font-black uppercase">{p.method}{p.details?.installments > 1 ? ` ${p.details.installments}x` : ''}</span>
+                                      <span className="text-[9px] font-black text-slate-500 tabular-nums">R$ {Number(p.value).toLocaleString('pt-BR', {minimumFractionDigits:2})}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded text-[9px] font-black uppercase">{record.method}</span>
+                              )}
+                              {record.installments > 1 && record.payments?.length <= 1 && (
+                                <p className="text-[9px] text-slate-400 mt-1">{record.installments}x PARCELADO</p>
+                              )}
                            </td>
                            <td className="px-4 py-3 text-right font-black tabular-nums text-sm">R$ {Number(record.value || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                         </tr>
@@ -385,25 +449,103 @@ const CashMovement: React.FC = () => {
              </div>
            ) : (
              <div className="p-8 space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                   <div className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 space-y-4">
-                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Cartões e Outros Meios</h4>
-                      {(Object.entries(sessionData?.resumoCartoes || {}) as any).map(([key, data]: [string, any]) => (
-                         <div key={key} className="flex justify-between items-center border-b border-slate-200 dark:border-slate-700 pb-2">
-                            <div className="flex flex-col"><span className="text-xs font-black uppercase">{key}</span><span className="text-[9px] font-bold text-slate-400">{data.count} Transações</span></div>
-                            <span className="text-sm font-black text-primary">R$ {data.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                         </div>
-                      ))}
+                {/* BREAKDOWN: TODAS AS FORMAS DE PAGAMENTO */}
+                <div className="bg-slate-50 dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 overflow-hidden">
+                   <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                         <span className="material-symbols-outlined text-primary text-xl">payments</span>
+                         <h4 className="text-[10px] font-black text-slate-700 dark:text-slate-200 uppercase tracking-widest">Detalhamento por Forma de Pagamento</h4>
+                      </div>
+                      <span className="text-[9px] font-black text-slate-400 uppercase">{Object.keys(sessionData?.resumoCartoes || {}).length} formas utilizadas</span>
                    </div>
+                   <div className="divide-y divide-slate-200 dark:divide-slate-700">
+                      {Object.keys(sessionData?.resumoCartoes || {}).length === 0 ? (
+                         <div className="px-6 py-8 text-center text-[10px] font-black text-slate-300 uppercase tracking-widest">Nenhuma venda registrada neste turno</div>
+                      ) : (
+                         (Object.entries(sessionData?.resumoCartoes || {}) as any).map(([key, data]: [string, any]) => {
+                            const isDinheiro = key === 'DINHEIRO' || key === 'ESPÉCIE';
+                            const isPix = key.toUpperCase().includes('PIX');
+                            const isCredito = key.toUpperCase().includes('CRÉDITO') || key.toUpperCase().includes('CREDITO');
+                            const isDebito = key.toUpperCase().includes('DÉBITO') || key.toUpperCase().includes('DEBITO');
+                            const icon = isDinheiro ? 'payments' : isPix ? 'qr_code_2' : isCredito ? 'credit_card' : isDebito ? 'credit_score' : 'point_of_sale';
+                            const color = isDinheiro ? 'text-emerald-500' : isPix ? 'text-violet-500' : isCredito ? 'text-blue-500' : isDebito ? 'text-cyan-500' : 'text-amber-500';
+                            const bg = isDinheiro ? 'bg-emerald-500/10' : isPix ? 'bg-violet-500/10' : isCredito ? 'bg-blue-500/10' : isDebito ? 'bg-cyan-500/10' : 'bg-amber-500/10';
+                            const bar = isDinheiro ? 'bg-emerald-500' : isPix ? 'bg-violet-500' : isCredito ? 'bg-blue-500' : isDebito ? 'bg-cyan-500' : 'bg-amber-500';
+                            const totalAll = (Object.values(sessionData?.resumoCartoes || {}) as any[]).reduce((acc: number, d: any) => acc + d.value, 0);
+                            const pct = totalAll > 0 ? ((data.value / totalAll) * 100).toFixed(1) : '0.0';
+                            return (
+                               <div key={key} className="px-6 py-4 flex items-center gap-4 hover:bg-white/60 dark:hover:bg-slate-700/40 transition-colors">
+                                  <div className={`size-10 rounded-2xl ${bg} ${color} flex items-center justify-center shrink-0`}>
+                                     <span className="material-symbols-outlined text-lg">{icon}</span>
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                     <div className="flex items-center justify-between mb-1.5">
+                                        <span className={`text-xs font-black uppercase ${color}`}>{key}</span>
+                                        <span className="text-sm font-black tabular-nums text-slate-800 dark:text-white">R$ {data.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                                     </div>
+                                     <div className="flex items-center gap-3">
+                                        <div className="flex-1 h-1.5 bg-slate-200 dark:bg-slate-600 rounded-full overflow-hidden">
+                                           <div className={`h-full rounded-full ${bar}`} style={{width: `${pct}%`}}></div>
+                                        </div>
+                                        <span className="text-[9px] font-black text-slate-400 shrink-0">{data.count} venda{data.count !== 1 ? 's' : ''} • {pct}%</span>
+                                     </div>
+                                  </div>
+                               </div>
+                            );
+                         })
+                      )}
+                   </div>
+                   {Object.keys(sessionData?.resumoCartoes || {}).length > 0 && (
+                      <div className="px-6 py-4 bg-slate-100 dark:bg-slate-900/60 border-t-2 border-slate-300 dark:border-slate-600 flex justify-between items-center">
+                         <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Total Faturado (Todos os Meios)</span>
+                         <span className="text-lg font-black text-slate-900 dark:text-white tabular-nums">R$ {Number(sessionData?.totalVendasBruto || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                      </div>
+                   )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                    <div className="p-6 bg-slate-900 text-white rounded-3xl space-y-6">
-                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Resumo Dinheiro (Gaveta)</h4>
+                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><span className="material-symbols-outlined text-emerald-400 text-base">account_balance_wallet</span>Resumo Dinheiro (Gaveta)</h4>
                       <div className="space-y-3">
                          <div className="flex justify-between items-center"><span className="text-xs font-bold uppercase text-slate-400">Fundo Anterior</span><span className="text-sm font-black tabular-nums text-white">R$ {Number(sessionData?.saldoAnterior || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
                          <div className="flex justify-between items-center"><span className="text-xs font-bold uppercase text-emerald-400">Vendas Dinheiro (+)</span><span className="text-sm font-black tabular-nums text-emerald-400">R$ {Number(sessionData?.vendasEmDinheiro || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
-                         <div className="flex justify-between items-center"><span className="text-xs font-bold uppercase text-blue-400">Entradas Manuais (+)</span><span className="text-sm font-black tabular-nums text-blue-400">R$ {Number(sessionData?.entradasManuaisDinheiro || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
+                         <div className="flex justify-between items-center"><span className="text-xs font-bold uppercase text-blue-400">Suprimentos / Entradas (+)</span><span className="text-sm font-black tabular-nums text-blue-400">R$ {Number(sessionData?.entradasManuaisDinheiro || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
                          <div className="flex justify-between items-center"><span className="text-xs font-bold uppercase text-rose-400">Retiradas / Sangrias (-)</span><span className="text-sm font-black tabular-nums text-rose-400">R$ {Number(sessionData?.saídasDinheiro || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
                       </div>
                       <div className="flex justify-between items-center pt-6 border-t border-white/10"><span className="text-sm font-black uppercase text-primary">Saldo Final em Gaveta</span><span className="text-xl font-black text-white tabular-nums">R$ {Number(sessionData?.saldoFinalCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
+                   </div>
+                   <div className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 space-y-4">
+                      <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2"><span className="material-symbols-outlined text-primary text-base">receipt_long</span>Resumo Eletrônico / Outros</h4>
+                      <div className="space-y-3">
+                         {(Object.entries(sessionData?.resumoCartoes || {}) as any)
+                           .filter(([key]: [string, any]) => key !== 'DINHEIRO' && key !== 'ESPÉCIE')
+                           .map(([key, data]: [string, any]) => {
+                             const isPix = key.includes('PIX');
+                             const isCredito = key.includes('CRÉDITO') || key.includes('CREDITO');
+                             const isDebito = key.includes('DÉBITO') || key.includes('DEBITO');
+                             const color = isPix ? 'text-violet-500' : isCredito ? 'text-blue-500' : isDebito ? 'text-cyan-500' : 'text-amber-500';
+                             return (
+                               <div key={key} className="flex justify-between items-center border-b border-slate-200 dark:border-slate-600 pb-2">
+                                 <div><span className={`text-xs font-black uppercase ${color}`}>{key}</span><p className="text-[9px] text-slate-400 font-bold">{data.count} transação{data.count !== 1 ? 'ões' : ''}</p></div>
+                                 <span className={`text-sm font-black tabular-nums ${color}`}>R$ {data.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                               </div>
+                             );
+                         })}
+                         {(Object.keys(sessionData?.resumoCartoes || {}).filter((k: string) => k !== 'DINHEIRO' && k !== 'ESPÉCIE').length === 0) && (
+                           <p className="text-[10px] text-slate-300 font-black uppercase text-center py-4">Nenhum pagamento eletrônico neste turno</p>
+                         )}
+                      </div>
+                      {(() => {
+                        const elecTotal = (Object.entries(sessionData?.resumoCartoes || {}) as any)
+                          .filter(([k]: [string, any]) => k !== 'DINHEIRO' && k !== 'ESPÉCIE')
+                          .reduce((acc: number, [, d]: [string, any]) => acc + d.value, 0);
+                        return elecTotal > 0 ? (
+                          <div className="pt-3 border-t border-slate-200 dark:border-slate-600 flex justify-between items-center">
+                             <span className="text-[10px] font-black text-slate-500 uppercase">Total Eletrônico</span>
+                             <span className="text-base font-black text-primary tabular-nums">R$ {elecTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                          </div>
+                        ) : null;
+                      })()}
                    </div>
                 </div>
              </div>
@@ -517,21 +659,10 @@ const CashMovement: React.FC = () => {
                     <p className="text-[9px] font-black text-emerald-600 uppercase mb-2">Fundo Sugerido (Saldo Acumulado)</p>
                     <p className="text-sm font-black text-slate-900 dark:text-white">R$ {totalCumulativeBalance.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase px-2">Confirmar Fundo em Gaveta (R$)</label>
-                    <input 
-                      autoFocus={isAdmin}
-                      type="number" 
-                      step="0.01" 
-                      required 
-                      readOnly={!isAdmin}
-                      value={openingValue} 
-                      onChange={e => setOpeningValue(parseFloat(e.target.value) || 0)} 
-                      className={`w-full h-14 border-none rounded-xl px-6 text-2xl font-black text-emerald-600 text-center ${!isAdmin ? 'bg-slate-100 dark:bg-slate-800/50 cursor-not-allowed opacity-70' : 'bg-slate-50 dark:bg-slate-800'}`} 
-                      placeholder="0,00" 
-                    />
-                    {!isAdmin && <p className="text-[9px] text-slate-400 text-center mt-2 uppercase font-bold">O valor de abertura é definido pelo saldo de fechamento anterior.</p>}
-                  </div>
+                 <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Confirmar Fundo em Gaveta (R$)</label>
+                    <input autoFocus type="number" step="0.01" required value={openingValue} onChange={e => setOpeningValue(parseFloat(e.target.value) || 0)} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-6 text-2xl font-black text-emerald-600 text-center" placeholder="0,00" />
+                 </div>
                  <button type="submit" disabled={availableCashiers.length === 0} className="w-full h-16 bg-primary text-white rounded-xl font-black text-[11px] uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 transition-all">INICIAR TURNO AGORA</button>
               </form>
            </div>
