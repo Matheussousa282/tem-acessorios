@@ -40,7 +40,7 @@ interface AppContextType {
   updateServiceOrder: (os: ServiceOrder) => Promise<void>;
   addServiceOrder: (os: ServiceOrder) => Promise<void>;
   updateConfig: (config: any) => Promise<void>;
-  processSale: (cart: any[], total: number, method: string, customerId: string, vendorId: string, shipping: number, cardDetails: any) => Promise<void>;
+  processSale: (cart: any[], total: number, method: string, customerId: string, vendorId: string, shipping: number, cardDetails: any, payments?: any[]) => Promise<void>;
   bulkUpdateStock: (adjustments: Record<string, number>) => Promise<void>;
   updateRolePermissions: (role: string, perms: RolePermissions) => Promise<void>;
 }
@@ -266,10 +266,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await refreshData();
   };
 
-  const processSale = async (cart: any[], total: number, method: string, customerId: string, vendorId: string, shipping: number, cardDetails: any) => {
+  const processSale = async (cart: any[], total: number, method: string, customerId: string, vendorId: string, shipping: number, cardDetails: any, payments?: any[]) => {
     const saleId = `SALE-${Date.now()}`;
     const store = establishments.find(e => e.id === currentUser?.storeId);
     const customer = customers.find(c => c.id === customerId);
+
+    // Sessão de caixa aberta desta loja (para vincular cashierId)
+    const activeSession = cashSessions.find(s =>
+      (s.storeId === currentUser?.storeId || s.storeName === store?.name) &&
+      s.status === CashSessionStatus.OPEN
+    );
 
     const transaction: Transaction = {
       id: saleId,
@@ -282,9 +288,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       shippingValue: shipping,
       type: 'INCOME',
       method,
+      // Array completo de pagamentos — essencial para conferência de caixa
+      payments: payments || [],
       client: customer?.name || 'Consumidor Final',
       clientId: customerId,
       vendorId,
+      // Vincula ao caixa aberto para filtro por operador
+      cashierId: activeSession?.openingOperatorId || currentUser?.id,
       items: cart,
       ...cardDetails
     };

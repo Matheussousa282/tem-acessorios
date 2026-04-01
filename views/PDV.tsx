@@ -325,7 +325,7 @@ const PDV: React.FC = () => {
       
       setLastSaleData(currentSaleData);
 
-      await processSale(cart, totalGeral, methodStr, selectedCustomerId, selectedVendorId, shippingValue, cardDetails);
+      await processSale(cart, totalGeral, methodStr, selectedCustomerId, selectedVendorId, shippingValue, cardDetails, payments);
       
       setCart([]);
       setShippingValue(0);

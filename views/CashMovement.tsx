@@ -1,7 +1,7 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../AppContext';
-// Corrected CashEntry import to come from types.ts
-import { CashSession, CashSessionStatus, UserRole, TransactionStatus, CashEntry } from '../types';
+import { CashSession, CashSessionStatus, UserRole, TransactionStatus } from '../types';
 import { useNavigate } from 'react-router-dom';
 
 const CashMovement: React.FC = () => {
@@ -152,20 +152,17 @@ const CashMovement: React.FC = () => {
 
     const sessionManualEntries = cashEntries.filter(e => e.sessionId === viewingSession.id);
 
-    // ─── RESUMO POR FORMA DE PAGAMENTO ───────────────────────────────────────
-    // Para vendas múltiplas (t.payments[]), desdobra cada forma individualmente.
-    // Para vendas simples usa t.method diretamente.
-    const resumoCartoes: Record<string, { count: number, value: number }> = {};
-
+    // ── Normaliza nome do método ────────────────────────────────────────────
     const normalizeMethod = (raw: string): string => {
       const u = (raw || 'DINHEIRO').trim().toUpperCase();
       if (u === 'DINHEIRO' || u === 'ESPÉCIE' || u === 'ESPECIE') return 'DINHEIRO';
-      if (u === 'PIX' || u.startsWith('PIX')) return u;
-      if (u.includes('CRÉDITO') || u.includes('CREDITO')) return u;
-      if (u.includes('DÉBITO') || u.includes('DEBITO')) return u;
       return u;
     };
 
+    // ── Resumo por TODAS as formas de pagamento ─────────────────────────────
+    // Vendas com payments[] → desdobra cada forma individualmente.
+    // Vendas antigas sem payments[] → usa method + value (fallback).
+    const resumoCartoes: Record<string, { count: number; value: number }> = {};
     sessionVendas.forEach(v => {
       const paymentsArr: Array<{ method: string; value: number }> =
         Array.isArray((v as any).payments) && (v as any).payments.length > 0
@@ -179,11 +176,10 @@ const CashMovement: React.FC = () => {
         resumoCartoes[key].value += Number(p.value) || 0;
       });
     });
-    // ─────────────────────────────────────────────────────────────────────────
 
     const totalVendasBruto = sessionVendas.reduce((acc, t) => acc + t.value, 0);
 
-    // Vendas em dinheiro: soma parcelas de pagamento em dinheiro de cada venda
+    // Soma apenas parcelas em dinheiro (inclusive em vendas mistas)
     const vendasEmDinheiro = sessionVendas.reduce((acc, v) => {
       const paymentsArr: Array<{ method: string; value: number }> =
         Array.isArray((v as any).payments) && (v as any).payments.length > 0
@@ -330,7 +326,7 @@ const CashMovement: React.FC = () => {
 
            <div className="bg-[#136dec] text-white p-1.5 text-center font-black uppercase mb-2 text-[10px] print:bg-[#136dec] print:text-white">RESUMO POR MEIO DE PAGAMENTO</div>
            <table className="w-full border-collapse border border-black mb-6">
-              <thead><tr className="border-b border-black"><th className="p-1 text-left uppercase border-r border-black font-black text-[9px]">Forma de Pagamento</th><th className="p-1 text-center uppercase border-r border-black font-black text-[9px] w-28">Qtd. Vendas</th><th className="p-1 text-right uppercase font-black text-[9px] w-36">Total Bruto</th></tr></thead>
+              <thead><tr className="border-b border-black"><th className="p-1 text-left uppercase border-r border-black font-black text-[9px]">Forma de Pagamento</th><th className="p-1 text-center uppercase border-r border-black font-black text-[9px] w-28">Qtd. Vendas</th><th className="p-1 text-right uppercase font-black text-[9px] w-36">Total</th></tr></thead>
               <tbody>
                  {(Object.entries(sessionData?.resumoCartoes || {}) as any).map(([key, data]: [string, any]) => (
                     <tr key={key} className="border-b border-black font-bold">
@@ -429,14 +425,14 @@ const CashMovement: React.FC = () => {
                                   {record.payments.map((p: any, pi: number) => (
                                     <div key={pi} className="flex items-center justify-between gap-2">
                                       <span className="px-2 py-0.5 bg-primary/10 text-primary rounded text-[9px] font-black uppercase">{p.method}{p.details?.installments > 1 ? ` ${p.details.installments}x` : ''}</span>
-                                      <span className="text-[9px] font-black text-slate-500 tabular-nums">R$ {Number(p.value).toLocaleString('pt-BR', {minimumFractionDigits:2})}</span>
+                                      <span className="text-[9px] font-black text-slate-500 tabular-nums">R$ {Number(p.value).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                                     </div>
                                   ))}
                                 </div>
                               ) : (
                                 <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded text-[9px] font-black uppercase">{record.method}</span>
                               )}
-                              {record.installments > 1 && record.payments?.length <= 1 && (
+                              {record.installments > 1 && (!record.payments || record.payments.length <= 1) && (
                                 <p className="text-[9px] text-slate-400 mt-1">{record.installments}x PARCELADO</p>
                               )}
                            </td>
@@ -449,8 +445,9 @@ const CashMovement: React.FC = () => {
              </div>
            ) : (
              <div className="p-8 space-y-6">
-                {/* BREAKDOWN: TODAS AS FORMAS DE PAGAMENTO */}
-                <div className="bg-slate-50 dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 overflow-hidden">
+
+                {/* ── DETALHAMENTO POR FORMA DE PAGAMENTO ── */}
+                <div className="bg-slate-50 dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 overflow-hidden">
                    <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
                       <div className="flex items-center gap-3">
                          <span className="material-symbols-outlined text-primary text-xl">payments</span>
@@ -461,93 +458,104 @@ const CashMovement: React.FC = () => {
                    <div className="divide-y divide-slate-200 dark:divide-slate-700">
                       {Object.keys(sessionData?.resumoCartoes || {}).length === 0 ? (
                          <div className="px-6 py-8 text-center text-[10px] font-black text-slate-300 uppercase tracking-widest">Nenhuma venda registrada neste turno</div>
-                      ) : (
-                         (Object.entries(sessionData?.resumoCartoes || {}) as any).map(([key, data]: [string, any]) => {
-                            const isDinheiro = key === 'DINHEIRO' || key === 'ESPÉCIE';
-                            const isPix = key.toUpperCase().includes('PIX');
-                            const isCredito = key.toUpperCase().includes('CRÉDITO') || key.toUpperCase().includes('CREDITO');
-                            const isDebito = key.toUpperCase().includes('DÉBITO') || key.toUpperCase().includes('DEBITO');
-                            const icon = isDinheiro ? 'payments' : isPix ? 'qr_code_2' : isCredito ? 'credit_card' : isDebito ? 'credit_score' : 'point_of_sale';
-                            const color = isDinheiro ? 'text-emerald-500' : isPix ? 'text-violet-500' : isCredito ? 'text-blue-500' : isDebito ? 'text-cyan-500' : 'text-amber-500';
-                            const bg = isDinheiro ? 'bg-emerald-500/10' : isPix ? 'bg-violet-500/10' : isCredito ? 'bg-blue-500/10' : isDebito ? 'bg-cyan-500/10' : 'bg-amber-500/10';
-                            const bar = isDinheiro ? 'bg-emerald-500' : isPix ? 'bg-violet-500' : isCredito ? 'bg-blue-500' : isDebito ? 'bg-cyan-500' : 'bg-amber-500';
-                            const totalAll = (Object.values(sessionData?.resumoCartoes || {}) as any[]).reduce((acc: number, d: any) => acc + d.value, 0);
-                            const pct = totalAll > 0 ? ((data.value / totalAll) * 100).toFixed(1) : '0.0';
-                            return (
-                               <div key={key} className="px-6 py-4 flex items-center gap-4 hover:bg-white/60 dark:hover:bg-slate-700/40 transition-colors">
-                                  <div className={`size-10 rounded-2xl ${bg} ${color} flex items-center justify-center shrink-0`}>
-                                     <span className="material-symbols-outlined text-lg">{icon}</span>
+                      ) : (() => {
+                        const totalAll = (Object.values(sessionData?.resumoCartoes || {}) as any[]).reduce((acc: number, d: any) => acc + d.value, 0);
+                        return (Object.entries(sessionData?.resumoCartoes || {}) as any).map(([key, data]: [string, any]) => {
+                          const isDinheiro = key === 'DINHEIRO';
+                          const isPix     = key.includes('PIX');
+                          const isCredito = key.includes('CRÉDITO') || key.includes('CREDITO');
+                          const isDebito  = key.includes('DÉBITO')  || key.includes('DEBITO');
+                          const icon  = isDinheiro ? 'payments'     : isPix ? 'qr_code_2'    : isCredito ? 'credit_card' : isDebito ? 'credit_score' : 'point_of_sale';
+                          const color = isDinheiro ? 'text-emerald-500' : isPix ? 'text-violet-500' : isCredito ? 'text-blue-500' : isDebito ? 'text-cyan-500' : 'text-amber-500';
+                          const bg    = isDinheiro ? 'bg-emerald-500/10' : isPix ? 'bg-violet-500/10' : isCredito ? 'bg-blue-500/10'  : isDebito ? 'bg-cyan-500/10'  : 'bg-amber-500/10';
+                          const bar   = isDinheiro ? 'bg-emerald-500'    : isPix ? 'bg-violet-500'    : isCredito ? 'bg-blue-500'     : isDebito ? 'bg-cyan-500'     : 'bg-amber-500';
+                          const pct   = totalAll > 0 ? ((data.value / totalAll) * 100).toFixed(1) : '0.0';
+                          return (
+                            <div key={key} className="px-6 py-4 flex items-center gap-4 hover:bg-white/60 dark:hover:bg-slate-700/40 transition-colors">
+                              <div className={`size-10 rounded-2xl ${bg} ${color} flex items-center justify-center shrink-0`}>
+                                <span className="material-symbols-outlined text-lg">{icon}</span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between mb-1.5">
+                                  <span className={`text-xs font-black uppercase ${color}`}>{key}</span>
+                                  <span className="text-sm font-black tabular-nums text-slate-800 dark:text-white">R$ {data.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <div className="flex-1 h-1.5 bg-slate-200 dark:bg-slate-600 rounded-full overflow-hidden">
+                                    <div className={`h-full rounded-full ${bar}`} style={{width: `${pct}%`}}></div>
                                   </div>
-                                  <div className="flex-1 min-w-0">
-                                     <div className="flex items-center justify-between mb-1.5">
-                                        <span className={`text-xs font-black uppercase ${color}`}>{key}</span>
-                                        <span className="text-sm font-black tabular-nums text-slate-800 dark:text-white">R$ {data.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                                     </div>
-                                     <div className="flex items-center gap-3">
-                                        <div className="flex-1 h-1.5 bg-slate-200 dark:bg-slate-600 rounded-full overflow-hidden">
-                                           <div className={`h-full rounded-full ${bar}`} style={{width: `${pct}%`}}></div>
-                                        </div>
-                                        <span className="text-[9px] font-black text-slate-400 shrink-0">{data.count} venda{data.count !== 1 ? 's' : ''} • {pct}%</span>
-                                     </div>
-                                  </div>
-                               </div>
-                            );
-                         })
-                      )}
+                                  <span className="text-[9px] font-black text-slate-400 shrink-0">{data.count} venda{data.count !== 1 ? 's' : ''} • {pct}%</span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        });
+                      })()}
                    </div>
                    {Object.keys(sessionData?.resumoCartoes || {}).length > 0 && (
-                      <div className="px-6 py-4 bg-slate-100 dark:bg-slate-900/60 border-t-2 border-slate-300 dark:border-slate-600 flex justify-between items-center">
-                         <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Total Faturado (Todos os Meios)</span>
-                         <span className="text-lg font-black text-slate-900 dark:text-white tabular-nums">R$ {Number(sessionData?.totalVendasBruto || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                      </div>
+                     <div className="px-6 py-4 bg-slate-100 dark:bg-slate-900/60 border-t-2 border-slate-300 dark:border-slate-600 flex justify-between items-center">
+                       <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Total Faturado (Todos os Meios)</span>
+                       <span className="text-lg font-black text-slate-900 dark:text-white tabular-nums">R$ {Number(sessionData?.totalVendasBruto || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                     </div>
                    )}
                 </div>
 
+                {/* ── GAVETA + ELETRÔNICOS ── */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                   <div className="p-6 bg-slate-900 text-white rounded-3xl space-y-6">
-                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><span className="material-symbols-outlined text-emerald-400 text-base">account_balance_wallet</span>Resumo Dinheiro (Gaveta)</h4>
+                   <div className="p-6 bg-slate-900 text-white rounded-3xl space-y-4">
+                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                        <span className="material-symbols-outlined text-emerald-400 text-base">account_balance_wallet</span>Resumo Dinheiro (Gaveta)
+                      </h4>
                       <div className="space-y-3">
-                         <div className="flex justify-between items-center"><span className="text-xs font-bold uppercase text-slate-400">Fundo Anterior</span><span className="text-sm font-black tabular-nums text-white">R$ {Number(sessionData?.saldoAnterior || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
-                         <div className="flex justify-between items-center"><span className="text-xs font-bold uppercase text-emerald-400">Vendas Dinheiro (+)</span><span className="text-sm font-black tabular-nums text-emerald-400">R$ {Number(sessionData?.vendasEmDinheiro || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
-                         <div className="flex justify-between items-center"><span className="text-xs font-bold uppercase text-blue-400">Suprimentos / Entradas (+)</span><span className="text-sm font-black tabular-nums text-blue-400">R$ {Number(sessionData?.entradasManuaisDinheiro || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
-                         <div className="flex justify-between items-center"><span className="text-xs font-bold uppercase text-rose-400">Retiradas / Sangrias (-)</span><span className="text-sm font-black tabular-nums text-rose-400">R$ {Number(sessionData?.saídasDinheiro || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
+                        <div className="flex justify-between items-center"><span className="text-xs font-bold uppercase text-slate-400">Fundo Anterior</span><span className="text-sm font-black tabular-nums">R$ {Number(sessionData?.saldoAnterior || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
+                        <div className="flex justify-between items-center"><span className="text-xs font-bold uppercase text-emerald-400">Vendas Dinheiro (+)</span><span className="text-sm font-black tabular-nums text-emerald-400">R$ {Number(sessionData?.vendasEmDinheiro || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
+                        <div className="flex justify-between items-center"><span className="text-xs font-bold uppercase text-blue-400">Suprimentos / Entradas (+)</span><span className="text-sm font-black tabular-nums text-blue-400">R$ {Number(sessionData?.entradasManuaisDinheiro || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
+                        <div className="flex justify-between items-center"><span className="text-xs font-bold uppercase text-rose-400">Retiradas / Sangrias (-)</span><span className="text-sm font-black tabular-nums text-rose-400">R$ {Number(sessionData?.saídasDinheiro || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
                       </div>
-                      <div className="flex justify-between items-center pt-6 border-t border-white/10"><span className="text-sm font-black uppercase text-primary">Saldo Final em Gaveta</span><span className="text-xl font-black text-white tabular-nums">R$ {Number(sessionData?.saldoFinalCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
+                      <div className="flex justify-between items-center pt-4 border-t border-white/10">
+                        <span className="text-sm font-black uppercase text-primary">Saldo Final em Gaveta</span>
+                        <span className="text-xl font-black tabular-nums">R$ {Number(sessionData?.saldoFinalCaixa || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                      </div>
                    </div>
-                   <div className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 space-y-4">
-                      <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2"><span className="material-symbols-outlined text-primary text-base">receipt_long</span>Resumo Eletrônico / Outros</h4>
-                      <div className="space-y-3">
-                         {(Object.entries(sessionData?.resumoCartoes || {}) as any)
-                           .filter(([key]: [string, any]) => key !== 'DINHEIRO' && key !== 'ESPÉCIE')
-                           .map(([key, data]: [string, any]) => {
-                             const isPix = key.includes('PIX');
-                             const isCredito = key.includes('CRÉDITO') || key.includes('CREDITO');
-                             const isDebito = key.includes('DÉBITO') || key.includes('DEBITO');
-                             const color = isPix ? 'text-violet-500' : isCredito ? 'text-blue-500' : isDebito ? 'text-cyan-500' : 'text-amber-500';
-                             return (
-                               <div key={key} className="flex justify-between items-center border-b border-slate-200 dark:border-slate-600 pb-2">
-                                 <div><span className={`text-xs font-black uppercase ${color}`}>{key}</span><p className="text-[9px] text-slate-400 font-bold">{data.count} transação{data.count !== 1 ? 'ões' : ''}</p></div>
-                                 <span className={`text-sm font-black tabular-nums ${color}`}>R$ {data.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                               </div>
-                             );
-                         })}
-                         {(Object.keys(sessionData?.resumoCartoes || {}).filter((k: string) => k !== 'DINHEIRO' && k !== 'ESPÉCIE').length === 0) && (
-                           <p className="text-[10px] text-slate-300 font-black uppercase text-center py-4">Nenhum pagamento eletrônico neste turno</p>
-                         )}
-                      </div>
+
+                   <div className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 space-y-3">
+                      <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                        <span className="material-symbols-outlined text-primary text-base">receipt_long</span>Resumo Eletrônico / Outros
+                      </h4>
+                      {(Object.entries(sessionData?.resumoCartoes || {}) as any)
+                        .filter(([key]: [string, any]) => key !== 'DINHEIRO')
+                        .map(([key, data]: [string, any]) => {
+                          const isPix = key.includes('PIX');
+                          const isCredito = key.includes('CRÉDITO') || key.includes('CREDITO');
+                          const isDebito  = key.includes('DÉBITO')  || key.includes('DEBITO');
+                          const color = isPix ? 'text-violet-500' : isCredito ? 'text-blue-500' : isDebito ? 'text-cyan-500' : 'text-amber-500';
+                          return (
+                            <div key={key} className="flex justify-between items-center border-b border-slate-200 dark:border-slate-600 pb-2">
+                              <div>
+                                <span className={`text-xs font-black uppercase ${color}`}>{key}</span>
+                                <p className="text-[9px] text-slate-400 font-bold">{data.count} transação{data.count !== 1 ? 'ões' : ''}</p>
+                              </div>
+                              <span className={`text-sm font-black tabular-nums ${color}`}>R$ {data.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                            </div>
+                          );
+                        })}
+                      {Object.keys(sessionData?.resumoCartoes || {}).filter((k: string) => k !== 'DINHEIRO').length === 0 && (
+                        <p className="text-[10px] text-slate-300 font-black uppercase text-center py-6">Nenhum pagamento eletrônico neste turno</p>
+                      )}
                       {(() => {
                         const elecTotal = (Object.entries(sessionData?.resumoCartoes || {}) as any)
-                          .filter(([k]: [string, any]) => k !== 'DINHEIRO' && k !== 'ESPÉCIE')
+                          .filter(([k]: [string, any]) => k !== 'DINHEIRO')
                           .reduce((acc: number, [, d]: [string, any]) => acc + d.value, 0);
                         return elecTotal > 0 ? (
-                          <div className="pt-3 border-t border-slate-200 dark:border-slate-600 flex justify-between items-center">
-                             <span className="text-[10px] font-black text-slate-500 uppercase">Total Eletrônico</span>
-                             <span className="text-base font-black text-primary tabular-nums">R$ {elecTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                          <div className="pt-2 border-t border-slate-200 dark:border-slate-600 flex justify-between items-center">
+                            <span className="text-[10px] font-black text-slate-500 uppercase">Total Eletrônico</span>
+                            <span className="text-base font-black text-primary tabular-nums">R$ {elecTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                           </div>
                         ) : null;
                       })()}
                    </div>
                 </div>
+
              </div>
            )}
         </div>
@@ -659,10 +667,21 @@ const CashMovement: React.FC = () => {
                     <p className="text-[9px] font-black text-emerald-600 uppercase mb-2">Fundo Sugerido (Saldo Acumulado)</p>
                     <p className="text-sm font-black text-slate-900 dark:text-white">R$ {totalCumulativeBalance.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
                  </div>
-                 <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Confirmar Fundo em Gaveta (R$)</label>
-                    <input autoFocus type="number" step="0.01" required value={openingValue} onChange={e => setOpeningValue(parseFloat(e.target.value) || 0)} className="w-full h-14 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-6 text-2xl font-black text-emerald-600 text-center" placeholder="0,00" />
-                 </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase px-2">Confirmar Fundo em Gaveta (R$)</label>
+                    <input 
+                      autoFocus={isAdmin}
+                      type="number" 
+                      step="0.01" 
+                      required 
+                      readOnly={!isAdmin}
+                      value={openingValue} 
+                      onChange={e => setOpeningValue(parseFloat(e.target.value) || 0)} 
+                      className={`w-full h-14 border-none rounded-xl px-6 text-2xl font-black text-emerald-600 text-center ${!isAdmin ? 'bg-slate-100 dark:bg-slate-800/50 cursor-not-allowed opacity-70' : 'bg-slate-50 dark:bg-slate-800'}`} 
+                      placeholder="0,00" 
+                    />
+                    {!isAdmin && <p className="text-[9px] text-slate-400 text-center mt-2 uppercase font-bold">O valor de abertura é definido pelo saldo de fechamento anterior.</p>}
+                  </div>
                  <button type="submit" disabled={availableCashiers.length === 0} className="w-full h-16 bg-primary text-white rounded-xl font-black text-[11px] uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 transition-all">INICIAR TURNO AGORA</button>
               </form>
            </div>
