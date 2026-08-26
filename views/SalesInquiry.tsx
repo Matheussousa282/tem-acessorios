@@ -15,7 +15,7 @@ const SalesInquiry: React.FC = () => {
   } = useApp();
 
   // =========================================================
-  // FILTROS
+  // ESTADOS DE FILTRO
   // =========================================================
 
   const [filter, setFilter] = useState('');
@@ -33,7 +33,7 @@ const SalesInquiry: React.FC = () => {
   const [storeFilter, setStoreFilter] = useState('TODAS');
 
   // =========================================================
-  // ESTADOS
+  // ESTADOS DOS MODAIS
   // =========================================================
 
   const [selectedTransaction, setSelectedTransaction] =
@@ -54,6 +54,9 @@ const SalesInquiry: React.FC = () => {
   const [showCustomerModal, setShowCustomerModal] =
     useState(false);
 
+  const [customerSearch, setCustomerSearch] =
+    useState('');
+
   // =========================================================
   // USUÁRIO / LOJA
   // =========================================================
@@ -67,7 +70,7 @@ const SalesInquiry: React.FC = () => {
   );
 
   // =========================================================
-  // VENDAS
+  // FILTRAGEM DAS VENDAS
   // =========================================================
 
   const sales = useMemo(() => {
@@ -93,8 +96,7 @@ const SalesInquiry: React.FC = () => {
         t.date >= startDate &&
         t.date <= endDate;
 
-      const search =
-        filter.toLowerCase().trim();
+      const search = filter.toLowerCase().trim();
 
       const matchesSearch =
         !search ||
@@ -129,10 +131,10 @@ const SalesInquiry: React.FC = () => {
 
     sales.forEach(s => {
 
-      totalValue += Number(s.value || 0);
+      totalValue += s.value;
 
       s.items?.forEach(i => {
-        qtyItems += Number(i.quantity || 0);
+        qtyItems += i.quantity;
       });
 
     });
@@ -176,7 +178,7 @@ const SalesInquiry: React.FC = () => {
   };
 
   // =========================================================
-  // REIMPRESSÃO A4
+  // REIMPRESSÃO DO ROMANEIO
   // =========================================================
 
   const handleReprint = (sale: Transaction) => {
@@ -189,7 +191,7 @@ const SalesInquiry: React.FC = () => {
 
       setTimeout(() => {
         setSelectedTransaction(null);
-      }, 800);
+      }, 1000);
 
     }, 300);
   };
@@ -216,7 +218,9 @@ const SalesInquiry: React.FC = () => {
 
     } catch (e) {
 
-      alert('Erro ao atualizar vendedor.');
+      alert(
+        'Erro ao atualizar vendedor.'
+      );
 
     }
   };
@@ -231,10 +235,9 @@ const SalesInquiry: React.FC = () => {
 
     if (!selectedTransaction) return;
 
-    const customer =
-      customers.find(
-        c => c.id === customerId
-      );
+    const customer = customers.find(
+      c => c.id === customerId
+    );
 
     try {
 
@@ -247,153 +250,232 @@ const SalesInquiry: React.FC = () => {
       });
 
       setShowCustomerModal(false);
+      setCustomerSearch('');
       setSelectedTransaction(null);
 
     } catch (e) {
 
-      alert('Erro ao atualizar cliente.');
+      alert(
+        'Erro ao atualizar cliente.'
+      );
 
     }
   };
 
   // =========================================================
-  // RETURN
+  // CLIENTES FILTRADOS
+  // =========================================================
+
+  const filteredCustomers = useMemo(() => {
+
+    const search =
+      customerSearch
+        .toLowerCase()
+        .trim();
+
+    if (!search) {
+      return customers;
+    }
+
+    return customers.filter(c =>
+      c.name
+        .toLowerCase()
+        .includes(search) ||
+      c.cpfCnpj
+        ?.toLowerCase()
+        .includes(search)
+    );
+
+  }, [
+    customers,
+    customerSearch
+  ]);
+
+  // =========================================================
+  // RENDER
   // =========================================================
 
   return (
 
-    <div className="min-h-screen bg-slate-100 dark:bg-background-dark font-sans text-[11px] uppercase font-bold flex flex-col relative">
+    <div
+      className="
+        min-h-screen
+        bg-slate-100
+        dark:bg-background-dark
+        font-sans
+        text-[11px]
+        uppercase
+        font-bold
+        flex
+        flex-col
+        relative
+      "
+    >
 
       {/* =====================================================
           ROMANEIO A4 - IMPRESSÃO
-      ===================================================== */}
+      ====================================================== */}
 
       <div
         id="receipt-reprint-area"
-        className="a4-print-area"
+        className="hidden print:block"
       >
 
         {selectedTransaction && (
 
-          <div className="a4-document">
+          <div className="romaneio-a4">
 
-            {/* CABEÇALHO */}
+            {/* =================================================
+                CABEÇALHO
+            ================================================== */}
 
-            <div className="a4-header">
+            <div className="romaneio-header">
 
-              <div className="a4-header-left">
+              <div className="empresa-info">
 
-                <div className="a4-title">
+                <h1>
+                  {selectedTransaction.store}
+                </h1>
+
+                <h2>
                   ROMANEIO DE VENDA
-                </div>
+                </h2>
 
-                <div className="a4-subtitle">
-                  DOCUMENTO DE VENDA / PDV
-                </div>
+                <p>
+                  DOCUMENTO DE VENDA / REIMPRESSÃO
+                </p>
 
               </div>
 
-              <div className="a4-header-right">
+              <div className="documento-info">
 
-                <div className="a4-doc-number">
-                  Nº {selectedTransaction.id.slice(-8)}
+                <div>
+                  <strong>
+                    DOCUMENTO
+                  </strong>
+
+                  <span>
+                    {selectedTransaction.id.slice(-6)}
+                  </span>
                 </div>
 
                 <div>
-                  EMISSÃO: {selectedTransaction.date}
+                  <strong>
+                    DATA
+                  </strong>
+
+                  <span>
+                    {selectedTransaction.date}
+                  </span>
                 </div>
 
               </div>
 
             </div>
 
+            {/* =================================================
+                DADOS DA VENDA
+            ================================================== */}
 
-            {/* DADOS DA EMPRESA */}
-
-            <div className="a4-company-box">
-
-              <div className="a4-company-name">
-                {selectedTransaction.store}
-              </div>
-
-              <div className="a4-company-info">
-                ROMANEIO / DOCUMENTO DE VENDA
-              </div>
-
+            <div className="romaneio-section-title">
+              DADOS DA VENDA
             </div>
 
+            <div className="dados-grid">
 
-            {/* DADOS DA VENDA */}
+              <div className="campo">
 
-            <div className="a4-info-grid">
+                <label>
+                  CLIENTE
+                </label>
 
-              <div className="a4-info-item a4-span-2">
-                <span>CLIENTE</span>
-                <strong>
+                <span>
                   {selectedTransaction.client ||
                     'CONSUMIDOR FINAL'}
-                </strong>
+                </span>
+
               </div>
 
-              <div className="a4-info-item">
-                <span>VENDEDOR</span>
-                <strong>
-                  {getUserData(
-                    selectedTransaction.vendorId
-                  )?.name || 'BALCÃO'}
-                </strong>
+              <div className="campo">
+
+                <label>
+                  VENDEDOR
+                </label>
+
+                <span>
+                  {
+                    getUserData(
+                      selectedTransaction.vendorId
+                    )?.name ||
+                    'BALCÃO'
+                  }
+                </span>
+
               </div>
 
-              <div className="a4-info-item">
-                <span>CAIXA</span>
-                <strong>
-                  {getUserData(
-                    selectedTransaction.cashierId
-                  )?.name ||
+              <div className="campo">
+
+                <label>
+                  CAIXA
+                </label>
+
+                <span>
+                  {
+                    getUserData(
+                      selectedTransaction.cashierId
+                    )?.name ||
                     selectedTransaction.method ||
-                    'SISTEMA'}
-                </strong>
+                    'SISTEMA'
+                  }
+                </span>
+
               </div>
 
-              <div className="a4-info-item">
-                <span>DATA</span>
-                <strong>
-                  {selectedTransaction.date}
-                </strong>
+              <div className="campo">
+
+                <label>
+                  LOJA / UNIDADE
+                </label>
+
+                <span>
+                  {selectedTransaction.store}
+                </span>
+
               </div>
 
             </div>
 
+            {/* =================================================
+                ITENS
+            ================================================== */}
 
-            {/* TABELA DE PRODUTOS */}
-
-            <div className="a4-section-title">
+            <div className="romaneio-section-title">
               ITENS DA VENDA
             </div>
 
-            <table className="a4-items-table">
+            <table className="romaneio-table">
 
               <thead>
 
                 <tr>
 
-                  <th className="col-seq">
-                    #
+                  <th className="col-item">
+                    ITEM
                   </th>
 
-                  <th className="col-sku">
+                  <th className="col-codigo">
                     CÓDIGO
                   </th>
 
-                  <th>
-                    DESCRIÇÃO DO PRODUTO
+                  <th className="col-descricao">
+                    DESCRIÇÃO
                   </th>
 
-                  <th className="col-quantity">
+                  <th className="col-qtd">
                     QTD.
                   </th>
 
-                  <th className="col-price">
+                  <th className="col-unit">
                     VALOR UNIT.
                   </th>
 
@@ -425,16 +507,12 @@ const SalesInquiry: React.FC = () => {
                       </td>
 
                       <td className="text-right">
-                        {Number(
-                          item.quantity || 0
-                        ).toFixed(2)}
+                        {item.quantity.toFixed(2)}
                       </td>
 
                       <td className="text-right">
                         R${' '}
-                        {Number(
-                          item.salePrice || 0
-                        ).toLocaleString(
+                        {item.salePrice.toLocaleString(
                           'pt-BR',
                           {
                             minimumFractionDigits: 2
@@ -442,11 +520,11 @@ const SalesInquiry: React.FC = () => {
                         )}
                       </td>
 
-                      <td className="text-right">
+                      <td className="text-right font-bold">
                         R${' '}
                         {(
-                          Number(item.quantity || 0) *
-                          Number(item.salePrice || 0)
+                          item.quantity *
+                          item.salePrice
                         ).toLocaleString(
                           'pt-BR',
                           {
@@ -464,203 +542,143 @@ const SalesInquiry: React.FC = () => {
 
             </table>
 
+            {/* =================================================
+                RESUMO
+            ================================================== */}
 
-            {/* RESUMO */}
+            <div className="resumo-container">
 
-            <div className="a4-summary">
+              <div className="resumo-left">
 
-              <div className="a4-summary-left">
-
-                <div>
-                  <span>
-                    QUANTIDADE TOTAL DE ITENS
-                  </span>
+                <div className="resumo-box">
 
                   <strong>
-                    {selectedTransaction.items?.reduce(
-                      (acc, i) =>
-                        acc +
-                        Number(i.quantity || 0),
-                      0
-                    ).toFixed(2)}
+                    FORMA DE PAGAMENTO
                   </strong>
+
+                  <span>
+                    {selectedTransaction.method ||
+                      'DINHEIRO'}
+
+                    {selectedTransaction.installments
+                      ? ` - ${selectedTransaction.installments}X`
+                      : ''}
+                  </span>
+
                 </div>
 
-              </div>
+                {selectedTransaction.cardOperatorId && (
 
-
-              <div className="a4-summary-right">
-
-                <div className="a4-total-label">
-                  TOTAL GERAL
-                </div>
-
-                <div className="a4-total-value">
-                  R${' '}
-                  {Number(
-                    selectedTransaction.value || 0
-                  ).toLocaleString(
-                    'pt-BR',
-                    {
-                      minimumFractionDigits: 2
-                    }
-                  )}
-                </div>
-
-              </div>
-
-            </div>
-
-
-            {/* PAGAMENTO */}
-
-            <div className="a4-section-title">
-              FORMA DE PAGAMENTO
-            </div>
-
-            <div className="a4-payment-box">
-
-              <div>
-
-                <span>
-                  FORMA DE PAGAMENTO
-                </span>
-
-                <strong>
-                  {selectedTransaction.method ||
-                    'DINHEIRO'}
-
-                  {selectedTransaction.installments
-                    ? ` - ${selectedTransaction.installments}X`
-                    : ''}
-                </strong>
-
-              </div>
-
-
-              {selectedTransaction.cardOperatorId && (
-
-                <>
-
-                  <div>
-
-                    <span>
-                      OPERADORA
-                    </span>
+                  <div className="resumo-box">
 
                     <strong>
+                      DADOS DO CARTÃO
+                    </strong>
+
+                    <span>
+                      OPERADORA:{' '}
                       {
                         getCardInfo(
                           selectedTransaction.cardOperatorId,
                           selectedTransaction.cardBrandId
                         ).operator
                       }
-                    </strong>
-
-                  </div>
-
-                  <div>
-
-                    <span>
-                      BANDEIRA
                     </span>
 
-                    <strong>
+                    <span>
+                      BANDEIRA:{' '}
                       {
                         getCardInfo(
                           selectedTransaction.cardOperatorId,
                           selectedTransaction.cardBrandId
                         ).brand
                       }
-                    </strong>
-
-                  </div>
-
-                  <div>
-
-                    <span>
-                      NSU
                     </span>
 
-                    <strong>
+                    <span>
+                      NSU:{' '}
                       {selectedTransaction.transactionSku ||
                         '---'}
-                    </strong>
-
-                  </div>
-
-                  <div>
-
-                    <span>
-                      AUTORIZAÇÃO
                     </span>
 
-                    <strong>
+                    <span>
+                      AUTH:{' '}
                       {selectedTransaction.authNumber ||
                         '---'}
-                    </strong>
+                    </span>
 
                   </div>
 
-                </>
-
-              )}
-
-            </div>
-
-
-            {/* OBSERVAÇÕES */}
-
-            <div className="a4-section-title">
-              OBSERVAÇÕES
-            </div>
-
-            <div className="a4-observations">
-              DOCUMENTO REIMPRESSO PARA CONFERÊNCIA.
-            </div>
-
-
-            {/* ASSINATURAS */}
-
-            <div className="a4-signatures">
-
-              <div className="a4-signature">
-
-                <div className="signature-line"></div>
-
-                <span>
-                  RESPONSÁVEL / VENDEDOR
-                </span>
+                )}
 
               </div>
 
+              <div className="total-box">
 
-              <div className="a4-signature">
+                <div className="total-label">
+                  TOTAL DA VENDA
+                </div>
 
-                <div className="signature-line"></div>
+                <div className="total-value">
 
-                <span>
-                  CLIENTE
-                </span>
+                  R${' '}
+
+                  {selectedTransaction.value.toLocaleString(
+                    'pt-BR',
+                    {
+                      minimumFractionDigits: 2
+                    }
+                  )}
+
+                </div>
 
               </div>
 
             </div>
 
+            {/* =================================================
+                ASSINATURAS
+            ================================================== */}
 
-            {/* RODAPÉ */}
+            <div className="assinaturas">
 
-            <div className="a4-footer">
+              <div className="assinatura">
+
+                <div></div>
+
+                <span>
+                  RESPONSÁVEL / CLIENTE
+                </span>
+
+              </div>
+
+              <div className="assinatura">
+
+                <div></div>
+
+                <span>
+                  VENDEDOR
+                </span>
+
+              </div>
+
+            </div>
+
+            {/* =================================================
+                RODAPÉ
+            ================================================== */}
+
+            <div className="romaneio-footer">
 
               <span>
-                ROMANEIO GERADO PELO SISTEMA PDV
-              </span>
-
-              <span>
-                REIMPRESSO EM{' '}
+                DOCUMENTO REIMPRESSO EM{' '}
                 {new Date().toLocaleString(
                   'pt-BR'
                 )}
+              </span>
+
+              <span>
+                ROMANEIO DE VENDA
               </span>
 
             </div>
@@ -674,21 +692,54 @@ const SalesInquiry: React.FC = () => {
 
       {/* =====================================================
           CABEÇALHO DA TELA
-      ===================================================== */}
+      ====================================================== */}
 
-      <header className="bg-primary p-4 flex items-center justify-between text-white shadow-lg shrink-0 print:hidden">
+      <header
+        className="
+          bg-primary
+          p-4
+          flex
+          items-center
+          justify-between
+          text-white
+          shadow-lg
+          shrink-0
+          print:hidden
+        "
+      >
 
         <div className="flex items-center gap-4">
 
-          <div className="bg-white rounded-lg p-1.5 flex items-center justify-center">
+          <div
+            className="
+              bg-white
+              rounded-lg
+              p-1.5
+              flex
+              items-center
+              justify-center
+            "
+          >
 
-            <span className="material-symbols-outlined text-primary text-2xl">
+            <span
+              className="
+                material-symbols-outlined
+                text-primary
+                text-2xl
+              "
+            >
               receipt_long
             </span>
 
           </div>
 
-          <h1 className="text-sm font-black tracking-tight">
+          <h1
+            className="
+              text-sm
+              font-black
+              tracking-tight
+            "
+          >
             DOCUMENTOS DE VENDAS PDV
           </h1>
 
@@ -699,19 +750,63 @@ const SalesInquiry: React.FC = () => {
 
       {/* =====================================================
           FILTROS
-      ===================================================== */}
+      ====================================================== */}
 
-      <div className="p-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-end gap-4 shadow-sm print:hidden">
+      <div
+        className="
+          p-4
+          bg-white
+          dark:bg-slate-900
+          border-b
+          border-slate-200
+          dark:border-slate-800
+          flex
+          flex-wrap
+          items-end
+          gap-4
+          shadow-sm
+          print:hidden
+        "
+      >
+
+        {/* DATA INICIAL */}
 
         <div className="space-y-1">
 
-          <label className="text-[9px] text-slate-400 font-black px-1">
+          <label
+            className="
+              text-[9px]
+              text-slate-400
+              font-black
+              px-1
+            "
+          >
             DATA INICIAL:
           </label>
 
-          <div className="h-10 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-3 flex items-center gap-2">
+          <div
+            className="
+              h-10
+              bg-slate-50
+              dark:bg-slate-800
+              border
+              border-slate-200
+              dark:border-slate-700
+              rounded
+              px-3
+              flex
+              items-center
+              gap-2
+            "
+          >
 
-            <span className="material-symbols-outlined text-slate-400 text-sm">
+            <span
+              className="
+                material-symbols-outlined
+                text-slate-400
+                text-sm
+              "
+            >
               calendar_today
             </span>
 
@@ -721,7 +816,16 @@ const SalesInquiry: React.FC = () => {
               onChange={e =>
                 setStartDate(e.target.value)
               }
-              className="bg-transparent border-none text-[10px] font-black outline-none focus:ring-0 p-0 w-24"
+              className="
+                bg-transparent
+                border-none
+                text-[10px]
+                font-black
+                outline-none
+                focus:ring-0
+                p-0
+                w-24
+              "
             />
 
           </div>
@@ -729,15 +833,44 @@ const SalesInquiry: React.FC = () => {
         </div>
 
 
+        {/* DATA FINAL */}
+
         <div className="space-y-1">
 
-          <label className="text-[9px] text-slate-400 font-black px-1">
+          <label
+            className="
+              text-[9px]
+              text-slate-400
+              font-black
+              px-1
+            "
+          >
             DATA FINAL:
           </label>
 
-          <div className="h-10 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-3 flex items-center gap-2">
+          <div
+            className="
+              h-10
+              bg-slate-50
+              dark:bg-slate-800
+              border
+              border-slate-200
+              dark:border-slate-700
+              rounded
+              px-3
+              flex
+              items-center
+              gap-2
+            "
+          >
 
-            <span className="material-symbols-outlined text-slate-400 text-sm">
+            <span
+              className="
+                material-symbols-outlined
+                text-slate-400
+                text-sm
+              "
+            >
               calendar_today
             </span>
 
@@ -747,7 +880,16 @@ const SalesInquiry: React.FC = () => {
               onChange={e =>
                 setEndDate(e.target.value)
               }
-              className="bg-transparent border-none text-[10px] font-black outline-none focus:ring-0 p-0 w-24"
+              className="
+                bg-transparent
+                border-none
+                text-[10px]
+                font-black
+                outline-none
+                focus:ring-0
+                p-0
+                w-24
+              "
             />
 
           </div>
@@ -755,15 +897,44 @@ const SalesInquiry: React.FC = () => {
         </div>
 
 
+        {/* LOJA */}
+
         <div className="space-y-1">
 
-          <label className="text-[9px] text-slate-400 font-black px-1">
+          <label
+            className="
+              text-[9px]
+              text-slate-400
+              font-black
+              px-1
+            "
+          >
             UNIDADE / LOJA:
           </label>
 
-          <div className="h-10 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-3 flex items-center gap-2">
+          <div
+            className="
+              h-10
+              bg-slate-50
+              dark:bg-slate-800
+              border
+              border-slate-200
+              dark:border-slate-700
+              rounded
+              px-3
+              flex
+              items-center
+              gap-2
+            "
+          >
 
-            <span className="material-symbols-outlined text-slate-400 text-sm">
+            <span
+              className="
+                material-symbols-outlined
+                text-slate-400
+                text-sm
+              "
+            >
               store
             </span>
 
@@ -773,7 +944,16 @@ const SalesInquiry: React.FC = () => {
               onChange={e =>
                 setStoreFilter(e.target.value)
               }
-              className="bg-transparent border-none text-[10px] font-black outline-none focus:ring-0 p-0 pr-8"
+              className="
+                bg-transparent
+                border-none
+                text-[10px]
+                font-black
+                outline-none
+                focus:ring-0
+                p-0
+                pr-8
+              "
             >
 
               <option value="TODAS">
@@ -798,15 +978,34 @@ const SalesInquiry: React.FC = () => {
         </div>
 
 
+        {/* PESQUISA */}
+
         <div className="flex-1 space-y-1">
 
-          <label className="text-[9px] text-slate-400 font-black px-1">
+          <label
+            className="
+              text-[9px]
+              text-slate-400
+              font-black
+              px-1
+            "
+          >
             PESQUISA RÁPIDA (ID OU CLIENTE):
           </label>
 
           <div className="relative">
 
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+            <span
+              className="
+                material-symbols-outlined
+                absolute
+                left-3
+                top-1/2
+                -translate-y-1/2
+                text-slate-400
+                text-sm
+              "
+            >
               search
             </span>
 
@@ -816,7 +1015,23 @@ const SalesInquiry: React.FC = () => {
                 setFilter(e.target.value)
               }
               placeholder="DIGITE PARA BUSCAR..."
-              className="w-full h-10 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded pl-10 text-[10px] font-black outline-none focus:ring-1 focus:ring-primary/30 uppercase"
+              className="
+                w-full
+                h-10
+                bg-slate-50
+                dark:bg-slate-800
+                border
+                border-slate-200
+                dark:border-slate-700
+                rounded
+                pl-10
+                text-[10px]
+                font-black
+                outline-none
+                focus:ring-1
+                focus:ring-primary/30
+                uppercase
+              "
             />
 
           </div>
@@ -824,15 +1039,41 @@ const SalesInquiry: React.FC = () => {
         </div>
 
 
+        {/* LIMPAR */}
+
         <button
           onClick={() => {
+
             setFilter('');
             setStoreFilter('TODAS');
+
           }}
-          className="h-10 px-4 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[9px] font-black hover:bg-rose-50 hover:text-rose-600 transition-all flex items-center gap-2"
+          className="
+            h-10
+            px-4
+            bg-slate-100
+            dark:bg-slate-800
+            border
+            border-slate-200
+            dark:border-slate-700
+            rounded
+            text-[9px]
+            font-black
+            hover:bg-rose-50
+            hover:text-rose-600
+            transition-all
+            flex
+            items-center
+            gap-2
+          "
         >
 
-          <span className="material-symbols-outlined text-sm">
+          <span
+            className="
+              material-symbols-outlined
+              text-sm
+            "
+          >
             filter_alt_off
           </span>
 
@@ -845,20 +1086,62 @@ const SalesInquiry: React.FC = () => {
 
       {/* =====================================================
           TABELA
-      ===================================================== */}
+      ====================================================== */}
 
-      <div className="flex-1 overflow-auto bg-white dark:bg-slate-900 print:hidden">
+      <div
+        className="
+          flex-1
+          overflow-auto
+          bg-white
+          dark:bg-slate-900
+          print:hidden
+        "
+      >
 
-        <table className="w-full text-left border-collapse min-w-[1200px]">
+        <table
+          className="
+            w-full
+            text-left
+            border-collapse
+            min-w-[1200px]
+          "
+        >
 
-          <thead className="bg-primary text-white sticky top-0 z-20">
+          <thead
+            className="
+              bg-primary
+              text-white
+              sticky
+              top-0
+              z-20
+            "
+          >
 
-            <tr className="divide-x divide-white/10">
+            <tr
+              className="
+                divide-x
+                divide-white/10
+              "
+            >
 
-              <th className="px-3 py-2 text-center w-10">
-                <span className="material-symbols-outlined text-sm">
+              <th
+                className="
+                  px-3
+                  py-2
+                  text-center
+                  w-10
+                "
+              >
+
+                <span
+                  className="
+                    material-symbols-outlined
+                    text-sm
+                  "
+                >
                   settings
                 </span>
+
               </th>
 
               <th className="px-3 py-2 w-20">
@@ -885,11 +1168,25 @@ const SalesInquiry: React.FC = () => {
                 Cliente
               </th>
 
-              <th className="px-3 py-2 w-24 text-right">
+              <th
+                className="
+                  px-3
+                  py-2
+                  w-24
+                  text-right
+                "
+              >
                 Qtd. Itens
               </th>
 
-              <th className="px-3 py-2 w-32 text-right">
+              <th
+                className="
+                  px-3
+                  py-2
+                  w-32
+                  text-right
+                "
+              >
                 Vr. Total
               </th>
 
@@ -897,29 +1194,64 @@ const SalesInquiry: React.FC = () => {
 
           </thead>
 
-
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+          <tbody
+            className="
+              divide-y
+              divide-slate-100
+              dark:divide-slate-800
+            "
+          >
 
             {sales.map(s => (
 
               <tr
                 key={s.id}
                 onClick={() => {
+
                   setViewingDetail(s);
                   setActiveDetailTab('ITENS');
+
                 }}
-                className="hover:bg-slate-50 dark:hover:bg-slate-800/40 divide-x divide-slate-100 dark:divide-slate-800 transition-colors cursor-pointer group"
+                className="
+                  hover:bg-slate-50
+                  dark:hover:bg-slate-800/40
+                  divide-x
+                  divide-slate-100
+                  dark:divide-slate-800
+                  transition-colors
+                  cursor-pointer
+                  group
+                "
               >
 
-                <td className="px-3 py-1.5 text-center">
+                <td
+                  className="
+                    px-3
+                    py-1.5
+                    text-center
+                  "
+                >
 
-                  <div className="size-2.5 bg-blue-600 rounded-full mx-auto"></div>
+                  <div
+                    className="
+                      size-2.5
+                      bg-blue-600
+                      rounded-full
+                      mx-auto
+                    "
+                  />
 
                 </td>
 
 
+                {/* OPÇÕES */}
+
                 <td
-                  className="px-3 py-1.5 relative"
+                  className="
+                    px-3
+                    py-1.5
+                    relative
+                  "
                   onClick={e =>
                     e.stopPropagation()
                   }
@@ -933,10 +1265,30 @@ const SalesInquiry: React.FC = () => {
                           : s.id
                       )
                     }
-                    className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-2 py-0.5 hover:bg-primary hover:text-white transition-all flex items-center justify-center"
+                    className="
+                      bg-slate-100
+                      dark:bg-slate-800
+                      border
+                      border-slate-200
+                      dark:border-slate-700
+                      rounded
+                      px-2
+                      py-0.5
+                      hover:bg-primary
+                      hover:text-white
+                      transition-all
+                      flex
+                      items-center
+                      justify-center
+                    "
                   >
 
-                    <span className="material-symbols-outlined text-sm">
+                    <span
+                      className="
+                        material-symbols-outlined
+                        text-sm
+                      "
+                    >
                       list
                     </span>
 
@@ -945,9 +1297,36 @@ const SalesInquiry: React.FC = () => {
 
                   {showOptionsId === s.id && (
 
-                    <div className="absolute left-full top-0 ml-1 z-50 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-slate-700 rounded-lg py-2 w-56">
+                    <div
+                      className="
+                        absolute
+                        left-full
+                        top-0
+                        ml-1
+                        z-50
+                        bg-white
+                        dark:bg-slate-800
+                        shadow-2xl
+                        border
+                        border-slate-200
+                        dark:border-slate-700
+                        rounded-lg
+                        py-2
+                        w-56
+                      "
+                    >
 
-                      <p className="px-4 py-1 text-[9px] text-slate-400 font-black border-b mb-1">
+                      <p
+                        className="
+                          px-4
+                          py-1
+                          text-[9px]
+                          text-slate-400
+                          font-black
+                          border-b
+                          mb-1
+                        "
+                      >
                         Ações Disponíveis
                       </p>
 
@@ -956,28 +1335,61 @@ const SalesInquiry: React.FC = () => {
                         onClick={() =>
                           handleReprint(s)
                         }
-                        className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"
+                        className="
+                          w-full
+                          text-left
+                          px-4
+                          py-2
+                          hover:bg-slate-50
+                          dark:hover:bg-slate-700
+                          flex
+                          items-center
+                          gap-2
+                        "
                       >
 
-                        <span className="material-symbols-outlined text-sm">
+                        <span
+                          className="
+                            material-symbols-outlined
+                            text-sm
+                          "
+                        >
                           print
                         </span>
 
-                        01 - Reimprimir Romaneio A4
+                        01 - Reimprimir Romaneio
 
                       </button>
 
 
                       <button
                         onClick={() => {
+
                           setSelectedTransaction(s);
                           setShowCustomerModal(true);
                           setShowOptionsId(null);
+                          setCustomerSearch('');
+
                         }}
-                        className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"
+                        className="
+                          w-full
+                          text-left
+                          px-4
+                          py-2
+                          hover:bg-slate-50
+                          dark:hover:bg-slate-700
+                          flex
+                          items-center
+                          gap-2
+                        "
                       >
 
-                        <span className="material-symbols-outlined text-sm">
+                        <span
+                          className="
+                            material-symbols-outlined
+                            text-sm
+                          "
+                        >
                           person_edit
                         </span>
 
@@ -988,14 +1400,31 @@ const SalesInquiry: React.FC = () => {
 
                       <button
                         onClick={() => {
+
                           setSelectedTransaction(s);
                           setShowVendorModal(true);
                           setShowOptionsId(null);
+
                         }}
-                        className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"
+                        className="
+                          w-full
+                          text-left
+                          px-4
+                          py-2
+                          hover:bg-slate-50
+                          dark:hover:bg-slate-700
+                          flex
+                          items-center
+                          gap-2
+                        "
                       >
 
-                        <span className="material-symbols-outlined text-sm">
+                        <span
+                          className="
+                            material-symbols-outlined
+                            text-sm
+                          "
+                        >
                           badge
                         </span>
 
@@ -1010,55 +1439,111 @@ const SalesInquiry: React.FC = () => {
                 </td>
 
 
-                <td className="px-3 py-1.5 font-mono text-slate-400">
+                <td
+                  className="
+                    px-3
+                    py-1.5
+                    font-mono
+                    text-slate-400
+                  "
+                >
                   {s.id.slice(-6)}
                 </td>
 
 
-                <td className="px-3 py-1.5 text-primary">
+                <td
+                  className="
+                    px-3
+                    py-1.5
+                    text-primary
+                  "
+                >
                   {s.store}
                 </td>
 
 
-                <td className="px-3 py-1.5 text-primary">
-                  {getUserData(
-                    s.vendorId
-                  )?.name?.split(' ')[0] ||
-                    '---'}
+                <td
+                  className="
+                    px-3
+                    py-1.5
+                    text-primary
+                  "
+                >
+                  {
+                    getUserData(
+                      s.vendorId
+                    )?.name.split(' ')[0] ||
+                    '---'
+                  }
                 </td>
 
 
-                <td className="px-3 py-1.5 text-slate-500">
+                <td
+                  className="
+                    px-3
+                    py-1.5
+                    text-slate-500
+                  "
+                >
                   {s.date}
                 </td>
 
 
-                <td className="px-3 py-1.5">
-                  <span className="truncate max-w-[200px] uppercase">
+                <td
+                  className="
+                    px-3
+                    py-1.5
+                  "
+                >
+
+                  <span
+                    className="
+                      truncate
+                      max-w-[200px]
+                      uppercase
+                    "
+                  >
                     {s.client ||
                       'Consumidor Final'}
                   </span>
+
                 </td>
 
 
-                <td className="px-3 py-1.5 text-right font-black tabular-nums">
+                <td
+                  className="
+                    px-3
+                    py-1.5
+                    text-right
+                    font-black
+                    tabular-nums
+                  "
+                >
                   {s.items
                     ?.reduce(
                       (acc, i) =>
-                        acc +
-                        Number(i.quantity || 0),
+                        acc + i.quantity,
                       0
                     )
                     .toFixed(2)}
                 </td>
 
 
-                <td className="px-3 py-1.5 text-right font-black text-slate-900 dark:text-white tabular-nums">
+                <td
+                  className="
+                    px-3
+                    py-1.5
+                    text-right
+                    font-black
+                    text-slate-900
+                    dark:text-white
+                    tabular-nums
+                  "
+                >
 
                   R${' '}
-                  {Number(
-                    s.value || 0
-                  ).toLocaleString(
+
+                  {s.value.toLocaleString(
                     'pt-BR',
                     {
                       minimumFractionDigits: 2
@@ -1079,10 +1564,22 @@ const SalesInquiry: React.FC = () => {
 
 
       {/* =====================================================
-          RODAPÉ
-      ===================================================== */}
+          RODAPÉ DA TELA
+      ====================================================== */}
 
-      <footer className="bg-slate-400 p-2 flex justify-between items-center text-slate-900 font-black shrink-0 print:hidden">
+      <footer
+        className="
+          bg-slate-400
+          p-2
+          flex
+          justify-between
+          items-center
+          text-slate-900
+          font-black
+          shrink-0
+          print:hidden
+        "
+      >
 
         <div className="flex items-center gap-4">
 
@@ -1092,21 +1589,34 @@ const SalesInquiry: React.FC = () => {
 
         </div>
 
+        <div
+          className="
+            flex
+            gap-10
+            pr-4
+          "
+        >
 
-        <div className="flex gap-10 pr-4">
-
-          <span className="text-[12px] tabular-nums">
-
+          <span
+            className="
+              text-[12px]
+              tabular-nums
+            "
+          >
             {totals.qtyItems
               .toFixed(2)
               .replace('.', ',')}
-
           </span>
 
-
-          <span className="text-[12px] tabular-nums">
+          <span
+            className="
+              text-[12px]
+              tabular-nums
+            "
+          >
 
             R${' '}
+
             {totals.totalValue.toLocaleString(
               'pt-BR',
               {
@@ -1123,21 +1633,75 @@ const SalesInquiry: React.FC = () => {
 
       {/* =====================================================
           MODAL DETALHE
-      ===================================================== */}
+      ====================================================== */}
 
       {viewingDetail && (
 
-        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 p-4 animate-in fade-in print:hidden">
+        <div
+          className="
+            fixed
+            inset-0
+            z-[150]
+            flex
+            items-center
+            justify-center
+            bg-black/60
+            p-4
+            animate-in
+            fade-in
+            print:hidden
+          "
+        >
 
-          <div className="bg-slate-100 w-full max-w-[1200px] h-[90vh] rounded shadow-2xl flex flex-col overflow-hidden text-slate-700">
+          <div
+            className="
+              bg-slate-100
+              w-full
+              max-w-[1200px]
+              h-[90vh]
+              rounded
+              shadow-2xl
+              flex
+              flex-col
+              overflow-hidden
+              text-slate-700
+            "
+          >
 
-            <div className="bg-white p-3 border-b border-slate-300 flex items-center justify-between">
+            <div
+              className="
+                bg-white
+                p-3
+                border-b
+                border-slate-300
+                flex
+                items-center
+                justify-between
+              "
+            >
 
-              <h2 className="text-sm font-bold flex items-center gap-2">
+              <h2
+                className="
+                  text-sm
+                  font-bold
+                  flex
+                  items-center
+                  gap-2
+                "
+              >
 
                 Informações Gerais do Documento
 
-                <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-[10px]">
+                <span
+                  className="
+                    bg-blue-100
+                    text-blue-700
+                    px-2
+                    py-0.5
+                    rounded-full
+                    text-[10px]
+                  "
+                >
                   VENDA
                 </span>
 
@@ -1148,10 +1712,23 @@ const SalesInquiry: React.FC = () => {
                 onClick={() =>
                   setViewingDetail(null)
                 }
-                className="size-8 hover:bg-rose-500 hover:text-white flex items-center justify-center rounded transition-all"
+                className="
+                  size-8
+                  hover:bg-rose-500
+                  hover:text-white
+                  flex
+                  items-center
+                  justify-center
+                  rounded
+                  transition-all
+                "
               >
 
-                <span className="material-symbols-outlined">
+                <span
+                  className="
+                    material-symbols-outlined
+                  "
+                >
                   close
                 </span>
 
@@ -1160,29 +1737,55 @@ const SalesInquiry: React.FC = () => {
             </div>
 
 
-            <div className="p-4 space-y-4 overflow-y-auto">
+            <div
+              className="
+                p-4
+                space-y-4
+                overflow-y-auto
+              "
+            >
 
-              <div className="grid grid-cols-12 gap-2">
+              <div
+                className="
+                  grid
+                  grid-cols-12
+                  gap-2
+                "
+              >
 
                 <div className="col-span-2">
+
                   <DetailField
                     label="ID:"
-                    value={viewingDetail.id.slice(-6)}
+                    value={
+                      viewingDetail.id.slice(-6)
+                    }
                   />
+
                 </div>
 
                 <div className="col-span-10">
+
                   <DetailField
                     label="LOJA:"
-                    value={viewingDetail.store}
+                    value={
+                      viewingDetail.store
+                    }
                     borderHighlight
                   />
+
                 </div>
 
               </div>
 
 
-              <div className="grid grid-cols-12 gap-2">
+              <div
+                className="
+                  grid
+                  grid-cols-12
+                  gap-2
+                "
+              >
 
                 <div className="col-span-10">
 
@@ -1197,12 +1800,13 @@ const SalesInquiry: React.FC = () => {
 
                 </div>
 
-
                 <div className="col-span-2">
 
                   <DetailField
                     label="DATA EMISSÃO:"
-                    value={viewingDetail.date}
+                    value={
+                      viewingDetail.date
+                    }
                     borderHighlight
                   />
 
@@ -1211,7 +1815,13 @@ const SalesInquiry: React.FC = () => {
               </div>
 
 
-              <div className="grid grid-cols-12 gap-2">
+              <div
+                className="
+                  grid
+                  grid-cols-12
+                  gap-2
+                "
+              >
 
                 <div className="col-span-4">
 
@@ -1254,14 +1864,34 @@ const SalesInquiry: React.FC = () => {
                         viewingDetail
                       )
                     }
-                    className="w-full h-12 bg-primary text-white rounded font-black uppercase text-[10px] shadow flex items-center justify-center gap-2 hover:bg-blue-600"
+                    className="
+                      w-full
+                      h-12
+                      bg-primary
+                      text-white
+                      rounded
+                      font-black
+                      uppercase
+                      text-[10px]
+                      shadow
+                      flex
+                      items-center
+                      justify-center
+                      gap-2
+                      hover:bg-blue-600
+                    "
                   >
 
-                    <span className="material-symbols-outlined">
+                    <span
+                      className="
+                        material-symbols-outlined
+                        text-sm
+                      "
+                    >
                       print
                     </span>
 
-                    Reimprimir Romaneio A4
+                    Reimprimir Romaneio
 
                   </button>
 
@@ -1270,17 +1900,36 @@ const SalesInquiry: React.FC = () => {
               </div>
 
 
-              <div className="bg-primary text-white flex items-center px-4 py-1.5 gap-8 mt-2">
+              <div
+                className="
+                  bg-primary
+                  text-white
+                  flex
+                  items-center
+                  px-4
+                  py-1.5
+                  gap-8
+                  mt-2
+                "
+              >
 
                 <button
                   onClick={() =>
-                    setActiveDetailTab('ITENS')
+                    setActiveDetailTab(
+                      'ITENS'
+                    )
                   }
-                  className={`text-[10px] font-black pb-0.5 uppercase ${
-                    activeDetailTab === 'ITENS'
-                      ? 'border-b-2 border-white'
-                      : 'opacity-70'
-                  }`}
+                  className={`
+                    text-[10px]
+                    font-black
+                    pb-0.5
+                    uppercase
+                    ${
+                      activeDetailTab === 'ITENS'
+                        ? 'border-b-2 border-white'
+                        : 'opacity-70'
+                    }
+                  `}
                 >
                   ITENS
                 </button>
@@ -1292,12 +1941,17 @@ const SalesInquiry: React.FC = () => {
                       'PAGAMENTO'
                     )
                   }
-                  className={`text-[10px] font-black pb-0.5 uppercase ${
-                    activeDetailTab ===
-                    'PAGAMENTO'
-                      ? 'border-b-2 border-white'
-                      : 'opacity-70'
-                  }`}
+                  className={`
+                    text-[10px]
+                    font-black
+                    pb-0.5
+                    uppercase
+                    ${
+                      activeDetailTab === 'PAGAMENTO'
+                        ? 'border-b-2 border-white'
+                        : 'opacity-70'
+                    }
+                  `}
                 >
                   FORMAS DE PAGAMENTO
                 </button>
@@ -1305,16 +1959,43 @@ const SalesInquiry: React.FC = () => {
               </div>
 
 
-              <div className="bg-white border border-slate-300 flex flex-col min-h-[300px]">
+              <div
+                className="
+                  bg-white
+                  border
+                  border-slate-300
+                  flex
+                  flex-col
+                  min-h-[300px]
+                "
+              >
 
-                {activeDetailTab ===
-                  'ITENS' && (
+                {/* ITENS */}
 
-                  <div className="overflow-auto flex-1">
+                {activeDetailTab === 'ITENS' && (
 
-                    <table className="w-full text-left border-collapse text-[10px]">
+                  <div
+                    className="
+                      overflow-auto
+                      flex-1
+                    "
+                  >
 
-                      <thead className="bg-primary text-white">
+                    <table
+                      className="
+                        w-full
+                        text-left
+                        border-collapse
+                        text-[10px]
+                      "
+                    >
+
+                      <thead
+                        className="
+                          bg-primary
+                          text-white
+                        "
+                      >
 
                         <tr>
 
@@ -1322,15 +2003,33 @@ const SalesInquiry: React.FC = () => {
                             Produto
                           </th>
 
-                          <th className="px-2 py-1 text-right">
+                          <th
+                            className="
+                              px-2
+                              py-1
+                              text-right
+                            "
+                          >
                             Qtd.
                           </th>
 
-                          <th className="px-2 py-1 text-right">
+                          <th
+                            className="
+                              px-2
+                              py-1
+                              text-right
+                            "
+                          >
                             Vr. Unitário
                           </th>
 
-                          <th className="px-2 py-1 text-right">
+                          <th
+                            className="
+                              px-2
+                              py-1
+                              text-right
+                            "
+                          >
                             Vr. Total
                           </th>
 
@@ -1346,12 +2045,20 @@ const SalesInquiry: React.FC = () => {
 
                             <tr
                               key={idx}
-                              className="hover:bg-slate-50 border-b"
+                              className="
+                                hover:bg-slate-50
+                                border-b
+                              "
                             >
 
                               <td className="px-2 py-1">
 
-                                <span className="text-blue-600 font-black">
+                                <span
+                                  className="
+                                    text-blue-600
+                                    font-black
+                                  "
+                                >
                                   {item.sku}
                                 </span>
 
@@ -1361,50 +2068,51 @@ const SalesInquiry: React.FC = () => {
 
                               </td>
 
-
-                              <td className="px-2 py-1 text-right font-black">
-
-                                {Number(
-                                  item.quantity || 0
-                                ).toFixed(2)}
-
+                              <td
+                                className="
+                                  px-2
+                                  py-1
+                                  text-right
+                                  font-black
+                                "
+                              >
+                                {item.quantity.toFixed(2)}
                               </td>
 
-
-                              <td className="px-2 py-1 text-right">
-
+                              <td
+                                className="
+                                  px-2
+                                  py-1
+                                  text-right
+                                "
+                              >
                                 R${' '}
-
-                                {Number(
-                                  item.salePrice || 0
-                                ).toLocaleString(
+                                {item.salePrice.toLocaleString(
                                   'pt-BR',
                                   {
                                     minimumFractionDigits: 2
                                   }
                                 )}
-
                               </td>
 
-
-                              <td className="px-2 py-1 text-right font-black">
-
+                              <td
+                                className="
+                                  px-2
+                                  py-1
+                                  text-right
+                                  font-black
+                                "
+                              >
                                 R${' '}
-
                                 {(
-                                  Number(
-                                    item.quantity || 0
-                                  ) *
-                                  Number(
-                                    item.salePrice || 0
-                                  )
+                                  item.quantity *
+                                  item.salePrice
                                 ).toLocaleString(
                                   'pt-BR',
                                   {
                                     minimumFractionDigits: 2
                                   }
                                 )}
-
                               </td>
 
                             </tr>
@@ -1421,20 +2129,49 @@ const SalesInquiry: React.FC = () => {
                 )}
 
 
-                {activeDetailTab ===
-                  'PAGAMENTO' && (
+                {/* PAGAMENTO */}
 
-                  <div className="p-8 space-y-6">
+                {activeDetailTab === 'PAGAMENTO' && (
 
-                    <div className="grid grid-cols-3 gap-6">
+                  <div
+                    className="
+                      p-8
+                      space-y-6
+                    "
+                  >
 
-                      <div className="bg-slate-50 p-4 rounded border">
+                    <div
+                      className="
+                        grid
+                        grid-cols-3
+                        gap-6
+                      "
+                    >
 
-                        <p className="text-[9px] text-slate-400">
+                      <div
+                        className="
+                          bg-slate-50
+                          p-4
+                          rounded
+                          border
+                        "
+                      >
+
+                        <p
+                          className="
+                            text-[9px]
+                            text-slate-400
+                          "
+                        >
                           PAGAMENTO
                         </p>
 
-                        <p className="text-sm font-black">
+                        <p
+                          className="
+                            text-sm
+                            font-black
+                          "
+                        >
                           {viewingDetail.method ||
                             'DINHEIRO'}
                         </p>
@@ -1442,20 +2179,35 @@ const SalesInquiry: React.FC = () => {
                       </div>
 
 
-                      <div className="bg-slate-50 p-4 rounded border">
+                      <div
+                        className="
+                          bg-slate-50
+                          p-4
+                          rounded
+                          border
+                        "
+                      >
 
-                        <p className="text-[9px] text-slate-400">
+                        <p
+                          className="
+                            text-[9px]
+                            text-slate-400
+                          "
+                        >
                           TOTAL
                         </p>
 
-                        <p className="text-sm font-black text-emerald-600">
+                        <p
+                          className="
+                            text-sm
+                            font-black
+                            text-emerald-600
+                          "
+                        >
 
                           R${' '}
 
-                          {Number(
-                            viewingDetail.value ||
-                              0
-                          ).toLocaleString(
+                          {viewingDetail.value.toLocaleString(
                             'pt-BR',
                             {
                               minimumFractionDigits: 2
@@ -1471,75 +2223,145 @@ const SalesInquiry: React.FC = () => {
 
                     {viewingDetail.cardOperatorId && (
 
-                      <div className="grid grid-cols-4 gap-4">
+                      <div
+                        className="
+                          grid
+                          grid-cols-4
+                          gap-4
+                        "
+                      >
 
-                        <div className="bg-white p-3 rounded border">
+                        <div
+                          className="
+                            bg-white
+                            p-3
+                            rounded
+                            border
+                          "
+                        >
 
-                          <p className="text-[8px] text-slate-400">
+                          <p
+                            className="
+                              text-[8px]
+                              text-slate-400
+                            "
+                          >
                             OPERADORA
                           </p>
 
-                          <p className="text-[10px] font-bold">
-
+                          <p
+                            className="
+                              text-[10px]
+                              font-bold
+                            "
+                          >
                             {
                               getCardInfo(
                                 viewingDetail.cardOperatorId,
                                 viewingDetail.cardBrandId
                               ).operator
                             }
-
                           </p>
 
                         </div>
 
 
-                        <div className="bg-white p-3 rounded border">
+                        <div
+                          className="
+                            bg-white
+                            p-3
+                            rounded
+                            border
+                          "
+                        >
 
-                          <p className="text-[8px] text-slate-400">
+                          <p
+                            className="
+                              text-[8px]
+                              text-slate-400
+                            "
+                          >
                             BANDEIRA
                           </p>
 
-                          <p className="text-[10px] font-bold">
-
+                          <p
+                            className="
+                              text-[10px]
+                              font-bold
+                            "
+                          >
                             {
                               getCardInfo(
                                 viewingDetail.cardOperatorId,
                                 viewingDetail.cardBrandId
                               ).brand
                             }
-
                           </p>
 
                         </div>
 
 
-                        <div className="bg-white p-3 rounded border">
+                        <div
+                          className="
+                            bg-white
+                            p-3
+                            rounded
+                            border
+                          "
+                        >
 
-                          <p className="text-[8px] text-slate-400">
+                          <p
+                            className="
+                              text-[8px]
+                              text-slate-400
+                            "
+                          >
                             NSU
                           </p>
 
-                          <p className="text-[10px] font-bold">
-
-                            {viewingDetail.transactionSku ||
-                              '---'}
-
+                          <p
+                            className="
+                              text-[10px]
+                              font-bold
+                            "
+                          >
+                            {
+                              viewingDetail.transactionSku ||
+                              '---'
+                            }
                           </p>
 
                         </div>
 
 
-                        <div className="bg-white p-3 rounded border">
+                        <div
+                          className="
+                            bg-white
+                            p-3
+                            rounded
+                            border
+                          "
+                        >
 
-                          <p className="text-[8px] text-slate-400">
+                          <p
+                            className="
+                              text-[8px]
+                              text-slate-400
+                            "
+                          >
                             AUTH
                           </p>
 
-                          <p className="text-[10px] font-bold">
-
-                            {viewingDetail.authNumber ||
-                              '---'}
-
+                          <p
+                            className="
+                              text-[10px]
+                              font-bold
+                            "
+                          >
+                            {
+                              viewingDetail.authNumber ||
+                              '---'
+                            }
                           </p>
 
                         </div>
@@ -1564,16 +2386,52 @@ const SalesInquiry: React.FC = () => {
 
 
       {/* =====================================================
-          MODAL VENDEDOR
-      ===================================================== */}
+          MODAL ALTERAR VENDEDOR
+      ====================================================== */}
 
       {showVendorModal && (
 
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-in fade-in">
+        <div
+          className="
+            fixed
+            inset-0
+            z-[200]
+            flex
+            items-center
+            justify-center
+            bg-black/80
+            backdrop-blur-xl
+            p-4
+            animate-in
+            fade-in
+          "
+        >
 
-          <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+          <div
+            className="
+              bg-white
+              dark:bg-slate-900
+              w-full
+              max-w-lg
+              rounded-[2.5rem]
+              shadow-2xl
+              overflow-hidden
+              animate-in
+              zoom-in-95
+            "
+          >
 
-            <div className="p-6 bg-primary text-white flex justify-between items-center font-black">
+            <div
+              className="
+                p-6
+                bg-primary
+                text-white
+                flex
+                justify-between
+                items-center
+                font-black
+              "
+            >
 
               <h3 className="text-lg uppercase">
                 Alterar Vendedor
@@ -1584,27 +2442,53 @@ const SalesInquiry: React.FC = () => {
                   setShowVendorModal(false)
                 }
               >
-                <span className="material-symbols-outlined">
+
+                <span
+                  className="
+                    material-symbols-outlined
+                  "
+                >
                   close
                 </span>
+
               </button>
 
             </div>
 
 
-            <div className="p-8 space-y-4">
+            <div
+              className="
+                p-8
+                space-y-4
+              "
+            >
 
-              <p className="text-[10px] text-slate-400 font-black uppercase mb-4 tracking-widest px-2">
-
-                Selecione o novo vendedor
-                para o documento{' '}
-
-                {selectedTransaction?.id.slice(-6)}
-
+              <p
+                className="
+                  text-[10px]
+                  text-slate-400
+                  font-black
+                  uppercase
+                  mb-4
+                  tracking-widest
+                  px-2
+                "
+              >
+                Selecione o novo vendedor para
+                o documento{' '}
+                {selectedTransaction?.id.slice(-6)}:
               </p>
 
 
-              <div className="space-y-2 max-h-96 overflow-y-auto custom-scrollbar pr-2">
+              <div
+                className="
+                  space-y-2
+                  max-h-96
+                  overflow-y-auto
+                  custom-scrollbar
+                  pr-2
+                "
+              >
 
                 {users
                   .filter(
@@ -1625,27 +2509,48 @@ const SalesInquiry: React.FC = () => {
                           v.id
                         )
                       }
-                      className={`w-full p-4 rounded-2xl flex items-center justify-between group transition-all ${
-                        selectedTransaction?.vendorId ===
-                        v.id
-                          ? 'bg-primary text-white'
-                          : 'bg-slate-50 dark:bg-slate-800 hover:bg-primary/10'
-                      }`}
+                      className={`
+                        w-full
+                        p-4
+                        rounded-2xl
+                        flex
+                        items-center
+                        justify-between
+                        group
+                        transition-all
+                        ${
+                          selectedTransaction?.vendorId ===
+                          v.id
+                            ? 'bg-primary text-white'
+                            : 'bg-slate-50 dark:bg-slate-800 hover:bg-primary/10'
+                        }
+                      `}
                     >
 
-                      <span className={`text-xs font-black uppercase ${
-                        selectedTransaction?.vendorId ===
-                        v.id
-                          ? 'text-white'
-                          : 'text-slate-700 dark:text-slate-200'
-                      }`}>
-
+                      <span
+                        className={`
+                          text-xs
+                          font-black
+                          uppercase
+                          ${
+                            selectedTransaction?.vendorId ===
+                            v.id
+                              ? 'text-white'
+                              : 'text-slate-700 dark:text-slate-200'
+                          }
+                        `}
+                      >
                         {v.name}
-
                       </span>
 
-
-                      <span className="material-symbols-outlined opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span
+                        className="
+                          material-symbols-outlined
+                          opacity-0
+                          group-hover:opacity-100
+                          transition-opacity
+                        "
+                      >
                         check_circle
                       </span>
 
@@ -1658,7 +2563,21 @@ const SalesInquiry: React.FC = () => {
                   onClick={() =>
                     handleUpdateVendor('')
                   }
-                  className="w-full p-4 rounded-2xl bg-slate-100 dark:bg-slate-700 text-slate-400 text-xs font-black uppercase hover:bg-rose-500 hover:text-white transition-all text-center"
+                  className="
+                    w-full
+                    p-4
+                    rounded-2xl
+                    bg-slate-100
+                    dark:bg-slate-700
+                    text-slate-400
+                    text-xs
+                    font-black
+                    uppercase
+                    hover:bg-rose-500
+                    hover:text-white
+                    transition-all
+                    text-center
+                  "
                 >
                   Limpar Vendedor (Balcão)
                 </button>
@@ -1675,28 +2594,71 @@ const SalesInquiry: React.FC = () => {
 
 
       {/* =====================================================
-          MODAL CLIENTE
-      ===================================================== */}
+          MODAL ALTERAR CLIENTE
+      ====================================================== */}
 
       {showCustomerModal && (
 
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-in fade-in">
+        <div
+          className="
+            fixed
+            inset-0
+            z-[200]
+            flex
+            items-center
+            justify-center
+            bg-black/80
+            backdrop-blur-xl
+            p-4
+            animate-in
+            fade-in
+          "
+        >
 
-          <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+          <div
+            className="
+              bg-white
+              dark:bg-slate-900
+              w-full
+              max-w-2xl
+              rounded-[2.5rem]
+              shadow-2xl
+              overflow-hidden
+              animate-in
+              zoom-in-95
+            "
+          >
 
-            <div className="p-6 bg-primary text-white flex justify-between items-center font-black">
+            <div
+              className="
+                p-6
+                bg-primary
+                text-white
+                flex
+                justify-between
+                items-center
+                font-black
+              "
+            >
 
               <h3 className="text-lg uppercase">
                 Alterar Cliente
               </h3>
 
               <button
-                onClick={() =>
-                  setShowCustomerModal(false)
-                }
+                onClick={() => {
+
+                  setShowCustomerModal(false);
+                  setCustomerSearch('');
+
+                }}
               >
 
-                <span className="material-symbols-outlined">
+                <span
+                  className="
+                    material-symbols-outlined
+                  "
+                >
                   close
                 </span>
 
@@ -1705,26 +2667,76 @@ const SalesInquiry: React.FC = () => {
             </div>
 
 
-            <div className="p-8 space-y-4">
+            <div
+              className="
+                p-8
+                space-y-4
+              "
+            >
 
-              <div className="relative mb-6">
+              <div
+                className="
+                  relative
+                  mb-6
+                "
+              >
 
-                <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                <span
+                  className="
+                    material-symbols-outlined
+                    absolute
+                    left-4
+                    top-1/2
+                    -translate-y-1/2
+                    text-slate-400
+                  "
+                >
                   search
                 </span>
 
                 <input
                   autoFocus
-                  placeholder="BUSCAR CLIENTE PELO NOME..."
-                  className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl pl-12 pr-6 text-xs font-black uppercase outline-none focus:ring-2 focus:ring-primary/20"
+                  value={customerSearch}
+                  onChange={e =>
+                    setCustomerSearch(
+                      e.target.value
+                    )
+                  }
+                  placeholder="
+                    BUSCAR CLIENTE PELO NOME...
+                  "
+                  className="
+                    w-full
+                    h-12
+                    bg-slate-50
+                    dark:bg-slate-800
+                    border-none
+                    rounded-xl
+                    pl-12
+                    pr-6
+                    text-xs
+                    font-black
+                    uppercase
+                    outline-none
+                    focus:ring-2
+                    focus:ring-primary/20
+                  "
                 />
 
               </div>
 
 
-              <div className="space-y-2 max-h-96 overflow-y-auto custom-scrollbar pr-2">
+              <div
+                className="
+                  space-y-2
+                  max-h-96
+                  overflow-y-auto
+                  custom-scrollbar
+                  pr-2
+                "
+              >
 
-                {customers.map(c => (
+                {filteredCustomers.map(c => (
 
                   <button
                     key={c.id}
@@ -1733,36 +2745,54 @@ const SalesInquiry: React.FC = () => {
                         c.id
                       )
                     }
-                    className={`w-full p-5 rounded-2xl flex flex-col text-left group transition-all ${
-                      selectedTransaction?.clientId ===
-                      c.id
-                        ? 'bg-primary text-white'
-                        : 'bg-slate-50 dark:bg-slate-800 hover:bg-primary/10'
-                    }`}
+                    className={`
+                      w-full
+                      p-5
+                      rounded-2xl
+                      flex
+                      flex-col
+                      text-left
+                      group
+                      transition-all
+                      ${
+                        selectedTransaction?.clientId ===
+                        c.id
+                          ? 'bg-primary text-white'
+                          : 'bg-slate-50 dark:bg-slate-800 hover:bg-primary/10'
+                      }
+                    `}
                   >
 
-                    <span className={`text-sm font-black uppercase ${
-                      selectedTransaction?.clientId ===
-                      c.id
-                        ? 'text-white'
-                        : 'text-slate-800 dark:text-slate-200'
-                    }`}>
-
+                    <span
+                      className={`
+                        text-sm
+                        font-black
+                        uppercase
+                        ${
+                          selectedTransaction?.clientId ===
+                          c.id
+                            ? 'text-white'
+                            : 'text-slate-800 dark:text-slate-200'
+                        }
+                      `}
+                    >
                       {c.name}
-
                     </span>
 
-
-                    <span className={`text-[10px] font-bold ${
-                      selectedTransaction?.clientId ===
-                      c.id
-                        ? 'text-white/60'
-                        : 'text-slate-400'
-                    }`}>
-
+                    <span
+                      className={`
+                        text-[10px]
+                        font-bold
+                        ${
+                          selectedTransaction?.clientId ===
+                          c.id
+                            ? 'text-white/60'
+                            : 'text-slate-400'
+                        }
+                      `}
+                    >
                       {c.cpfCnpj ||
                         'DOCUMENTO NÃO CADASTRADO'}
-
                     </span>
 
                   </button>
@@ -1770,16 +2800,44 @@ const SalesInquiry: React.FC = () => {
                 ))}
 
 
+                {filteredCustomers.length === 0 && (
+
+                  <div
+                    className="
+                      text-center
+                      py-8
+                      text-slate-400
+                      text-xs
+                    "
+                  >
+                    NENHUM CLIENTE ENCONTRADO
+                  </div>
+
+                )}
+
+
                 <button
                   onClick={() =>
                     handleUpdateCustomer('')
                   }
-                  className="w-full p-4 rounded-2xl bg-slate-100 dark:bg-slate-700 text-slate-400 text-xs font-black uppercase hover:bg-rose-500 hover:text-white transition-all text-center"
+                  className="
+                    w-full
+                    p-4
+                    rounded-2xl
+                    bg-slate-100
+                    dark:bg-slate-700
+                    text-slate-400
+                    text-xs
+                    font-black
+                    uppercase
+                    hover:bg-rose-500
+                    hover:text-white
+                    transition-all
+                    text-center
+                  "
                 >
-
                   Consumidor Final
                   (Sem Cadastro)
-
                 </button>
 
               </div>
@@ -1795,9 +2853,13 @@ const SalesInquiry: React.FC = () => {
 
       {/* =====================================================
           CSS
-      ===================================================== */}
+      ====================================================== */}
 
       <style>{`
+
+        /* ================================================
+           SCROLLBAR
+        ================================================ */
 
         .custom-scrollbar::-webkit-scrollbar {
           width: 4px;
@@ -1810,85 +2872,659 @@ const SalesInquiry: React.FC = () => {
         }
 
 
-        /* ===================================================
+        /* ================================================
            ROMANEIO A4
-        =================================================== */
+        ================================================ */
 
-        .a4-print-area {
-          display: none;
+        .romaneio-a4 {
+
+          width: 100%;
+          max-width: 100%;
+
+          margin: 0 auto;
+
+          padding:
+            12mm
+            12mm
+            10mm
+            12mm;
+
+          box-sizing: border-box;
+
+          background: #ffffff;
+
+          color: #111827;
+
+          font-family:
+            Arial,
+            Helvetica,
+            sans-serif;
+
+          font-size: 10px;
+
+          line-height: 1.35;
         }
 
 
-        /* ===================================================
+        /* ================================================
+           CABEÇALHO
+        ================================================ */
+
+        .romaneio-header {
+
+          width: 100%;
+
+          display: flex;
+
+          justify-content: space-between;
+
+          align-items: flex-start;
+
+          padding-bottom: 12px;
+
+          margin-bottom: 12px;
+
+          border-bottom:
+            2px solid #111827;
+
+          box-sizing: border-box;
+        }
+
+
+        .empresa-info {
+
+          flex: 1;
+
+        }
+
+
+        .empresa-info h1 {
+
+          margin: 0;
+
+          font-size: 20px;
+
+          font-weight: 900;
+
+          text-transform: uppercase;
+
+        }
+
+
+        .empresa-info h2 {
+
+          margin: 4px 0 0 0;
+
+          font-size: 15px;
+
+          font-weight: 900;
+
+          text-transform: uppercase;
+
+        }
+
+
+        .empresa-info p {
+
+          margin: 4px 0 0 0;
+
+          font-size: 9px;
+
+          color: #4b5563;
+
+          font-weight: bold;
+
+        }
+
+
+        .documento-info {
+
+          width: 180px;
+
+          display: grid;
+
+          grid-template-columns:
+            1fr 1fr;
+
+          border:
+            1px solid #111827;
+
+        }
+
+
+        .documento-info div {
+
+          padding: 7px;
+
+          display: flex;
+
+          flex-direction: column;
+
+          gap: 2px;
+
+        }
+
+
+        .documento-info div + div {
+
+          border-left:
+            1px solid #111827;
+
+        }
+
+
+        .documento-info strong {
+
+          font-size: 8px;
+
+          font-weight: 900;
+
+        }
+
+
+        .documento-info span {
+
+          font-size: 11px;
+
+          font-weight: bold;
+
+        }
+
+
+        /* ================================================
+           TÍTULOS
+        ================================================ */
+
+        .romaneio-section-title {
+
+          width: 100%;
+
+          background: #e5e7eb;
+
+          border:
+            1px solid #9ca3af;
+
+          padding: 6px 8px;
+
+          margin-top: 10px;
+
+          margin-bottom: 6px;
+
+          box-sizing: border-box;
+
+          font-size: 9px;
+
+          font-weight: 900;
+
+          text-transform: uppercase;
+
+        }
+
+
+        /* ================================================
+           DADOS
+        ================================================ */
+
+        .dados-grid {
+
+          width: 100%;
+
+          display: grid;
+
+          grid-template-columns:
+            2fr
+            1.5fr
+            1.2fr
+            1.5fr;
+
+          border:
+            1px solid #d1d5db;
+
+          box-sizing: border-box;
+
+        }
+
+
+        .campo {
+
+          min-height: 45px;
+
+          padding: 6px 8px;
+
+          display: flex;
+
+          flex-direction: column;
+
+          justify-content: center;
+
+          box-sizing: border-box;
+
+        }
+
+
+        .campo + .campo {
+
+          border-left:
+            1px solid #d1d5db;
+
+        }
+
+
+        .campo label {
+
+          font-size: 7px;
+
+          font-weight: 900;
+
+          color: #6b7280;
+
+          margin-bottom: 3px;
+
+        }
+
+
+        .campo span {
+
+          font-size: 9px;
+
+          font-weight: 700;
+
+          text-transform: uppercase;
+
+          overflow: hidden;
+
+          text-overflow: ellipsis;
+
+        }
+
+
+        /* ================================================
+           TABELA
+        ================================================ */
+
+        .romaneio-table {
+
+          width: 100%;
+
+          border-collapse: collapse;
+
+          table-layout: fixed;
+
+          font-size: 9px;
+
+        }
+
+
+        .romaneio-table thead {
+
+          background: #1f2937;
+
+          color: white;
+
+        }
+
+
+        .romaneio-table th {
+
+          padding: 7px 5px;
+
+          border:
+            1px solid #1f2937;
+
+          font-size: 8px;
+
+          font-weight: 900;
+
+          text-transform: uppercase;
+
+        }
+
+
+        .romaneio-table td {
+
+          padding: 6px 5px;
+
+          border:
+            1px solid #d1d5db;
+
+          vertical-align: middle;
+
+          word-wrap: break-word;
+
+        }
+
+
+        .romaneio-table tbody tr:nth-child(even) {
+
+          background: #f9fafb;
+
+        }
+
+
+        .romaneio-table .col-item {
+
+          width: 6%;
+
+        }
+
+
+        .romaneio-table .col-codigo {
+
+          width: 14%;
+
+        }
+
+
+        .romaneio-table .col-descricao {
+
+          width: 40%;
+
+        }
+
+
+        .romaneio-table .col-qtd {
+
+          width: 10%;
+
+        }
+
+
+        .romaneio-table .col-unit {
+
+          width: 15%;
+
+        }
+
+
+        .romaneio-table .col-total {
+
+          width: 15%;
+
+        }
+
+
+        /* ================================================
+           RESUMO
+        ================================================ */
+
+        .resumo-container {
+
+          width: 100%;
+
+          display: flex;
+
+          justify-content: space-between;
+
+          gap: 15px;
+
+          margin-top: 12px;
+
+          box-sizing: border-box;
+
+        }
+
+
+        .resumo-left {
+
+          flex: 1;
+
+          display: flex;
+
+          gap: 8px;
+
+        }
+
+
+        .resumo-box {
+
+          min-width: 180px;
+
+          border:
+            1px solid #d1d5db;
+
+          padding: 8px;
+
+          display: flex;
+
+          flex-direction: column;
+
+          gap: 3px;
+
+          box-sizing: border-box;
+
+        }
+
+
+        .resumo-box strong {
+
+          font-size: 8px;
+
+          font-weight: 900;
+
+          padding-bottom: 4px;
+
+          border-bottom:
+            1px solid #e5e7eb;
+
+        }
+
+
+        .resumo-box span {
+
+          font-size: 8px;
+
+          font-weight: 600;
+
+        }
+
+
+        /* ================================================
+           TOTAL
+        ================================================ */
+
+        .total-box {
+
+          width: 230px;
+
+          border:
+            2px solid #111827;
+
+          padding: 10px;
+
+          box-sizing: border-box;
+
+          display: flex;
+
+          flex-direction: column;
+
+          justify-content: center;
+
+          align-items: flex-end;
+
+        }
+
+
+        .total-label {
+
+          font-size: 9px;
+
+          font-weight: 900;
+
+          text-transform: uppercase;
+
+        }
+
+
+        .total-value {
+
+          margin-top: 4px;
+
+          font-size: 19px;
+
+          font-weight: 900;
+
+        }
+
+
+        /* ================================================
+           ASSINATURAS
+        ================================================ */
+
+        .assinaturas {
+
+          width: 100%;
+
+          display: flex;
+
+          justify-content: space-between;
+
+          gap: 60px;
+
+          margin-top: 45px;
+
+          box-sizing: border-box;
+
+        }
+
+
+        .assinatura {
+
+          flex: 1;
+
+          text-align: center;
+
+        }
+
+
+        .assinatura div {
+
+          width: 100%;
+
+          border-top:
+            1px solid #111827;
+
+          margin-bottom: 5px;
+
+        }
+
+
+        .assinatura span {
+
+          font-size: 8px;
+
+          font-weight: 900;
+
+          text-transform: uppercase;
+
+        }
+
+
+        /* ================================================
+           RODAPÉ
+        ================================================ */
+
+        .romaneio-footer {
+
+          width: 100%;
+
+          margin-top: 25px;
+
+          padding-top: 8px;
+
+          border-top:
+            1px solid #9ca3af;
+
+          display: flex;
+
+          justify-content: space-between;
+
+          font-size: 7px;
+
+          color: #6b7280;
+
+          font-weight: bold;
+
+        }
+
+
+        /* ================================================
            IMPRESSÃO
-        =================================================== */
+        ================================================ */
 
         @media print {
 
           html,
-          body,
-          #root {
-            width: 100% !important;
-            min-width: 0 !important;
-            max-width: none !important;
+          body {
+
+            width: 210mm !important;
+
+            min-width: 210mm !important;
 
             margin: 0 !important;
+
             padding: 0 !important;
 
-            background: white !important;
+            background:
+              #ffffff !important;
+
           }
 
 
           body {
+
             overflow: visible !important;
+
           }
 
 
           body * {
+
             visibility: hidden !important;
+
           }
 
 
-          /* Esconde absolutamente tudo */
+          #root {
 
-          header,
-          footer,
-          .print\\:hidden,
-          div[class*="fixed"],
-          div[class*="backdrop-blur"] {
-            display: none !important;
-          }
+            width: 210mm !important;
 
+            min-width: 210mm !important;
 
-          /* =================================================
-             ÁREA A4
-          ================================================= */
+            margin: 0 !important;
 
-          #receipt-reprint-area {
+            padding: 0 !important;
 
             display: block !important;
 
+          }
+
+
+          #receipt-reprint-area {
+
             visibility: visible !important;
+
+            display: block !important;
 
             position: relative !important;
 
-            width: 100% !important;
+            width: 210mm !important;
 
-            max-width: none !important;
+            min-width: 210mm !important;
 
-            min-width: 0 !important;
+            max-width: 210mm !important;
+
+            height: auto !important;
 
             margin: 0 auto !important;
 
             padding: 0 !important;
 
-            background: white !important;
+            left: 0 !important;
 
-            color: black !important;
+            top: 0 !important;
 
-            overflow: visible !important;
-
-            box-sizing: border-box !important;
+            background:
+              white !important;
 
           }
 
@@ -1900,15 +3536,15 @@ const SalesInquiry: React.FC = () => {
           }
 
 
-          /* =================================================
-             DOCUMENTO
-          ================================================= */
+          .romaneio-a4 {
 
-          .a4-document {
+            visibility: visible !important;
 
             display: block !important;
 
-            width: 100% !important;
+            width: 210mm !important;
+
+            min-width: 210mm !important;
 
             max-width: 210mm !important;
 
@@ -1917,621 +3553,54 @@ const SalesInquiry: React.FC = () => {
             margin: 0 auto !important;
 
             padding:
-
+              12mm
+              12mm
               10mm
-              10mm
-              10mm
-              10mm !important;
+              12mm !important;
 
-            box-sizing: border-box !important;
+            box-sizing:
+              border-box !important;
 
-            background: white !important;
+            background:
+              white !important;
 
-            color: black !important;
-
-            font-family:
-              Arial,
-              Helvetica,
-              sans-serif !important;
-
-            font-size: 10pt !important;
-
-            line-height: 1.3 !important;
+            color:
+              #111827 !important;
 
           }
 
-
-          /* =================================================
-             CABEÇALHO
-          ================================================= */
-
-          .a4-header {
-
-            width: 100% !important;
-
-            display: flex !important;
-
-            justify-content: space-between !important;
-
-            align-items: flex-start !important;
-
-            border-bottom: 2px solid #000 !important;
-
-            padding-bottom: 5mm !important;
-
-            margin-bottom: 4mm !important;
-
-          }
-
-
-          .a4-header-left {
-
-            text-align: left !important;
-
-          }
-
-
-          .a4-title {
-
-            font-size: 20pt !important;
-
-            font-weight: 900 !important;
-
-            line-height: 1.1 !important;
-
-          }
-
-
-          .a4-subtitle {
-
-            margin-top: 2mm !important;
-
-            font-size: 9pt !important;
-
-            font-weight: 700 !important;
-
-          }
-
-
-          .a4-header-right {
-
-            text-align: right !important;
-
-            font-size: 9pt !important;
-
-            font-weight: 700 !important;
-
-          }
-
-
-          .a4-doc-number {
-
-            font-size: 13pt !important;
-
-            font-weight: 900 !important;
-
-            margin-bottom: 2mm !important;
-
-          }
-
-
-          /* =================================================
-             EMPRESA
-          ================================================= */
-
-          .a4-company-box {
-
-            width: 100% !important;
-
-            border: 1px solid #000 !important;
-
-            padding: 4mm !important;
-
-            margin-bottom: 4mm !important;
-
-            box-sizing: border-box !important;
-
-          }
-
-
-          .a4-company-name {
-
-            font-size: 14pt !important;
-
-            font-weight: 900 !important;
-
-          }
-
-
-          .a4-company-info {
-
-            font-size: 8pt !important;
-
-            margin-top: 1mm !important;
-
-          }
-
-
-          /* =================================================
-             INFORMAÇÕES
-          ================================================= */
-
-          .a4-info-grid {
-
-            width: 100% !important;
-
-            display: grid !important;
-
-            grid-template-columns:
-              2fr
-              1fr
-              1fr
-              1fr !important;
-
-            border-left: 1px solid #000 !important;
-
-            border-top: 1px solid #000 !important;
-
-            margin-bottom: 5mm !important;
-
-          }
-
-
-          .a4-info-item {
-
-            min-height: 17mm !important;
-
-            border-right: 1px solid #000 !important;
-
-            border-bottom: 1px solid #000 !important;
-
-            padding: 3mm !important;
-
-            box-sizing: border-box !important;
-
-            display: flex !important;
-
-            flex-direction: column !important;
-
-            justify-content: center !important;
-
-          }
-
-
-          .a4-info-item span {
-
-            font-size: 7pt !important;
-
-            font-weight: 700 !important;
-
-            color: #444 !important;
-
-            margin-bottom: 1mm !important;
-
-          }
-
-
-          .a4-info-item strong {
-
-            font-size: 9pt !important;
-
-            font-weight: 900 !important;
-
-          }
-
-
-          .a4-span-2 {
-
-            grid-column: span 2 !important;
-
-          }
-
-
-          /* =================================================
-             TÍTULOS
-          ================================================= */
-
-          .a4-section-title {
-
-            width: 100% !important;
-
-            box-sizing: border-box !important;
-
-            background: #000 !important;
-
-            color: white !important;
-
-            font-size: 8pt !important;
-
-            font-weight: 900 !important;
-
-            padding: 2.5mm 3mm !important;
-
-            margin-top: 4mm !important;
-
-            margin-bottom: 0 !important;
-
-          }
-
-
-          /* =================================================
-             TABELA
-          ================================================= */
-
-          .a4-items-table {
-
-            width: 100% !important;
-
-            max-width: 100% !important;
-
-            border-collapse: collapse !important;
-
-            table-layout: fixed !important;
-
-            margin: 0 !important;
-
-            padding: 0 !important;
-
-            font-size: 8.5pt !important;
-
-          }
-
-
-          .a4-items-table th {
-
-            background: #e5e5e5 !important;
-
-            color: #000 !important;
-
-            border: 1px solid #000 !important;
-
-            padding: 2.5mm 2mm !important;
-
-            font-weight: 900 !important;
-
-            text-transform: uppercase !important;
-
-          }
-
-
-          .a4-items-table td {
-
-            border: 1px solid #000 !important;
-
-            padding: 2.5mm 2mm !important;
-
-            vertical-align: middle !important;
-
-            word-wrap: break-word !important;
-
-            overflow-wrap: anywhere !important;
-
-          }
-
-
-          .a4-items-table th:nth-child(1),
-          .a4-items-table td:nth-child(1) {
-            width: 7% !important;
-          }
-
-
-          .a4-items-table th:nth-child(2),
-          .a4-items-table td:nth-child(2) {
-            width: 13% !important;
-          }
-
-
-          .a4-items-table th:nth-child(3),
-          .a4-items-table td:nth-child(3) {
-            width: 39% !important;
-          }
-
-
-          .a4-items-table th:nth-child(4),
-          .a4-items-table td:nth-child(4) {
-            width: 10% !important;
-          }
-
-
-          .a4-items-table th:nth-child(5),
-          .a4-items-table td:nth-child(5) {
-            width: 15% !important;
-          }
-
-
-          .a4-items-table th:nth-child(6),
-          .a4-items-table td:nth-child(6) {
-            width: 16% !important;
-          }
-
-
-          /* =================================================
-             RESUMO
-          ================================================= */
-
-          .a4-summary {
-
-            width: 100% !important;
-
-            display: flex !important;
-
-            justify-content: space-between !important;
-
-            align-items: stretch !important;
-
-            margin-top: 5mm !important;
-
-            border: 2px solid #000 !important;
-
-          }
-
-
-          .a4-summary-left {
-
-            flex: 1 !important;
-
-            padding: 4mm !important;
-
-          }
-
-
-          .a4-summary-left span {
-
-            display: block !important;
-
-            font-size: 7pt !important;
-
-            font-weight: 700 !important;
-
-          }
-
-
-          .a4-summary-left strong {
-
-            display: block !important;
-
-            font-size: 12pt !important;
-
-            font-weight: 900 !important;
-
-            margin-top: 1mm !important;
-
-          }
-
-
-          .a4-summary-right {
-
-            min-width: 55mm !important;
-
-            padding: 4mm !important;
-
-            border-left: 2px solid #000 !important;
-
-            text-align: right !important;
-
-          }
-
-
-          .a4-total-label {
-
-            font-size: 8pt !important;
-
-            font-weight: 900 !important;
-
-          }
-
-
-          .a4-total-value {
-
-            font-size: 17pt !important;
-
-            font-weight: 900 !important;
-
-            margin-top: 1mm !important;
-
-          }
-
-
-          /* =================================================
-             PAGAMENTO
-          ================================================= */
-
-          .a4-payment-box {
-
-            width: 100% !important;
-
-            display: grid !important;
-
-            grid-template-columns:
-              repeat(5, 1fr) !important;
-
-            border-left: 1px solid #000 !important;
-
-            border-bottom: 1px solid #000 !important;
-
-          }
-
-
-          .a4-payment-box > div {
-
-            min-height: 18mm !important;
-
-            padding: 3mm !important;
-
-            border-right: 1px solid #000 !important;
-
-            border-top: 1px solid #000 !important;
-
-            box-sizing: border-box !important;
-
-          }
-
-
-          .a4-payment-box span {
-
-            display: block !important;
-
-            font-size: 7pt !important;
-
-            font-weight: 700 !important;
-
-            color: #444 !important;
-
-            margin-bottom: 1mm !important;
-
-          }
-
-
-          .a4-payment-box strong {
-
-            font-size: 8.5pt !important;
-
-            font-weight: 900 !important;
-
-            word-break: break-word !important;
-
-          }
-
-
-          /* =================================================
-             OBSERVAÇÃO
-          ================================================= */
-
-          .a4-observations {
-
-            width: 100% !important;
-
-            min-height: 20mm !important;
-
-            border: 1px solid #000 !important;
-
-            padding: 4mm !important;
-
-            box-sizing: border-box !important;
-
-            font-size: 8pt !important;
-
-          }
-
-
-          /* =================================================
-             ASSINATURAS
-          ================================================= */
-
-          .a4-signatures {
-
-            width: 100% !important;
-
-            display: flex !important;
-
-            gap: 20mm !important;
-
-            margin-top: 18mm !important;
-
-          }
-
-
-          .a4-signature {
-
-            flex: 1 !important;
-
-            text-align: center !important;
-
-          }
-
-
-          .signature-line {
-
-            width: 100% !important;
-
-            border-top: 1px solid #000 !important;
-
-            margin-bottom: 2mm !important;
-
-          }
-
-
-          .a4-signature span {
-
-            font-size: 7pt !important;
-
-            font-weight: 700 !important;
-
-          }
-
-
-          /* =================================================
-             RODAPÉ
-          ================================================= */
-
-          .a4-footer {
-
-            width: 100% !important;
-
-            display: flex !important;
-
-            justify-content: space-between !important;
-
-            border-top: 1px solid #000 !important;
-
-            margin-top: 15mm !important;
-
-            padding-top: 3mm !important;
-
-            font-size: 6.5pt !important;
-
-            font-weight: 700 !important;
-
-          }
-
-
-          /* =================================================
-             CONFIGURAÇÃO DA FOLHA
-          ================================================= */
 
           @page {
 
             size: A4 portrait;
 
-            margin: 0;
+            margin: 0 !important;
 
           }
 
 
-          /* =================================================
-             EVITA CORTES
-          ================================================= */
+          .romaneio-table {
 
-          .a4-document,
-          .a4-header,
-          .a4-company-box,
-          .a4-info-grid,
-          .a4-items-table,
-          .a4-summary,
-          .a4-payment-box,
-          .a4-observations,
-          .a4-signatures,
-          .a4-footer {
-
-            break-inside: avoid !important;
-
-            page-break-inside: avoid !important;
+            page-break-inside: auto;
 
           }
 
 
-          .a4-items-table thead {
+          .romaneio-table tr {
 
-            display: table-header-group !important;
+            page-break-inside: avoid;
+
+            page-break-after: auto;
 
           }
 
 
-          .a4-items-table tr {
+          .romaneio-header,
+          .dados-grid,
+          .resumo-container,
+          .assinaturas {
 
-            break-inside: avoid !important;
-
-            page-break-inside: avoid !important;
+            page-break-inside: avoid;
 
           }
 
@@ -2559,18 +3628,43 @@ const DetailField = ({
   borderHighlight?: boolean;
 }) => (
 
-  <div className="flex flex-col gap-0.5">
+  <div
+    className="
+      flex
+      flex-col
+      gap-0.5
+    "
+  >
 
-    <label className="text-[9px] font-black text-slate-500 uppercase">
+    <label
+      className="
+        text-[9px]
+        font-black
+        text-slate-500
+        uppercase
+      "
+    >
       {label}
     </label>
 
     <div
-      className={`h-8 bg-white border ${
-        borderHighlight
-          ? 'border-emerald-500/50 rounded-lg'
-          : 'border-slate-300'
-      } px-2 flex items-center text-[10px] font-bold truncate shadow-inner`}
+      className={`
+        h-8
+        bg-white
+        border
+        px-2
+        flex
+        items-center
+        text-[10px]
+        font-bold
+        truncate
+        shadow-inner
+        ${
+          borderHighlight
+            ? 'border-emerald-500/50 rounded-lg'
+            : 'border-slate-300'
+        }
+      `}
     >
       {value}
     </div>
@@ -2578,6 +3672,5 @@ const DetailField = ({
   </div>
 
 );
-
 
 export default SalesInquiry;
