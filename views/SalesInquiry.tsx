@@ -1,327 +1,2100 @@
-
 import React, { useMemo, useState } from 'react';
 import { useApp } from '../AppContext';
-import { Transaction, UserRole, Customer, User } from '../types';
+import { Transaction, UserRole } from '../types';
 
 const SalesInquiry: React.FC = () => {
-  const { transactions, users, customers, currentUser, establishments, addTransaction, cardOperators, cardBrands } = useApp();
-  
-  // Estados de Filtro
+  const {
+    transactions,
+    users,
+    customers,
+    currentUser,
+    establishments,
+    addTransaction,
+    cardOperators,
+    cardBrands
+  } = useApp();
+
+  // =========================================================
+  // FILTROS
+  // =========================================================
+
   const [filter, setFilter] = useState('');
-  const [startDate, setStartDate] = useState(new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0]);
-  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+
+  const [startDate, setStartDate] = useState(
+    new Date(
+      new Date().setDate(new Date().getDate() - 30)
+    ).toISOString().split('T')[0]
+  );
+
+  const [endDate, setEndDate] = useState(
+    new Date().toISOString().split('T')[0]
+  );
+
   const [storeFilter, setStoreFilter] = useState('TODAS');
 
-  // Estados de Seleção e Modais
-  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
-  const [showOptionsId, setShowOptionsId] = useState<string | null>(null);
-  const [viewingDetail, setViewingDetail] = useState<Transaction | null>(null);
-  const [activeDetailTab, setActiveDetailTab] = useState<'ITENS' | 'PAGAMENTO' | 'DEVOLUCOES'>('ITENS');
-  const [showVendorModal, setShowVendorModal] = useState(false);
-  const [showCustomerModal, setShowCustomerModal] = useState(false);
+  // =========================================================
+  // ESTADOS / MODAIS
+  // =========================================================
 
-  const isAdmin = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.MANAGER;
-  const currentStore = establishments.find(e => e.id === currentUser?.storeId);
+  const [selectedTransaction, setSelectedTransaction] =
+    useState<Transaction | null>(null);
 
-  // Filtragem das Vendas
+  const [showOptionsId, setShowOptionsId] =
+    useState<string | null>(null);
+
+  const [viewingDetail, setViewingDetail] =
+    useState<Transaction | null>(null);
+
+  const [activeDetailTab, setActiveDetailTab] =
+    useState<'ITENS' | 'PAGAMENTO' | 'DEVOLUCOES'>('ITENS');
+
+  const [showVendorModal, setShowVendorModal] =
+    useState(false);
+
+  const [showCustomerModal, setShowCustomerModal] =
+    useState(false);
+
+  const [customerSearch, setCustomerSearch] =
+    useState('');
+
+  // =========================================================
+  // PERMISSÕES
+  // =========================================================
+
+  const isAdmin =
+    currentUser?.role === UserRole.ADMIN ||
+    currentUser?.role === UserRole.MANAGER;
+
+  const currentStore = establishments.find(
+    e => e.id === currentUser?.storeId
+  );
+
+  // =========================================================
+  // VENDAS
+  // =========================================================
+
   const sales = useMemo(() => {
     return transactions.filter(t => {
-      const isSale = t.type === 'INCOME' && (t.category === 'Venda' || t.category === 'Serviço');
-      const matchesStore = isAdmin 
-        ? (storeFilter === 'TODAS' || t.store === storeFilter)
-        : (t.store === currentStore?.name);
-      const matchesDate = t.date >= startDate && t.date <= endDate;
-      const matchesSearch = !filter || 
-        t.id.toLowerCase().includes(filter.toLowerCase()) || 
-        t.client?.toLowerCase().includes(filter.toLowerCase());
-      return isSale && matchesStore && matchesDate && matchesSearch;
-    });
-  }, [transactions, isAdmin, currentStore, filter, startDate, endDate, storeFilter]);
+      const isSale =
+        t.type === 'INCOME' &&
+        (t.category === 'Venda' || t.category === 'Serviço');
 
-  // Totais do Rodapé
+      const matchesStore = isAdmin
+        ? (
+            storeFilter === 'TODAS' ||
+            t.store === storeFilter
+          )
+        : (
+            t.store === currentStore?.name
+          );
+
+      const matchesDate =
+        t.date >= startDate &&
+        t.date <= endDate;
+
+      const search = filter.toLowerCase();
+
+      const matchesSearch =
+        !filter ||
+        t.id.toLowerCase().includes(search) ||
+        t.client?.toLowerCase().includes(search);
+
+      return (
+        isSale &&
+        matchesStore &&
+        matchesDate &&
+        matchesSearch
+      );
+    });
+  }, [
+    transactions,
+    isAdmin,
+    currentStore,
+    filter,
+    startDate,
+    endDate,
+    storeFilter
+  ]);
+
+  // =========================================================
+  // TOTAIS
+  // =========================================================
+
   const totals = useMemo(() => {
     let qtyItems = 0;
     let totalValue = 0;
+
     sales.forEach(s => {
       totalValue += s.value;
-      s.items?.forEach(i => qtyItems += i.quantity);
+
+      s.items?.forEach(i => {
+        qtyItems += i.quantity;
+      });
     });
-    return { qtyItems, totalValue };
+
+    return {
+      qtyItems,
+      totalValue
+    };
   }, [sales]);
 
-  const getUserData = (userId?: string) => users.find(u => u.id === userId);
+  // =========================================================
+  // USUÁRIO
+  // =========================================================
 
-  const getCardInfo = (opId?: string, brId?: string) => {
-    const op = cardOperators.find(o => o.id === opId);
-    const br = cardBrands.find(b => b.id === brId);
-    return { operator: op?.name || '---', brand: br?.name || '---' };
+  const getUserData = (userId?: string) =>
+    users.find(u => u.id === userId);
+
+  // =========================================================
+  // CARTÃO
+  // =========================================================
+
+  const getCardInfo = (
+    opId?: string,
+    brId?: string
+  ) => {
+    const op = cardOperators.find(
+      o => o.id === opId
+    );
+
+    const br = cardBrands.find(
+      b => b.id === brId
+    );
+
+    return {
+      operator: op?.name || '---',
+      brand: br?.name || '---'
+    };
   };
+
+  // =========================================================
+  // FORMATAÇÕES
+  // =========================================================
+
+  const formatMoney = (value: number) => {
+    return value.toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  };
+
+  const formatDate = (date?: string) => {
+    if (!date) return '';
+
+    const parts = date.split('-');
+
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+
+    return date;
+  };
+
+  // =========================================================
+  // REIMPRESSÃO / ROMANEIO A4
+  // =========================================================
 
   const handleReprint = (sale: Transaction) => {
-     setSelectedTransaction(sale);
-     setTimeout(() => {
-       window.print();
-       // Limpa seleção após impressão para evitar conflitos visuais
-       setTimeout(() => setSelectedTransaction(null), 500);
-     }, 100);
+    setSelectedTransaction(sale);
+
+    setTimeout(() => {
+      window.print();
+
+      setTimeout(() => {
+        setSelectedTransaction(null);
+      }, 800);
+    }, 150);
   };
 
-  const handleUpdateVendor = async (vendorId: string) => {
+  // =========================================================
+  // ALTERAR VENDEDOR
+  // =========================================================
+
+  const handleUpdateVendor = async (
+    vendorId: string
+  ) => {
     if (!selectedTransaction) return;
+
     try {
-      await addTransaction({ ...selectedTransaction, vendorId });
+      await addTransaction({
+        ...selectedTransaction,
+        vendorId
+      });
+
       setShowVendorModal(false);
       setSelectedTransaction(null);
+
     } catch (e) {
-      alert("Erro ao atualizar vendedor.");
+      alert('Erro ao atualizar vendedor.');
     }
   };
 
-  const handleUpdateCustomer = async (customerId: string) => {
+  // =========================================================
+  // ALTERAR CLIENTE
+  // =========================================================
+
+  const handleUpdateCustomer = async (
+    customerId: string
+  ) => {
     if (!selectedTransaction) return;
-    const customer = customers.find(c => c.id === customerId);
+
+    const customer = customers.find(
+      c => c.id === customerId
+    );
+
     try {
-      await addTransaction({ 
-        ...selectedTransaction, 
-        clientId: customerId, 
-        client: customer?.name || 'Consumidor Final' 
+      await addTransaction({
+        ...selectedTransaction,
+        clientId: customerId,
+        client:
+          customer?.name ||
+          'Consumidor Final'
       });
+
       setShowCustomerModal(false);
       setSelectedTransaction(null);
+      setCustomerSearch('');
+
     } catch (e) {
-      alert("Erro ao atualizar cliente.");
+      alert('Erro ao atualizar cliente.');
     }
   };
+
+  // =========================================================
+  // CLIENTES FILTRADOS
+  // =========================================================
+
+  const filteredCustomers = customers.filter(c =>
+    c.name
+      .toLowerCase()
+      .includes(customerSearch.toLowerCase())
+  );
+
+  // =========================================================
+  // RENDER
+  // =========================================================
 
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-background-dark font-sans text-[11px] uppercase font-bold flex flex-col relative">
-      
-      {/* TEMPLATE DE REIMPRESSÃO (TÉRMICO) */}
-      <div id="receipt-reprint-area" className="hidden print:block bg-white text-black font-mono text-[11px] leading-tight p-4">
+
+      {/* =====================================================
+          ROMANEIO A4 - ÁREA DE IMPRESSÃO
+      ====================================================== */}
+
+      <div
+        id="receipt-reprint-area"
+        className="hidden print:block"
+      >
         {selectedTransaction && (
-          <>
-            <div className="text-center space-y-1 mb-3 border-b-2 border-dashed border-black pb-2">
-               <h2 className="text-[14px] font-black uppercase">{selectedTransaction.store}</h2>
-               <div className="font-black text-[12px] pt-1">*** REIMPRESSÃO DE CUPOM ***</div>
+          <div className="a4-romaneio">
+
+            {/* CABEÇALHO */}
+
+            <div className="romaneio-header">
+
+              <div className="romaneio-company">
+                <div className="romaneio-company-name">
+                  {selectedTransaction.store}
+                </div>
+
+                <div className="romaneio-company-subtitle">
+                  DOCUMENTO DE VENDA
+                </div>
+              </div>
+
+              <div className="romaneio-title-box">
+                <div className="romaneio-title">
+                  ROMANEIO
+                </div>
+
+                <div className="romaneio-subtitle">
+                  REIMPRESSÃO
+                </div>
+              </div>
+
             </div>
-            <div className="space-y-1 mb-2 text-[10px]">
-               <div className="flex justify-between font-bold"><span>DOC: {selectedTransaction.id}</span><span>{selectedTransaction.date}</span></div>
-               <div className="uppercase">CLIENTE: {selectedTransaction.client || 'CONSUMIDOR FINAL'}</div>
-               <div className="uppercase">VENDEDOR: {getUserData(selectedTransaction.vendorId)?.name || 'BALCÃO'}</div>
+
+            {/* LINHA */}
+
+            <div className="romaneio-line" />
+
+            {/* INFORMAÇÕES DO DOCUMENTO */}
+
+            <div className="romaneio-info-grid">
+
+              <div className="romaneio-info-item">
+                <span className="romaneio-label">
+                  DOCUMENTO
+                </span>
+
+                <strong>
+                  {selectedTransaction.id.slice(-8)}
+                </strong>
+              </div>
+
+              <div className="romaneio-info-item">
+                <span className="romaneio-label">
+                  DATA DE EMISSÃO
+                </span>
+
+                <strong>
+                  {formatDate(selectedTransaction.date)}
+                </strong>
+              </div>
+
+              <div className="romaneio-info-item">
+                <span className="romaneio-label">
+                  LOJA / UNIDADE
+                </span>
+
+                <strong>
+                  {selectedTransaction.store}
+                </strong>
+              </div>
+
+              <div className="romaneio-info-item">
+                <span className="romaneio-label">
+                  VENDEDOR
+                </span>
+
+                <strong>
+                  {
+                    getUserData(
+                      selectedTransaction.vendorId
+                    )?.name || 'BALCÃO'
+                  }
+                </strong>
+              </div>
+
             </div>
-            <div className="border-t border-b border-black py-1 mb-1 font-black flex justify-between uppercase text-[9px]">
-               <span className="w-8">QTD</span><span className="flex-1 px-2">DESCRIÇÃO</span><span className="w-16 text-right">VALOR</span>
+
+            {/* CLIENTE */}
+
+            <div className="romaneio-customer">
+
+              <div>
+                <span className="romaneio-label">
+                  CLIENTE
+                </span>
+
+                <strong>
+                  {
+                    selectedTransaction.client ||
+                    'CONSUMIDOR FINAL'
+                  }
+                </strong>
+              </div>
+
+              <div>
+                <span className="romaneio-label">
+                  CAIXA
+                </span>
+
+                <strong>
+                  {
+                    getUserData(
+                      selectedTransaction.cashierId
+                    )?.name ||
+                    'SISTEMA'
+                  }
+                </strong>
+              </div>
+
             </div>
-            <div className="space-y-1 mb-3 text-[10px]">
-               {selectedTransaction.items?.map((item, idx) => (
-                 <div key={idx} className="flex justify-between items-start uppercase">
-                    <span className="w-8">{item.quantity}</span><span className="flex-1 px-2">{item.name}</span><span className="w-16 text-right">{(item.quantity * item.salePrice).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                 </div>
-               ))}
+
+            {/* TÍTULO ITENS */}
+
+            <div className="romaneio-section-title">
+              ITENS DA VENDA
             </div>
-            <div className="space-y-1 border-t border-black pt-2 mb-3 text-[11px]">
-               <div className="flex justify-between text-[13px] font-black pt-1"><span>TOTAL GERAL:</span><span>R$ {selectedTransaction.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
+
+            {/* TABELA */}
+
+            <table className="romaneio-table">
+
+              <thead>
+                <tr>
+                  <th className="col-seq">
+                    #
+                  </th>
+
+                  <th className="col-sku">
+                    SKU
+                  </th>
+
+                  <th>
+                    DESCRIÇÃO DO PRODUTO
+                  </th>
+
+                  <th className="col-qtd">
+                    QTD.
+                  </th>
+
+                  <th className="col-unit">
+                    VALOR UNIT.
+                  </th>
+
+                  <th className="col-total">
+                    VALOR TOTAL
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody>
+
+                {selectedTransaction.items?.map(
+                  (item, index) => {
+
+                    const itemTotal =
+                      item.quantity *
+                      item.salePrice;
+
+                    return (
+                      <tr key={index}>
+
+                        <td className="text-center">
+                          {index + 1}
+                        </td>
+
+                        <td>
+                          {item.sku || '---'}
+                        </td>
+
+                        <td className="product-description">
+                          {item.name}
+                        </td>
+
+                        <td className="text-right">
+                          {item.quantity.toFixed(2)}
+                        </td>
+
+                        <td className="text-right">
+                          R$ {formatMoney(item.salePrice)}
+                        </td>
+
+                        <td className="text-right strong">
+                          R$ {formatMoney(itemTotal)}
+                        </td>
+
+                      </tr>
+                    );
+                  }
+                )}
+
+              </tbody>
+
+              <tfoot>
+
+                <tr>
+
+                  <td
+                    colSpan={3}
+                    className="table-footer-label"
+                  >
+                    TOTAL DE ITENS
+                  </td>
+
+                  <td className="text-right">
+                    {
+                      selectedTransaction.items?.reduce(
+                        (acc, item) =>
+                          acc + item.quantity,
+                        0
+                      ).toFixed(2)
+                    }
+                  </td>
+
+                  <td />
+
+                  <td />
+
+                </tr>
+
+              </tfoot>
+
+            </table>
+
+            {/* RESUMO FINANCEIRO */}
+
+            <div className="romaneio-financial">
+
+              <div className="payment-box">
+
+                <div className="romaneio-section-title small">
+                  FORMA DE PAGAMENTO
+                </div>
+
+                <div className="payment-main">
+                  {
+                    selectedTransaction.method ||
+                    'DINHEIRO'
+                  }
+
+                  {selectedTransaction.installments
+                    ? ` - ${selectedTransaction.installments}X`
+                    : ''
+                  }
+                </div>
+
+                {selectedTransaction.cardOperatorId && (
+                  <div className="payment-details">
+
+                    <div>
+                      <span>OPERADORA:</span>
+
+                      {
+                        getCardInfo(
+                          selectedTransaction.cardOperatorId,
+                          selectedTransaction.cardBrandId
+                        ).operator
+                      }
+                    </div>
+
+                    <div>
+                      <span>BANDEIRA:</span>
+
+                      {
+                        getCardInfo(
+                          selectedTransaction.cardOperatorId,
+                          selectedTransaction.cardBrandId
+                        ).brand
+                      }
+                    </div>
+
+                    <div>
+                      <span>NSU:</span>
+
+                      {
+                        selectedTransaction.transactionSku ||
+                        '---'
+                      }
+                    </div>
+
+                    <div>
+                      <span>AUTORIZAÇÃO:</span>
+
+                      {
+                        selectedTransaction.authNumber ||
+                        '---'
+                      }
+                    </div>
+
+                  </div>
+                )}
+
+              </div>
+
+              <div className="total-box">
+
+                <span className="total-label">
+                  TOTAL DA VENDA
+                </span>
+
+                <strong>
+                  R$ {formatMoney(
+                    selectedTransaction.value
+                  )}
+                </strong>
+
+              </div>
+
             </div>
-            <div className="bg-black/5 p-2 border border-black mb-4 text-[10px] space-y-1">
-               <div className="font-black uppercase border-b border-black/10 pb-1">FORMA DE PAGAMENTO:</div>
-               <div className="uppercase font-bold text-[11px]">{selectedTransaction.method} {selectedTransaction.installments ? `(${selectedTransaction.installments}X)` : ''}</div>
-               {(selectedTransaction.cardOperatorId) && (
-                 <div className="text-[8px] opacity-70">
-                    <p>OPERADORA: {getCardInfo(selectedTransaction.cardOperatorId, selectedTransaction.cardBrandId).operator} | BANDEIRA: {getCardInfo(selectedTransaction.cardOperatorId, selectedTransaction.cardBrandId).brand}</p>
-                    <p>NSU: {selectedTransaction.transactionSku || '---'} | AUTH: {selectedTransaction.authNumber || '---'}</p>
-                 </div>
-               )}
+
+            {/* OBSERVAÇÃO */}
+
+            <div className="romaneio-observation">
+
+              <span className="romaneio-label">
+                OBSERVAÇÕES
+              </span>
+
+              <div className="observation-line" />
+              <div className="observation-line" />
+              <div className="observation-line" />
+
             </div>
-            <div className="text-center space-y-1 pt-2 border-t border-dashed border-black text-[9px]"><p className="font-black">DOCUMENTO REIMPRESSO EM {new Date().toLocaleString()}</p></div>
-          </>
+
+            {/* ASSINATURAS */}
+
+            <div className="signature-area">
+
+              <div className="signature">
+
+                <div className="signature-line" />
+
+                <span>
+                  RESPONSÁVEL / CLIENTE
+                </span>
+
+              </div>
+
+              <div className="signature">
+
+                <div className="signature-line" />
+
+                <span>
+                  VENDEDOR
+                </span>
+
+              </div>
+
+            </div>
+
+            {/* RODAPÉ */}
+
+            <div className="romaneio-footer">
+
+              <span>
+                ROMANEIO DE VENDA
+              </span>
+
+              <span>
+                DOCUMENTO REIMPRESSO EM{' '}
+                {new Date().toLocaleString('pt-BR')}
+              </span>
+
+              <span>
+                ID: {selectedTransaction.id}
+              </span>
+
+            </div>
+
+          </div>
         )}
       </div>
 
+      {/* =====================================================
+          CABEÇALHO DA TELA
+      ====================================================== */}
+
       <header className="bg-primary p-4 flex items-center justify-between text-white shadow-lg shrink-0 print:hidden">
+
         <div className="flex items-center gap-4">
-           <div className="bg-white rounded-lg p-1.5 flex items-center justify-center"><span className="material-symbols-outlined text-primary text-2xl">receipt_long</span></div>
-           <h1 className="text-sm font-black tracking-tight">DOCUMENTOS DE VENDAS PDV</h1>
+
+          <div className="bg-white rounded-lg p-1.5 flex items-center justify-center">
+
+            <span className="material-symbols-outlined text-primary text-2xl">
+              receipt_long
+            </span>
+
+          </div>
+
+          <h1 className="text-sm font-black tracking-tight">
+            DOCUMENTOS DE VENDAS PDV
+          </h1>
+
         </div>
+
       </header>
 
+      {/* =====================================================
+          FILTROS
+      ====================================================== */}
+
       <div className="p-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-end gap-4 shadow-sm print:hidden">
-         <div className="space-y-1"><label className="text-[9px] text-slate-400 font-black px-1">DATA INICIAL:</label><div className="h-10 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-3 flex items-center gap-2"><span className="material-symbols-outlined text-slate-400 text-sm">calendar_today</span><input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-transparent border-none text-[10px] font-black outline-none focus:ring-0 p-0 w-24" /></div></div>
-         <div className="space-y-1"><label className="text-[9px] text-slate-400 font-black px-1">DATA FINAL:</label><div className="h-10 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-3 flex items-center gap-2"><span className="material-symbols-outlined text-slate-400 text-sm">calendar_today</span><input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-transparent border-none text-[10px] font-black outline-none focus:ring-0 p-0 w-24" /></div></div>
-         <div className="space-y-1"><label className="text-[9px] text-slate-400 font-black px-1">UNIDADE / LOJA:</label><div className="h-10 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-3 flex items-center gap-2"><span className="material-symbols-outlined text-slate-400 text-sm">store</span><select disabled={!isAdmin} value={storeFilter} onChange={e => setStoreFilter(e.target.value)} className="bg-transparent border-none text-[10px] font-black outline-none focus:ring-0 p-0 pr-8"><option value="TODAS">TODAS AS LOJAS</option>{establishments.map(est => <option key={est.id} value={est.name}>{est.name}</option>)}</select></div></div>
-         <div className="flex-1 space-y-1"><label className="text-[9px] text-slate-400 font-black px-1">PESQUISA RÁPIDA (ID OU CLIENTE):</label><div className="relative"><span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">search</span><input value={filter} onChange={e => setFilter(e.target.value)} placeholder="DIGITE PARA BUSCAR..." className="w-full h-10 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded pl-10 text-[10px] font-black outline-none focus:ring-1 focus:ring-primary/30 uppercase" /></div></div>
-         <button onClick={() => { setFilter(''); setStoreFilter('TODAS'); }} className="h-10 px-4 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[9px] font-black hover:bg-rose-50 hover:text-rose-600 transition-all flex items-center gap-2"><span className="material-symbols-outlined text-sm">filter_alt_off</span> LIMPAR</button>
+
+        <div className="space-y-1">
+
+          <label className="text-[9px] text-slate-400 font-black px-1">
+            DATA INICIAL:
+          </label>
+
+          <div className="h-10 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-3 flex items-center gap-2">
+
+            <span className="material-symbols-outlined text-slate-400 text-sm">
+              calendar_today
+            </span>
+
+            <input
+              type="date"
+              value={startDate}
+              onChange={e =>
+                setStartDate(e.target.value)
+              }
+              className="bg-transparent border-none text-[10px] font-black outline-none focus:ring-0 p-0 w-24"
+            />
+
+          </div>
+
+        </div>
+
+        <div className="space-y-1">
+
+          <label className="text-[9px] text-slate-400 font-black px-1">
+            DATA FINAL:
+          </label>
+
+          <div className="h-10 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-3 flex items-center gap-2">
+
+            <span className="material-symbols-outlined text-slate-400 text-sm">
+              calendar_today
+            </span>
+
+            <input
+              type="date"
+              value={endDate}
+              onChange={e =>
+                setEndDate(e.target.value)
+              }
+              className="bg-transparent border-none text-[10px] font-black outline-none focus:ring-0 p-0 w-24"
+            />
+
+          </div>
+
+        </div>
+
+        <div className="space-y-1">
+
+          <label className="text-[9px] text-slate-400 font-black px-1">
+            UNIDADE / LOJA:
+          </label>
+
+          <div className="h-10 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-3 flex items-center gap-2">
+
+            <span className="material-symbols-outlined text-slate-400 text-sm">
+              store
+            </span>
+
+            <select
+              disabled={!isAdmin}
+              value={storeFilter}
+              onChange={e =>
+                setStoreFilter(e.target.value)
+              }
+              className="bg-transparent border-none text-[10px] font-black outline-none focus:ring-0 p-0 pr-8"
+            >
+
+              <option value="TODAS">
+                TODAS AS LOJAS
+              </option>
+
+              {establishments.map(est => (
+                <option
+                  key={est.id}
+                  value={est.name}
+                >
+                  {est.name}
+                </option>
+              ))}
+
+            </select>
+
+          </div>
+
+        </div>
+
+        <div className="flex-1 space-y-1">
+
+          <label className="text-[9px] text-slate-400 font-black px-1">
+            PESQUISA RÁPIDA (ID OU CLIENTE):
+          </label>
+
+          <div className="relative">
+
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+              search
+            </span>
+
+            <input
+              value={filter}
+              onChange={e =>
+                setFilter(e.target.value)
+              }
+              placeholder="DIGITE PARA BUSCAR..."
+              className="w-full h-10 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded pl-10 text-[10px] font-black outline-none focus:ring-1 focus:ring-primary/30 uppercase"
+            />
+
+          </div>
+
+        </div>
+
+        <button
+          onClick={() => {
+            setFilter('');
+            setStoreFilter('TODAS');
+          }}
+          className="h-10 px-4 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[9px] font-black hover:bg-rose-50 hover:text-rose-600 transition-all flex items-center gap-2"
+        >
+
+          <span className="material-symbols-outlined text-sm">
+            filter_alt_off
+          </span>
+
+          LIMPAR
+
+        </button>
+
       </div>
+
+      {/* =====================================================
+          TABELA
+      ====================================================== */}
 
       <div className="flex-1 overflow-auto bg-white dark:bg-slate-900 print:hidden">
+
         <table className="w-full text-left border-collapse min-w-[1200px]">
+
           <thead className="bg-primary text-white sticky top-0 z-20">
+
             <tr className="divide-x divide-white/10">
-              <th className="px-3 py-2 text-center w-10"><span className="material-symbols-outlined text-sm">settings</span></th>
-              <th className="px-3 py-2 w-20">Opções</th>
-              <th className="px-3 py-2 w-24">ID</th>
-              <th className="px-3 py-2 w-32">Loja</th>
-              <th className="px-3 py-2 w-20">Vend.</th>
-              <th className="px-3 py-2 w-40">Data de Emissão</th>
-              <th className="px-3 py-2">Cliente</th>
-              <th className="px-3 py-2 w-24 text-right">Qtd. Itens</th>
-              <th className="px-3 py-2 w-32 text-right">Vr. Total</th>
+
+              <th className="px-3 py-2 text-center w-10">
+                <span className="material-symbols-outlined text-sm">
+                  settings
+                </span>
+              </th>
+
+              <th className="px-3 py-2 w-20">
+                Opções
+              </th>
+
+              <th className="px-3 py-2 w-24">
+                ID
+              </th>
+
+              <th className="px-3 py-2 w-32">
+                Loja
+              </th>
+
+              <th className="px-3 py-2 w-20">
+                Vend.
+              </th>
+
+              <th className="px-3 py-2 w-40">
+                Data de Emissão
+              </th>
+
+              <th className="px-3 py-2">
+                Cliente
+              </th>
+
+              <th className="px-3 py-2 w-24 text-right">
+                Qtd. Itens
+              </th>
+
+              <th className="px-3 py-2 w-32 text-right">
+                Vr. Total
+              </th>
+
             </tr>
+
           </thead>
+
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+
             {sales.map(s => (
-              <tr key={s.id} onClick={() => { setViewingDetail(s); setActiveDetailTab('ITENS'); }} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 divide-x divide-slate-100 dark:divide-slate-800 transition-colors cursor-pointer group">
-                <td className="px-3 py-1.5 text-center"><div className="size-2.5 bg-blue-600 rounded-full mx-auto"></div></td>
-                <td className="px-3 py-1.5 relative" onClick={(e) => e.stopPropagation()}>
-                   <button onClick={() => setShowOptionsId(showOptionsId === s.id ? null : s.id)} className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-2 py-0.5 hover:bg-primary hover:text-white transition-all flex items-center justify-center"><span className="material-symbols-outlined text-sm">list</span></button>
-                   {showOptionsId === s.id && (
-                     <div className="absolute left-full top-0 ml-1 z-50 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-slate-700 rounded-lg py-2 w-56">
-                        <p className="px-4 py-1 text-[9px] text-slate-400 font-black border-b mb-1">Ações Disponíveis</p>
-                        <button onClick={() => handleReprint(s)} className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"><span className="material-symbols-outlined text-sm">print</span> 01 - Reimprimir Cupom</button>
-                        <button onClick={() => { setSelectedTransaction(s); setShowCustomerModal(true); setShowOptionsId(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"><span className="material-symbols-outlined text-sm">person_edit</span> 05 - Alterar Cliente</button>
-                        <button onClick={() => { setSelectedTransaction(s); setShowVendorModal(true); setShowOptionsId(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"><span className="material-symbols-outlined text-sm">badge</span> 06 - Alterar Vendedor</button>
-                     </div>
-                   )}
+
+              <tr
+                key={s.id}
+                onClick={() => {
+                  setViewingDetail(s);
+                  setActiveDetailTab('ITENS');
+                }}
+                className="hover:bg-slate-50 dark:hover:bg-slate-800/40 divide-x divide-slate-100 dark:divide-slate-800 transition-colors cursor-pointer group"
+              >
+
+                <td className="px-3 py-1.5 text-center">
+
+                  <div className="size-2.5 bg-blue-600 rounded-full mx-auto" />
+
                 </td>
-                <td className="px-3 py-1.5 font-mono text-slate-400">{s.id.slice(-6)}</td>
-                <td className="px-3 py-1.5 text-primary">{s.store}</td>
-                <td className="px-3 py-1.5 text-primary">{getUserData(s.vendorId)?.name.split(' ')[0] || '---'}</td>
-                <td className="px-3 py-1.5 text-slate-500">{s.date}</td>
-                <td className="px-3 py-1.5"><span className="truncate max-w-[200px] uppercase">{s.client || 'Consumidor Final'}</span></td>
-                <td className="px-3 py-1.5 text-right font-black tabular-nums">{s.items?.reduce((acc, i) => acc + i.quantity, 0).toFixed(2)}</td>
-                <td className="px-3 py-1.5 text-right font-black text-slate-900 dark:text-white tabular-nums">R$ {s.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+
+                <td
+                  className="px-3 py-1.5 relative"
+                  onClick={e =>
+                    e.stopPropagation()
+                  }
+                >
+
+                  <button
+                    onClick={() =>
+                      setShowOptionsId(
+                        showOptionsId === s.id
+                          ? null
+                          : s.id
+                      )
+                    }
+                    className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-2 py-0.5 hover:bg-primary hover:text-white transition-all flex items-center justify-center"
+                  >
+
+                    <span className="material-symbols-outlined text-sm">
+                      list
+                    </span>
+
+                  </button>
+
+                  {showOptionsId === s.id && (
+
+                    <div className="absolute left-full top-0 ml-1 z-50 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-slate-700 rounded-lg py-2 w-60">
+
+                      <p className="px-4 py-1 text-[9px] text-slate-400 font-black border-b mb-1">
+                        AÇÕES DISPONÍVEIS
+                      </p>
+
+                      <button
+                        onClick={() =>
+                          handleReprint(s)
+                        }
+                        className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"
+                      >
+
+                        <span className="material-symbols-outlined text-sm">
+                          print
+                        </span>
+
+                        01 - Imprimir Romaneio A4
+
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setSelectedTransaction(s);
+                          setShowCustomerModal(true);
+                          setShowOptionsId(null);
+                        }}
+                        className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"
+                      >
+
+                        <span className="material-symbols-outlined text-sm">
+                          person_edit
+                        </span>
+
+                        05 - Alterar Cliente
+
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setSelectedTransaction(s);
+                          setShowVendorModal(true);
+                          setShowOptionsId(null);
+                        }}
+                        className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"
+                      >
+
+                        <span className="material-symbols-outlined text-sm">
+                          badge
+                        </span>
+
+                        06 - Alterar Vendedor
+
+                      </button>
+
+                    </div>
+
+                  )}
+
+                </td>
+
+                <td className="px-3 py-1.5 font-mono text-slate-400">
+                  {s.id.slice(-6)}
+                </td>
+
+                <td className="px-3 py-1.5 text-primary">
+                  {s.store}
+                </td>
+
+                <td className="px-3 py-1.5 text-primary">
+                  {getUserData(s.vendorId)?.name?.split(' ')[0] || '---'}
+                </td>
+
+                <td className="px-3 py-1.5 text-slate-500">
+                  {s.date}
+                </td>
+
+                <td className="px-3 py-1.5">
+                  <span className="truncate max-w-[200px] uppercase">
+                    {s.client || 'Consumidor Final'}
+                  </span>
+                </td>
+
+                <td className="px-3 py-1.5 text-right font-black tabular-nums">
+                  {s.items
+                    ?.reduce(
+                      (acc, i) =>
+                        acc + i.quantity,
+                      0
+                    )
+                    .toFixed(2)}
+                </td>
+
+                <td className="px-3 py-1.5 text-right font-black text-slate-900 dark:text-white tabular-nums">
+                  R$ {formatMoney(s.value)}
+                </td>
+
               </tr>
+
             ))}
+
           </tbody>
+
         </table>
+
       </div>
 
+      {/* =====================================================
+          RODAPÉ
+      ====================================================== */}
+
       <footer className="bg-slate-400 p-2 flex justify-between items-center text-slate-900 font-black shrink-0 print:hidden">
-         <div className="flex items-center gap-4"><span className="text-[12px]">TOTAL GERAL PESQUISA</span></div>
-         <div className="flex gap-10 pr-4"><span className="text-[12px] tabular-nums">{totals.qtyItems.toFixed(2).replace('.', ',')}</span><span className="text-[12px] tabular-nums">R$ {totals.totalValue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>
+
+        <div className="flex items-center gap-4">
+
+          <span className="text-[12px]">
+            TOTAL GERAL PESQUISA
+          </span>
+
+        </div>
+
+        <div className="flex gap-10 pr-4">
+
+          <span className="text-[12px] tabular-nums">
+            {totals.qtyItems
+              .toFixed(2)
+              .replace('.', ',')}
+          </span>
+
+          <span className="text-[12px] tabular-nums">
+            R$ {formatMoney(totals.totalValue)}
+          </span>
+
+        </div>
+
       </footer>
 
-      {/* MODAL DETALHE (TELA) */}
+      {/* =====================================================
+          MODAL DETALHE
+      ====================================================== */}
+
       {viewingDetail && (
+
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 p-4 animate-in fade-in print:hidden">
-           <div className="bg-slate-100 w-full max-w-[1200px] h-[90vh] rounded shadow-2xl flex flex-col overflow-hidden text-slate-700">
-              <div className="bg-white p-3 border-b border-slate-300 flex items-center justify-between"><h2 className="text-sm font-bold flex items-center gap-2">Informações Gerais do Documento <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-[10px]">VENDA</span></h2><button onClick={() => setViewingDetail(null)} className="size-8 hover:bg-rose-500 hover:text-white flex items-center justify-center rounded transition-all"><span className="material-symbols-outlined">close</span></button></div>
-              <div className="p-4 space-y-4 overflow-y-auto">
-                 <div className="grid grid-cols-12 gap-2"><div className="col-span-2"><DetailField label="ID:" value={viewingDetail.id.slice(-6)} /></div><div className="col-span-10"><DetailField label="LOJA:" value={viewingDetail.store} borderHighlight /></div></div>
-                 <div className="grid grid-cols-12 gap-2"><div className="col-span-10"><DetailField label="CLIENTE:" value={viewingDetail.client || 'Consumidor Final'} borderHighlight /></div><div className="col-span-2"><DetailField label="DATA EMISSÃO:" value={viewingDetail.date} borderHighlight /></div></div>
-                 <div className="grid grid-cols-12 gap-2"><div className="col-span-4"><DetailField label="VENDEDOR:" value={getUserData(viewingDetail.vendorId)?.name || 'NÃO INF.'} borderHighlight /></div><div className="col-span-4"><DetailField label="CAIXA:" value={getUserData(viewingDetail.cashierId)?.name || viewingDetail.method || 'SISTEMA'} borderHighlight /></div><div className="col-span-4"><button onClick={() => handleReprint(viewingDetail)} className="w-full h-12 bg-primary text-white rounded font-black uppercase text-[10px] shadow flex items-center justify-center gap-2 hover:bg-blue-600">Reimprimir Cupom</button></div></div>
-                 <div className="bg-primary text-white flex items-center px-4 py-1.5 gap-8 mt-2">
-                    <button onClick={() => setActiveDetailTab('ITENS')} className={`text-[10px] font-black pb-0.5 uppercase ${activeDetailTab === 'ITENS' ? 'border-b-2 border-white' : 'opacity-70'}`}>ITENS</button>
-                    <button onClick={() => setActiveDetailTab('PAGAMENTO')} className={`text-[10px] font-black pb-0.5 uppercase ${activeDetailTab === 'PAGAMENTO' ? 'border-b-2 border-white' : 'opacity-70'}`}>FORMAS DE PAGAMENTO</button>
-                 </div>
-                 <div className="bg-white border border-slate-300 flex flex-col min-h-[300px]">
-                    {activeDetailTab === 'ITENS' && (
-                       <div className="overflow-auto flex-1">
-                          <table className="w-full text-left border-collapse text-[10px]"><thead className="bg-primary text-white"><tr><th className="px-2 py-1">Produto</th><th className="px-2 py-1 text-right">Qtd.</th><th className="px-2 py-1 text-right">Vr. Unitário</th><th className="px-2 py-1 text-right">Vr. Total</th></tr></thead>
-                          <tbody>{viewingDetail.items?.map((item, idx) => (<tr key={idx} className="hover:bg-slate-50 border-b"><td className="px-2 py-1"><span className="text-blue-600 font-black">{item.sku}</span> - {item.name}</td><td className="px-2 py-1 text-right font-black">{item.quantity.toFixed(2)}</td><td className="px-2 py-1 text-right">R$ {item.salePrice.toLocaleString('pt-BR')}</td><td className="px-2 py-1 text-right font-black">R$ {(item.quantity * item.salePrice).toLocaleString('pt-BR')}</td></tr>))}</tbody></table>
-                       </div>
-                    )}
-                    {activeDetailTab === 'PAGAMENTO' && (
-                       <div className="p-8 space-y-6">
-                          <div className="grid grid-cols-3 gap-6"><div className="bg-slate-50 p-4 rounded border"><p className="text-[9px] text-slate-400">PAGAMENTO</p><p className="text-sm font-black">{viewingDetail.method || 'DINHEIRO'}</p></div><div className="bg-slate-50 p-4 rounded border"><p className="text-[9px] text-slate-400">TOTAL</p><p className="text-sm font-black text-emerald-600">R$ {viewingDetail.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p></div></div>
-                          {(viewingDetail.cardOperatorId) && (<div className="grid grid-cols-4 gap-4"><div className="bg-white p-3 rounded border"><p className="text-[8px] text-slate-400">OPERADORA</p><p className="text-[10px] font-bold">{getCardInfo(viewingDetail.cardOperatorId, viewingDetail.cardBrandId).operator}</p></div><div className="bg-white p-3 rounded border"><p className="text-[8px] text-slate-400">BANDEIRA</p><p className="text-[10px] font-bold">{getCardInfo(viewingDetail.cardOperatorId, viewingDetail.cardBrandId).brand}</p></div><div className="bg-white p-3 rounded border"><p className="text-[8px] text-slate-400">NSU / AUTH</p><p className="text-[10px] font-bold">{viewingDetail.transactionSku || viewingDetail.authNumber || '---'}</p></div></div>)}
-                       </div>
-                    )}
-                 </div>
+
+          <div className="bg-slate-100 w-full max-w-[1200px] h-[90vh] rounded shadow-2xl flex flex-col overflow-hidden text-slate-700">
+
+            <div className="bg-white p-3 border-b border-slate-300 flex items-center justify-between">
+
+              <h2 className="text-sm font-bold flex items-center gap-2">
+
+                Informações Gerais do Documento
+
+                <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-[10px]">
+                  VENDA
+                </span>
+
+              </h2>
+
+              <button
+                onClick={() =>
+                  setViewingDetail(null)
+                }
+                className="size-8 hover:bg-rose-500 hover:text-white flex items-center justify-center rounded transition-all"
+              >
+
+                <span className="material-symbols-outlined">
+                  close
+                </span>
+
+              </button>
+
+            </div>
+
+            <div className="p-4 space-y-4 overflow-y-auto">
+
+              <div className="grid grid-cols-12 gap-2">
+
+                <div className="col-span-2">
+                  <DetailField
+                    label="ID:"
+                    value={viewingDetail.id.slice(-6)}
+                  />
+                </div>
+
+                <div className="col-span-10">
+                  <DetailField
+                    label="LOJA:"
+                    value={viewingDetail.store}
+                    borderHighlight
+                  />
+                </div>
+
               </div>
-           </div>
+
+              <div className="grid grid-cols-12 gap-2">
+
+                <div className="col-span-10">
+                  <DetailField
+                    label="CLIENTE:"
+                    value={
+                      viewingDetail.client ||
+                      'Consumidor Final'
+                    }
+                    borderHighlight
+                  />
+                </div>
+
+                <div className="col-span-2">
+                  <DetailField
+                    label="DATA EMISSÃO:"
+                    value={viewingDetail.date}
+                    borderHighlight
+                  />
+                </div>
+
+              </div>
+
+              <div className="grid grid-cols-12 gap-2">
+
+                <div className="col-span-4">
+
+                  <DetailField
+                    label="VENDEDOR:"
+                    value={
+                      getUserData(
+                        viewingDetail.vendorId
+                      )?.name ||
+                      'NÃO INF.'
+                    }
+                    borderHighlight
+                  />
+
+                </div>
+
+                <div className="col-span-4">
+
+                  <DetailField
+                    label="CAIXA:"
+                    value={
+                      getUserData(
+                        viewingDetail.cashierId
+                      )?.name ||
+                      viewingDetail.method ||
+                      'SISTEMA'
+                    }
+                    borderHighlight
+                  />
+
+                </div>
+
+                <div className="col-span-4">
+
+                  <button
+                    onClick={() =>
+                      handleReprint(viewingDetail)
+                    }
+                    className="w-full h-12 bg-primary text-white rounded font-black uppercase text-[10px] shadow flex items-center justify-center gap-2 hover:bg-blue-600"
+                  >
+
+                    <span className="material-symbols-outlined text-sm">
+                      print
+                    </span>
+
+                    Imprimir Romaneio A4
+
+                  </button>
+
+                </div>
+
+              </div>
+
+              <div className="bg-primary text-white flex items-center px-4 py-1.5 gap-8 mt-2">
+
+                <button
+                  onClick={() =>
+                    setActiveDetailTab('ITENS')
+                  }
+                  className={`text-[10px] font-black pb-0.5 uppercase ${
+                    activeDetailTab === 'ITENS'
+                      ? 'border-b-2 border-white'
+                      : 'opacity-70'
+                  }`}
+                >
+                  ITENS
+                </button>
+
+                <button
+                  onClick={() =>
+                    setActiveDetailTab('PAGAMENTO')
+                  }
+                  className={`text-[10px] font-black pb-0.5 uppercase ${
+                    activeDetailTab === 'PAGAMENTO'
+                      ? 'border-b-2 border-white'
+                      : 'opacity-70'
+                  }`}
+                >
+                  FORMAS DE PAGAMENTO
+                </button>
+
+              </div>
+
+              <div className="bg-white border border-slate-300 flex flex-col min-h-[300px]">
+
+                {activeDetailTab === 'ITENS' && (
+
+                  <div className="overflow-auto flex-1">
+
+                    <table className="w-full text-left border-collapse text-[10px]">
+
+                      <thead className="bg-primary text-white">
+
+                        <tr>
+
+                          <th className="px-2 py-1">
+                            Produto
+                          </th>
+
+                          <th className="px-2 py-1 text-right">
+                            Qtd.
+                          </th>
+
+                          <th className="px-2 py-1 text-right">
+                            Vr. Unitário
+                          </th>
+
+                          <th className="px-2 py-1 text-right">
+                            Vr. Total
+                          </th>
+
+                        </tr>
+
+                      </thead>
+
+                      <tbody>
+
+                        {viewingDetail.items?.map(
+                          (item, idx) => (
+
+                            <tr
+                              key={idx}
+                              className="hover:bg-slate-50 border-b"
+                            >
+
+                              <td className="px-2 py-1">
+
+                                <span className="text-blue-600 font-black">
+                                  {item.sku}
+                                </span>
+
+                                {' - '}
+
+                                {item.name}
+
+                              </td>
+
+                              <td className="px-2 py-1 text-right font-black">
+                                {item.quantity.toFixed(2)}
+                              </td>
+
+                              <td className="px-2 py-1 text-right">
+                                R$ {formatMoney(item.salePrice)}
+                              </td>
+
+                              <td className="px-2 py-1 text-right font-black">
+                                R$ {formatMoney(
+                                  item.quantity *
+                                  item.salePrice
+                                )}
+                              </td>
+
+                            </tr>
+
+                          )
+                        )}
+
+                      </tbody>
+
+                    </table>
+
+                  </div>
+
+                )}
+
+                {activeDetailTab === 'PAGAMENTO' && (
+
+                  <div className="p-8 space-y-6">
+
+                    <div className="grid grid-cols-3 gap-6">
+
+                      <div className="bg-slate-50 p-4 rounded border">
+
+                        <p className="text-[9px] text-slate-400">
+                          PAGAMENTO
+                        </p>
+
+                        <p className="text-sm font-black">
+                          {viewingDetail.method ||
+                            'DINHEIRO'}
+                        </p>
+
+                      </div>
+
+                      <div className="bg-slate-50 p-4 rounded border">
+
+                        <p className="text-[9px] text-slate-400">
+                          TOTAL
+                        </p>
+
+                        <p className="text-sm font-black text-emerald-600">
+                          R$ {formatMoney(
+                            viewingDetail.value
+                          )}
+                        </p>
+
+                      </div>
+
+                    </div>
+
+                    {viewingDetail.cardOperatorId && (
+
+                      <div className="grid grid-cols-4 gap-4">
+
+                        <div className="bg-white p-3 rounded border">
+
+                          <p className="text-[8px] text-slate-400">
+                            OPERADORA
+                          </p>
+
+                          <p className="text-[10px] font-bold">
+
+                            {
+                              getCardInfo(
+                                viewingDetail.cardOperatorId,
+                                viewingDetail.cardBrandId
+                              ).operator
+                            }
+
+                          </p>
+
+                        </div>
+
+                        <div className="bg-white p-3 rounded border">
+
+                          <p className="text-[8px] text-slate-400">
+                            BANDEIRA
+                          </p>
+
+                          <p className="text-[10px] font-bold">
+
+                            {
+                              getCardInfo(
+                                viewingDetail.cardOperatorId,
+                                viewingDetail.cardBrandId
+                              ).brand
+                            }
+
+                          </p>
+
+                        </div>
+
+                        <div className="bg-white p-3 rounded border">
+
+                          <p className="text-[8px] text-slate-400">
+                            NSU
+                          </p>
+
+                          <p className="text-[10px] font-bold">
+                            {
+                              viewingDetail.transactionSku ||
+                              '---'
+                            }
+                          </p>
+
+                        </div>
+
+                        <div className="bg-white p-3 rounded border">
+
+                          <p className="text-[8px] text-slate-400">
+                            AUTORIZAÇÃO
+                          </p>
+
+                          <p className="text-[10px] font-bold">
+                            {
+                              viewingDetail.authNumber ||
+                              '---'
+                            }
+                          </p>
+
+                        </div>
+
+                      </div>
+
+                    )}
+
+                  </div>
+
+                )}
+
+              </div>
+
+            </div>
+
+          </div>
+
         </div>
+
       )}
 
-      {/* MODAL ALTERAR VENDEDOR */}
+      {/* =====================================================
+          MODAL ALTERAR VENDEDOR
+      ====================================================== */}
+
       {showVendorModal && (
+
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-in fade-in">
-           <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
-              <div className="p-6 bg-primary text-white flex justify-between items-center font-black">
-                 <h3 className="text-lg uppercase">Alterar Vendedor</h3>
-                 <button onClick={() => setShowVendorModal(false)}><span className="material-symbols-outlined">close</span></button>
-              </div>
-              <div className="p-8 space-y-4">
-                 <p className="text-[10px] text-slate-400 font-black uppercase mb-4 tracking-widest px-2">Selecione o novo vendedor para o documento {selectedTransaction?.id.slice(-6)}:</p>
-                 <div className="space-y-2 max-h-96 overflow-y-auto custom-scrollbar pr-2">
-                    {users.filter(u => u.active && (isAdmin || u.storeId === currentUser?.storeId)).map(v => (
-                       <button 
-                         key={v.id} 
-                         onClick={() => handleUpdateVendor(v.id)}
-                         className={`w-full p-4 rounded-2xl flex items-center justify-between group transition-all ${selectedTransaction?.vendorId === v.id ? 'bg-primary text-white' : 'bg-slate-50 dark:bg-slate-800 hover:bg-primary/10'}`}
-                       >
-                          <span className={`text-xs font-black uppercase ${selectedTransaction?.vendorId === v.id ? 'text-white' : 'text-slate-700 dark:text-slate-200'}`}>{v.name}</span>
-                          <span className="material-symbols-outlined opacity-0 group-hover:opacity-100 transition-opacity">check_circle</span>
-                       </button>
-                    ))}
-                    <button 
-                      onClick={() => handleUpdateVendor('')}
-                      className="w-full p-4 rounded-2xl bg-slate-100 dark:bg-slate-700 text-slate-400 text-xs font-black uppercase hover:bg-rose-500 hover:text-white transition-all text-center"
+
+          <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+
+            <div className="p-6 bg-primary text-white flex justify-between items-center font-black">
+
+              <h3 className="text-lg uppercase">
+                Alterar Vendedor
+              </h3>
+
+              <button
+                onClick={() =>
+                  setShowVendorModal(false)
+                }
+              >
+
+                <span className="material-symbols-outlined">
+                  close
+                </span>
+
+              </button>
+
+            </div>
+
+            <div className="p-8 space-y-4">
+
+              <p className="text-[10px] text-slate-400 font-black uppercase mb-4 tracking-widest px-2">
+
+                Selecione o novo vendedor para o documento{' '}
+
+                {selectedTransaction?.id.slice(-6)}
+
+              </p>
+
+              <div className="space-y-2 max-h-96 overflow-y-auto custom-scrollbar pr-2">
+
+                {users
+                  .filter(
+                    u =>
+                      u.active &&
+                      (
+                        isAdmin ||
+                        u.storeId ===
+                        currentUser?.storeId
+                      )
+                  )
+                  .map(v => (
+
+                    <button
+                      key={v.id}
+                      onClick={() =>
+                        handleUpdateVendor(v.id)
+                      }
+                      className={`w-full p-4 rounded-2xl flex items-center justify-between group transition-all ${
+                        selectedTransaction?.vendorId === v.id
+                          ? 'bg-primary text-white'
+                          : 'bg-slate-50 dark:bg-slate-800 hover:bg-primary/10'
+                      }`}
                     >
-                       Limpar Vendedor (Balcão)
+
+                      <span
+                        className={`text-xs font-black uppercase ${
+                          selectedTransaction?.vendorId === v.id
+                            ? 'text-white'
+                            : 'text-slate-700 dark:text-slate-200'
+                        }`}
+                      >
+                        {v.name}
+                      </span>
+
+                      <span className="material-symbols-outlined opacity-0 group-hover:opacity-100 transition-opacity">
+                        check_circle
+                      </span>
+
                     </button>
-                 </div>
+
+                  ))}
+
+                <button
+                  onClick={() =>
+                    handleUpdateVendor('')
+                  }
+                  className="w-full p-4 rounded-2xl bg-slate-100 dark:bg-slate-700 text-slate-400 text-xs font-black uppercase hover:bg-rose-500 hover:text-white transition-all text-center"
+                >
+                  Limpar Vendedor (Balcão)
+                </button>
+
               </div>
-           </div>
+
+            </div>
+
+          </div>
+
         </div>
+
       )}
 
-      {/* MODAL ALTERAR CLIENTE */}
+      {/* =====================================================
+          MODAL ALTERAR CLIENTE
+      ====================================================== */}
+
       {showCustomerModal && (
+
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-in fade-in">
-           <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
-              <div className="p-6 bg-primary text-white flex justify-between items-center font-black">
-                 <h3 className="text-lg uppercase">Alterar Cliente</h3>
-                 <button onClick={() => setShowCustomerModal(false)}><span className="material-symbols-outlined">close</span></button>
+
+          <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+
+            <div className="p-6 bg-primary text-white flex justify-between items-center font-black">
+
+              <h3 className="text-lg uppercase">
+                Alterar Cliente
+              </h3>
+
+              <button
+                onClick={() =>
+                  setShowCustomerModal(false)
+                }
+              >
+
+                <span className="material-symbols-outlined">
+                  close
+                </span>
+
+              </button>
+
+            </div>
+
+            <div className="p-8 space-y-4">
+
+              <div className="relative mb-6">
+
+                <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                  search
+                </span>
+
+                <input
+                  autoFocus
+                  value={customerSearch}
+                  onChange={e =>
+                    setCustomerSearch(
+                      e.target.value
+                    )
+                  }
+                  placeholder="BUSCAR CLIENTE PELO NOME..."
+                  className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl pl-12 pr-6 text-xs font-black uppercase outline-none focus:ring-2 focus:ring-primary/20"
+                />
+
               </div>
-              <div className="p-8 space-y-4">
-                 <div className="relative mb-6">
-                    <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">search</span>
-                    <input autoFocus placeholder="BUSCAR CLIENTE PELO NOME..." className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl pl-12 pr-6 text-xs font-black uppercase outline-none focus:ring-2 focus:ring-primary/20" />
-                 </div>
-                 <div className="space-y-2 max-h-96 overflow-y-auto custom-scrollbar pr-2">
-                    {customers.map(c => (
-                       <button 
-                         key={c.id} 
-                         onClick={() => handleUpdateCustomer(c.id)}
-                         className={`w-full p-5 rounded-2xl flex flex-col text-left group transition-all ${selectedTransaction?.clientId === c.id ? 'bg-primary text-white' : 'bg-slate-50 dark:bg-slate-800 hover:bg-primary/10'}`}
-                       >
-                          <span className={`text-sm font-black uppercase ${selectedTransaction?.clientId === c.id ? 'text-white' : 'text-slate-800 dark:text-slate-200'}`}>{c.name}</span>
-                          <span className={`text-[10px] font-bold ${selectedTransaction?.clientId === c.id ? 'text-white/60' : 'text-slate-400'}`}>{c.cpfCnpj || 'DOCUMENTO NÃO CADASTRADO'}</span>
-                       </button>
-                    ))}
-                    <button 
-                      onClick={() => handleUpdateCustomer('')}
-                      className="w-full p-4 rounded-2xl bg-slate-100 dark:bg-slate-700 text-slate-400 text-xs font-black uppercase hover:bg-rose-500 hover:text-white transition-all text-center"
+
+              <div className="space-y-2 max-h-96 overflow-y-auto custom-scrollbar pr-2">
+
+                {filteredCustomers.map(c => (
+
+                  <button
+                    key={c.id}
+                    onClick={() =>
+                      handleUpdateCustomer(c.id)
+                    }
+                    className={`w-full p-5 rounded-2xl flex flex-col text-left group transition-all ${
+                      selectedTransaction?.clientId === c.id
+                        ? 'bg-primary text-white'
+                        : 'bg-slate-50 dark:bg-slate-800 hover:bg-primary/10'
+                    }`}
+                  >
+
+                    <span
+                      className={`text-sm font-black uppercase ${
+                        selectedTransaction?.clientId === c.id
+                          ? 'text-white'
+                          : 'text-slate-800 dark:text-slate-200'
+                      }`}
                     >
-                       Consumidor Final (Sem Cadastro)
-                    </button>
-                 </div>
+                      {c.name}
+                    </span>
+
+                    <span
+                      className={`text-[10px] font-bold ${
+                        selectedTransaction?.clientId === c.id
+                          ? 'text-white/60'
+                          : 'text-slate-400'
+                      }`}
+                    >
+                      {c.cpfCnpj ||
+                        'DOCUMENTO NÃO CADASTRADO'}
+                    </span>
+
+                  </button>
+
+                ))}
+
+                <button
+                  onClick={() =>
+                    handleUpdateCustomer('')
+                  }
+                  className="w-full p-4 rounded-2xl bg-slate-100 dark:bg-slate-700 text-slate-400 text-xs font-black uppercase hover:bg-rose-500 hover:text-white transition-all text-center"
+                >
+                  Consumidor Final (Sem Cadastro)
+                </button>
+
               </div>
-           </div>
+
+            </div>
+
+          </div>
+
         </div>
+
       )}
+
+      {/* =====================================================
+          CSS
+      ====================================================== */}
 
       <style>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 20px; }
-        @media print {
-          body * { visibility: hidden !important; }
-          #root { display: block !important; }
-          .print\\:hidden, header, footer, div[class*="fixed"], div[class*="backdrop-blur"] { display: none !important; opacity: 0 !important; }
-          #receipt-reprint-area, #receipt-reprint-area * { visibility: visible !important; display: block !important; }
-          #receipt-reprint-area { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; max-width: 80mm !important; padding: 10px !important; margin: 0 !important; background: white !important; color: black !important; border: none !important; }
-          @page { size: auto; margin: 0mm; }
+
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 4px;
+          height: 4px;
         }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #cbd5e1;
+          border-radius: 20px;
+        }
+
+        /* ===================================================
+           ROMANEIO A4
+        =================================================== */
+
+        .a4-romaneio {
+          width: 100%;
+          min-height: 277mm;
+          background: #ffffff;
+          color: #111827;
+          font-family: Arial, Helvetica, sans-serif;
+          font-size: 10px;
+          font-weight: 500;
+          text-transform: uppercase;
+          padding: 0;
+          box-sizing: border-box;
+        }
+
+        .romaneio-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          padding-bottom: 12px;
+        }
+
+        .romaneio-company {
+          flex: 1;
+        }
+
+        .romaneio-company-name {
+          font-size: 22px;
+          font-weight: 900;
+          line-height: 1.1;
+        }
+
+        .romaneio-company-subtitle {
+          font-size: 9px;
+          margin-top: 5px;
+          color: #64748b;
+          font-weight: 700;
+        }
+
+        .romaneio-title-box {
+          width: 170px;
+          text-align: right;
+        }
+
+        .romaneio-title {
+          font-size: 24px;
+          font-weight: 900;
+          line-height: 1;
+        }
+
+        .romaneio-subtitle {
+          font-size: 9px;
+          margin-top: 5px;
+          color: #64748b;
+          font-weight: 800;
+        }
+
+        .romaneio-line {
+          border-top: 2px solid #111827;
+          margin-bottom: 12px;
+        }
+
+        .romaneio-info-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr 1.4fr 1.4fr;
+          border: 1px solid #cbd5e1;
+          margin-bottom: 10px;
+        }
+
+        .romaneio-info-item {
+          padding: 8px 10px;
+          border-right: 1px solid #cbd5e1;
+          display: flex;
+          flex-direction: column;
+          gap: 3px;
+        }
+
+        .romaneio-info-item:last-child {
+          border-right: none;
+        }
+
+        .romaneio-label {
+          display: block;
+          font-size: 7px;
+          color: #64748b;
+          font-weight: 900;
+          letter-spacing: 0.4px;
+        }
+
+        .romaneio-info-item strong {
+          font-size: 10px;
+          font-weight: 900;
+        }
+
+        .romaneio-customer {
+          display: grid;
+          grid-template-columns: 3fr 1fr;
+          border: 1px solid #cbd5e1;
+          margin-bottom: 14px;
+        }
+
+        .romaneio-customer > div {
+          padding: 8px 10px;
+          border-right: 1px solid #cbd5e1;
+          display: flex;
+          flex-direction: column;
+          gap: 3px;
+        }
+
+        .romaneio-customer > div:last-child {
+          border-right: none;
+        }
+
+        .romaneio-section-title {
+          background: #111827;
+          color: white;
+          padding: 7px 10px;
+          font-size: 9px;
+          font-weight: 900;
+          letter-spacing: 0.5px;
+          margin-top: 10px;
+        }
+
+        .romaneio-section-title.small {
+          margin-top: 0;
+          background: #e2e8f0;
+          color: #111827;
+        }
+
+        .romaneio-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-bottom: 12px;
+          table-layout: fixed;
+        }
+
+        .romaneio-table th {
+          background: #f1f5f9;
+          border: 1px solid #cbd5e1;
+          padding: 6px 7px;
+          font-size: 7px;
+          font-weight: 900;
+          text-align: left;
+        }
+
+        .romaneio-table td {
+          border: 1px solid #cbd5e1;
+          padding: 6px 7px;
+          font-size: 8px;
+          vertical-align: middle;
+        }
+
+        .romaneio-table tbody tr:nth-child(even) {
+          background: #f8fafc;
+        }
+
+        .romaneio-table .col-seq {
+          width: 28px;
+          text-align: center;
+        }
+
+        .romaneio-table .col-sku {
+          width: 90px;
+        }
+
+        .romaneio-table .col-qtd {
+          width: 65px;
+          text-align: right;
+        }
+
+        .romaneio-table .col-unit {
+          width: 95px;
+          text-align: right;
+        }
+
+        .romaneio-table .col-total {
+          width: 105px;
+          text-align: right;
+        }
+
+        .product-description {
+          font-weight: 700;
+        }
+
+        .text-right {
+          text-align: right !important;
+        }
+
+        .text-center {
+          text-align: center !important;
+        }
+
+        .strong {
+          font-weight: 900 !important;
+        }
+
+        .table-footer-label {
+          text-align: right;
+          font-weight: 900;
+          background: #f1f5f9;
+        }
+
+        .romaneio-financial {
+          display: grid;
+          grid-template-columns: 1fr 260px;
+          gap: 12px;
+          margin-top: 8px;
+        }
+
+        .payment-box {
+          border: 1px solid #cbd5e1;
+        }
+
+        .payment-main {
+          padding: 10px;
+          font-size: 12px;
+          font-weight: 900;
+        }
+
+        .payment-details {
+          border-top: 1px solid #e2e8f0;
+          padding: 8px 10px;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 5px 15px;
+          font-size: 8px;
+        }
+
+        .payment-details span {
+          color: #64748b;
+          font-size: 7px;
+          margin-right: 4px;
+          font-weight: 900;
+        }
+
+        .total-box {
+          border: 2px solid #111827;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: flex-end;
+          padding: 15px;
+        }
+
+        .total-label {
+          font-size: 8px;
+          font-weight: 900;
+          color: #64748b;
+        }
+
+        .total-box strong {
+          font-size: 20px;
+          font-weight: 900;
+          margin-top: 4px;
+        }
+
+        .romaneio-observation {
+          margin-top: 18px;
+        }
+
+        .observation-line {
+          height: 22px;
+          border-bottom: 1px solid #cbd5e1;
+        }
+
+        .signature-area {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 100px;
+          margin-top: 55px;
+          padding: 0 50px;
+        }
+
+        .signature {
+          text-align: center;
+          font-size: 8px;
+          font-weight: 900;
+          color: #475569;
+        }
+
+        .signature-line {
+          border-top: 1px solid #111827;
+          margin-bottom: 6px;
+        }
+
+        .romaneio-footer {
+          display: flex;
+          justify-content: space-between;
+          border-top: 1px solid #cbd5e1;
+          margin-top: 40px;
+          padding-top: 8px;
+          color: #64748b;
+          font-size: 7px;
+          font-weight: 700;
+        }
+
+        /* ===================================================
+           IMPRESSÃO A4
+        =================================================== */
+
+        @media print {
+
+          @page {
+            size: A4 portrait;
+            margin: 10mm;
+          }
+
+          html,
+          body {
+            width: 210mm;
+            min-height: 297mm;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: white !important;
+          }
+
+          body * {
+            visibility: hidden !important;
+          }
+
+          #root {
+            display: block !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+
+          #receipt-reprint-area,
+          #receipt-reprint-area * {
+            visibility: visible !important;
+          }
+
+          #receipt-reprint-area {
+            display: block !important;
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            max-width: none !important;
+            min-height: 277mm !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: white !important;
+            color: black !important;
+            border: none !important;
+          }
+
+          .a4-romaneio {
+            width: 100% !important;
+            min-height: 277mm !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            background: white !important;
+            color: #111827 !important;
+          }
+
+          .romaneio-table {
+            page-break-inside: auto;
+          }
+
+          .romaneio-table tr {
+            page-break-inside: avoid;
+            page-break-after: auto;
+          }
+
+          .romaneio-table thead {
+            display: table-header-group;
+          }
+
+          .romaneio-table tfoot {
+            display: table-footer-group;
+          }
+
+          .romaneio-section-title,
+          .romaneio-financial,
+          .romaneio-observation,
+          .signature-area {
+            page-break-inside: avoid;
+          }
+
+          button,
+          input,
+          select,
+          header,
+          footer {
+            display: none !important;
+          }
+
+        }
+
       `}</style>
+
     </div>
   );
 };
 
-const DetailField = ({ label, value, borderHighlight }: { label: string, value: string, borderHighlight?: boolean }) => (
+// =========================================================
+// CAMPO DE DETALHE
+// =========================================================
+
+const DetailField = ({
+  label,
+  value,
+  borderHighlight
+}: {
+  label: string;
+  value: string;
+  borderHighlight?: boolean;
+}) => (
+
   <div className="flex flex-col gap-0.5">
-     <label className="text-[9px] font-black text-slate-500 uppercase">{label}</label>
-     <div className={`h-8 bg-white border ${borderHighlight ? 'border-emerald-500/50 rounded-lg' : 'border-slate-300'} px-2 flex items-center text-[10px] font-bold truncate shadow-inner`}>{value}</div>
+
+    <label className="text-[9px] font-black text-slate-500 uppercase">
+      {label}
+    </label>
+
+    <div
+      className={`h-8 bg-white border ${
+        borderHighlight
+          ? 'border-emerald-500/50 rounded-lg'
+          : 'border-slate-300'
+      } px-2 flex items-center text-[10px] font-bold truncate shadow-inner`}
+    >
+      {value}
+    </div>
+
   </div>
+
 );
 
 export default SalesInquiry;
