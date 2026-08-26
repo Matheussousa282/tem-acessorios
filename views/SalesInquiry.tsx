@@ -2883,11 +2883,7 @@ const SalesInquiry: React.FC = () => {
 
           margin: 0 auto;
 
-          padding:
-            12mm
-            12mm
-            10mm
-            12mm;
+          padding: 10mm;
 
           box-sizing: border-box;
 
@@ -3453,157 +3449,408 @@ const SalesInquiry: React.FC = () => {
 
         @media print {
 
+          @page {
+            size: A4 portrait;
+            margin: 0;
+          }
+
           html,
           body {
-
-            width: 210mm !important;
-
-            min-width: 210mm !important;
-
+            width: 100% !important;
+            min-width: 0 !important;
             margin: 0 !important;
-
             padding: 0 !important;
-
-            background:
-              #ffffff !important;
-
+            background: #ffffff !important;
           }
-
 
           body {
-
             overflow: visible !important;
-
           }
-
 
           body * {
-
             visibility: hidden !important;
-
           }
-
 
           #root {
-
-            width: 210mm !important;
-
-            min-width: 210mm !important;
-
+            width: 100% !important;
+            min-width: 0 !important;
             margin: 0 !important;
-
             padding: 0 !important;
-
             display: block !important;
-
           }
 
-
           #receipt-reprint-area {
-
             visibility: visible !important;
-
             display: block !important;
+            position: static !important;
 
-            position: relative !important;
-
-            width: 210mm !important;
-
-            min-width: 210mm !important;
-
-            max-width: 210mm !important;
+            width: 100% !important;
+            min-width: 0 !important;
+            max-width: none !important;
 
             height: auto !important;
 
-            margin: 0 auto !important;
-
+            margin: 0 !important;
             padding: 0 !important;
 
-            left: 0 !important;
+            left: auto !important;
+            top: auto !important;
 
-            top: 0 !important;
-
-            background:
-              white !important;
-
+            background: #ffffff !important;
           }
-
 
           #receipt-reprint-area * {
-
             visibility: visible !important;
-
           }
 
-
           .romaneio-a4 {
-
             visibility: visible !important;
-
             display: block !important;
 
-            width: 210mm !important;
-
-            min-width: 210mm !important;
-
-            max-width: 210mm !important;
+            width: 100% !important;
+            min-width: 0 !important;
+            max-width: none !important;
 
             min-height: 297mm !important;
 
-            margin: 0 auto !important;
-
-            padding:
-              12mm
-              12mm
-              10mm
-              12mm !important;
-
-            box-sizing:
-              border-box !important;
-
-            background:
-              white !important;
-
-            color:
-              #111827 !important;
-
-          }
-
-
-          @page {
-
-            size: A4 portrait;
-
             margin: 0 !important;
+            padding: 10mm !important;
 
+            box-sizing: border-box !important;
+
+            background: #ffffff !important;
+            color: #111827 !important;
+
+            font-family: Arial, Helvetica, sans-serif !important;
+            font-size: 10px !important;
+            line-height: 1.3 !important;
           }
 
+          .romaneio-header {
+            width: 100% !important;
+
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: flex-start !important;
+
+            gap: 15px !important;
+
+            padding-bottom: 8px !important;
+            margin-bottom: 8px !important;
+
+            border-bottom: 2px solid #111827 !important;
+
+            box-sizing: border-box !important;
+          }
+
+          .empresa-info {
+            flex: 1 1 auto !important;
+            min-width: 0 !important;
+          }
+
+          .empresa-info h1 {
+            margin: 0 !important;
+            font-size: 19px !important;
+            line-height: 1.1 !important;
+            font-weight: 900 !important;
+          }
+
+          .empresa-info h2 {
+            margin: 3px 0 0 !important;
+            font-size: 14px !important;
+            line-height: 1.1 !important;
+            font-weight: 900 !important;
+          }
+
+          .empresa-info p {
+            margin: 3px 0 0 !important;
+            font-size: 8px !important;
+            color: #4b5563 !important;
+            font-weight: 700 !important;
+          }
+
+          .documento-info {
+            flex: 0 0 170px !important;
+            width: 170px !important;
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important;
+            border: 1px solid #111827 !important;
+          }
+
+          .documento-info div {
+            padding: 6px !important;
+          }
+
+          .documento-info strong {
+            font-size: 7px !important;
+            font-weight: 900 !important;
+          }
+
+          .documento-info span {
+            font-size: 10px !important;
+            font-weight: 900 !important;
+          }
+
+          .romaneio-section-title {
+            width: 100% !important;
+
+            margin-top: 7px !important;
+            margin-bottom: 4px !important;
+
+            padding: 5px 7px !important;
+
+            background: #e5e7eb !important;
+            border: 1px solid #9ca3af !important;
+
+            box-sizing: border-box !important;
+
+            font-size: 8px !important;
+            line-height: 1.1 !important;
+            font-weight: 900 !important;
+          }
+
+          .dados-grid {
+            width: 100% !important;
+
+            display: grid !important;
+
+            grid-template-columns:
+              2.2fr
+              1.4fr
+              1.2fr
+              1.5fr !important;
+
+            border: 1px solid #d1d5db !important;
+
+            box-sizing: border-box !important;
+          }
+
+          .campo {
+            min-width: 0 !important;
+            min-height: 42px !important;
+            padding: 5px 7px !important;
+
+            box-sizing: border-box !important;
+          }
+
+          .campo label {
+            font-size: 6.5px !important;
+            margin-bottom: 2px !important;
+          }
+
+          .campo span {
+            display: block !important;
+            font-size: 8px !important;
+            line-height: 1.2 !important;
+
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+          }
 
           .romaneio-table {
+            width: 100% !important;
 
-            page-break-inside: auto;
+            table-layout: fixed !important;
+            border-collapse: collapse !important;
 
+            font-size: 8px !important;
+            margin: 0 !important;
           }
 
+          .romaneio-table thead {
+            background: #1f2937 !important;
+            color: #ffffff !important;
+          }
+
+          .romaneio-table th {
+            padding: 5px 4px !important;
+
+            font-size: 7px !important;
+            line-height: 1.1 !important;
+            font-weight: 900 !important;
+
+            border: 1px solid #1f2937 !important;
+          }
+
+          .romaneio-table td {
+            padding: 5px 4px !important;
+
+            font-size: 8px !important;
+            line-height: 1.2 !important;
+
+            border: 1px solid #d1d5db !important;
+
+            vertical-align: middle !important;
+
+            overflow-wrap: anywhere !important;
+            word-break: break-word !important;
+          }
+
+          .romaneio-table .col-item {
+            width: 6% !important;
+          }
+
+          .romaneio-table .col-codigo {
+            width: 19% !important;
+          }
+
+          .romaneio-table .col-descricao {
+            width: 37% !important;
+          }
+
+          .romaneio-table .col-qtd {
+            width: 9% !important;
+          }
+
+          .romaneio-table .col-unit {
+            width: 14.5% !important;
+          }
+
+          .romaneio-table .col-total {
+            width: 14.5% !important;
+          }
+
+          .romaneio-table tbody tr:nth-child(even) {
+            background: #f9fafb !important;
+          }
 
           .romaneio-table tr {
-
-            page-break-inside: avoid;
-
-            page-break-after: auto;
-
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            page-break-after: auto !important;
           }
 
+          .resumo-container {
+            width: 100% !important;
+
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: stretch !important;
+
+            gap: 10px !important;
+
+            margin-top: 9px !important;
+
+            box-sizing: border-box !important;
+          }
+
+          .resumo-left {
+            flex: 1 1 auto !important;
+            min-width: 0 !important;
+
+            display: flex !important;
+            gap: 7px !important;
+          }
+
+          .resumo-box {
+            flex: 1 1 0 !important;
+            min-width: 0 !important;
+
+            padding: 7px !important;
+
+            border: 1px solid #d1d5db !important;
+
+            box-sizing: border-box !important;
+          }
+
+          .resumo-box strong {
+            font-size: 7px !important;
+            padding-bottom: 3px !important;
+          }
+
+          .resumo-box span {
+            font-size: 7px !important;
+            line-height: 1.2 !important;
+          }
+
+          .total-box {
+            flex: 0 0 190px !important;
+            width: 190px !important;
+
+            padding: 8px !important;
+
+            border: 2px solid #111827 !important;
+
+            box-sizing: border-box !important;
+
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: center !important;
+            align-items: flex-end !important;
+          }
+
+          .total-label {
+            font-size: 8px !important;
+            line-height: 1.1 !important;
+          }
+
+          .total-value {
+            margin-top: 3px !important;
+            font-size: 17px !important;
+            line-height: 1.1 !important;
+            font-weight: 900 !important;
+          }
+
+          .assinaturas {
+            width: 100% !important;
+
+            display: flex !important;
+            justify-content: space-between !important;
+
+            gap: 35px !important;
+
+            margin-top: 38px !important;
+
+            box-sizing: border-box !important;
+          }
+
+          .assinatura {
+            flex: 1 1 0 !important;
+            min-width: 0 !important;
+            text-align: center !important;
+          }
+
+          .assinatura div {
+            width: 100% !important;
+
+            border-top: 1px solid #111827 !important;
+
+            margin-bottom: 4px !important;
+          }
+
+          .assinatura span {
+            font-size: 7px !important;
+            line-height: 1.1 !important;
+            font-weight: 900 !important;
+          }
+
+          .romaneio-footer {
+            width: 100% !important;
+
+            margin-top: 18px !important;
+            padding-top: 6px !important;
+
+            border-top: 1px solid #9ca3af !important;
+
+            display: flex !important;
+            justify-content: space-between !important;
+            gap: 10px !important;
+
+            font-size: 6.5px !important;
+            line-height: 1.1 !important;
+
+            color: #6b7280 !important;
+            font-weight: bold !important;
+          }
 
           .romaneio-header,
           .dados-grid,
           .resumo-container,
           .assinaturas {
-
-            page-break-inside: avoid;
-
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
-
         }
 
       `}</style>
