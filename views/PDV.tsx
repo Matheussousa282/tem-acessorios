@@ -456,63 +456,251 @@ const PDV: React.FC = () => {
   return (
     <div className="h-screen flex flex-col bg-slate-50 dark:bg-background-dark overflow-hidden font-display relative">
       
-      {/* RECIBO TÉRMICO */}
-      <div id="receipt-print-area" className="hidden print:block bg-white text-black font-mono text-[11px] leading-tight p-4">
-        <div className="text-center space-y-1 mb-3 border-b-2 border-dashed border-black pb-2">
-           {lastSaleData?.store?.logoUrl && <img src={lastSaleData.store.logoUrl} className="h-14 mx-auto mb-1 grayscale" alt="Logo" />}
-           <h2 className="text-[14px] font-black uppercase">{lastSaleData?.store?.name || 'TEM ACESSÓRIOS'}</h2>
-           <p className="text-[9px] uppercase">{lastSaleData?.store?.location || 'LOCAL NÃO INFORMADO'}</p>
-           <p className="text-[9px]">CNPJ: {lastSaleData?.store?.cnpj || '00.000.000/0001-00'}</p>
-           <div className="font-black text-[12px] pt-1">*** CUPOM NÃO FISCAL ***</div>
-        </div>
+      {/* =====================================================
+          ROMANEIO A4 - IMPRESSÃO APÓS FINALIZAR A VENDA
+      ====================================================== */}
+      <div id="receipt-print-area" className="hidden print:block">
+        {lastSaleData && (
+          <div className="romaneio-a4">
 
-        <div className="space-y-1 mb-2 text-[10px]">
-           <div className="flex justify-between font-bold"><span>DOC: {lastSaleData?.id || '---'}</span><span>{lastSaleData?.date || '---'}</span></div>
-           <div className="uppercase">CLIENTE: {lastSaleData?.customer || 'CONSUMIDOR FINAL'}</div>
-           <div className="uppercase">VENDEDOR: {lastSaleData?.vendor || 'BALCÃO'}</div>
-        </div>
+            {/* CABEÇALHO */}
+            <div className="romaneio-header">
+              <div className="empresa-info">
+                {lastSaleData.store?.logoUrl && (
+                  <img
+                    src={lastSaleData.store.logoUrl}
+                    className="empresa-logo"
+                    alt="Logo"
+                  />
+                )}
 
-        <div className="border-t border-b border-black py-1 mb-1 font-black flex justify-between uppercase text-[9px]">
-           <span className="w-8">QTD</span><span className="flex-1 px-2">DESCRIÇÃO</span><span className="w-16 text-right">VALOR</span>
-        </div>
+                <div>
+                  <h1>{lastSaleData.store?.name || 'TEM ACESSÓRIOS'}</h1>
+                  <h2>ROMANEIO DE VENDA</h2>
+                  <p>DOCUMENTO DE VENDA</p>
+                </div>
+              </div>
 
-        <div className="space-y-1 mb-3 text-[10px]">
-           {lastSaleData?.items?.map((item: any, idx: number) => (
-             <div key={idx} className="flex justify-between items-start uppercase">
-                <span className="w-8">{item.quantity.toFixed(0)}</span>
-                <span className="flex-1 px-2">{item.name}</span>
-                <span className="w-16 text-right">{(item.quantity * item.salePrice).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-             </div>
-           ))}
-        </div>
+              <div className="documento-info">
+                <div>
+                  <strong>DOCUMENTO</strong>
+                  <span>{lastSaleData.id || '---'}</span>
+                </div>
 
-        <div className="space-y-1 border-t border-black pt-2 mb-3 text-[11px]">
-           <div className="flex justify-between font-bold"><span>SUBTOTAL:</span><span>R$ {lastSaleData?.subtotal?.toLocaleString('pt-BR', {minimumFractionDigits: 2}) || '0,00'}</span></div>
-           {lastSaleData?.discount > 0 && <div className="flex justify-between text-rose-600"><span>DESCONTO (-):</span><span>R$ {lastSaleData?.discount?.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>}
-           {lastSaleData?.shipping > 0 && <div className="flex justify-between text-blue-600"><span>FRETE (+):</span><span>R$ {lastSaleData?.shipping?.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></div>}
-           <div className="flex justify-between text-[13px] font-black border-t-2 border-black pt-1"><span>TOTAL GERAL:</span><span>R$ {lastSaleData?.total?.toLocaleString('pt-BR', {minimumFractionDigits: 2}) || '0,00'}</span></div>
-        </div>
+                <div>
+                  <strong>DATA</strong>
+                  <span>{lastSaleData.date || '---'}</span>
+                </div>
+              </div>
+            </div>
 
-        <div className="bg-black/5 p-2 border border-black mb-4 text-[10px] space-y-1">
-           <div className="font-black uppercase border-b border-black/10 pb-1">PAGAMENTOS EFETUADOS:</div>
-           {lastSaleData?.payments?.map((p: any, i: number) => (
-             <div key={i} className="flex justify-between uppercase font-bold text-[10px]">
-               <span>{p.method} {(p.details?.installments ?? 0) > 1 ? `(${p.details?.installments}X)` : ''}:</span>
-               <span>R$ {p.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-             </div>
-           ))}
-           {lastSaleData?.change > 0 && (
-             <div className="flex justify-between text-emerald-600 font-black border-t border-black/10 pt-1 mt-1">
-               <span>TROCO RECEBIDO:</span>
-               <span>R$ {lastSaleData.change.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-             </div>
-           )}
-        </div>
+            {/* DADOS DA VENDA */}
+            <div className="romaneio-section-title">
+              DADOS DA VENDA
+            </div>
 
-        <div className="text-center space-y-1 pt-2 border-t border-dashed border-black text-[9px]">
-           <p className="font-black">OBRIGADO PELA PREFERÊNCIA!</p>
-           <p className="opacity-70 uppercase">SISTEMA ERP CLOUD - v4.5.2</p>
-        </div>
+            <div className="dados-grid">
+              <div className="campo campo-cliente">
+                <label>CLIENTE</label>
+                <span>
+                  {lastSaleData.customer || 'CONSUMIDOR FINAL'}
+                </span>
+              </div>
+
+              <div className="campo">
+                <label>VENDEDOR</label>
+                <span>
+                  {lastSaleData.vendor || 'BALCÃO'}
+                </span>
+              </div>
+
+              <div className="campo">
+                <label>CAIXA</label>
+                <span>
+                  {lastSaleData.payment || 'SISTEMA'}
+                </span>
+              </div>
+
+              <div className="campo">
+                <label>LOJA / UNIDADE</label>
+                <span>
+                  {lastSaleData.store?.name || '---'}
+                </span>
+              </div>
+            </div>
+
+            {/* ITENS */}
+            <div className="romaneio-section-title">
+              ITENS DA VENDA
+            </div>
+
+            <table className="romaneio-table">
+              <thead>
+                <tr>
+                  <th className="col-item">ITEM</th>
+                  <th className="col-codigo">CÓDIGO</th>
+                  <th className="col-descricao">DESCRIÇÃO</th>
+                  <th className="col-qtd">QTD.</th>
+                  <th className="col-unit">VALOR UNIT.</th>
+                  <th className="col-total">VALOR TOTAL</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {lastSaleData.items?.map((item: any, idx: number) => (
+                  <tr key={idx}>
+                    <td className="text-center">{idx + 1}</td>
+
+                    <td>
+                      {item.sku || '---'}
+                    </td>
+
+                    <td>
+                      {item.name || '---'}
+                    </td>
+
+                    <td className="text-right">
+                      {Number(item.quantity || 0).toFixed(2)}
+                    </td>
+
+                    <td className="text-right">
+                      R$ {Number(item.salePrice || 0).toLocaleString(
+                        'pt-BR',
+                        { minimumFractionDigits: 2 }
+                      )}
+                    </td>
+
+                    <td className="text-right font-bold">
+                      R$ {(Number(item.quantity || 0) * Number(item.salePrice || 0)).toLocaleString(
+                        'pt-BR',
+                        { minimumFractionDigits: 2 }
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {/* RESUMO */}
+            <div className="resumo-container">
+              <div className="resumo-left">
+
+                <div className="resumo-box">
+                  <strong>FORMA DE PAGAMENTO</strong>
+                  <span>
+                    {lastSaleData.payment || 'DINHEIRO'}
+                  </span>
+                </div>
+
+                <div className="resumo-box">
+                  <strong>VALORES</strong>
+
+                  <span>
+                    SUBTOTAL:
+                    {' '}
+                    R$ {Number(lastSaleData.subtotal || 0).toLocaleString(
+                      'pt-BR',
+                      { minimumFractionDigits: 2 }
+                    )}
+                  </span>
+
+                  {Number(lastSaleData.discount || 0) > 0 && (
+                    <span>
+                      DESCONTO:
+                      {' '}
+                      R$ {Number(lastSaleData.discount).toLocaleString(
+                        'pt-BR',
+                        { minimumFractionDigits: 2 }
+                      )}
+                    </span>
+                  )}
+
+                  {Number(lastSaleData.shipping || 0) > 0 && (
+                    <span>
+                      FRETE:
+                      {' '}
+                      R$ {Number(lastSaleData.shipping).toLocaleString(
+                        'pt-BR',
+                        { minimumFractionDigits: 2 }
+                      )}
+                    </span>
+                  )}
+                </div>
+
+                {lastSaleData.payments?.length > 0 && (
+                  <div className="resumo-box">
+                    <strong>PAGAMENTOS EFETUADOS</strong>
+
+                    {lastSaleData.payments.map((p: any, i: number) => (
+                      <span key={i}>
+                        {p.method}
+                        {(p.details?.installments ?? 0) > 1
+                          ? ` (${p.details.installments}X)`
+                          : ''}
+                        :
+                        {' '}
+                        R$ {Number(p.value || 0).toLocaleString(
+                          'pt-BR',
+                          { minimumFractionDigits: 2 }
+                        )}
+                      </span>
+                    ))}
+
+                    {Number(lastSaleData.change || 0) > 0 && (
+                      <span>
+                        TROCO:
+                        {' '}
+                        R$ {Number(lastSaleData.change).toLocaleString(
+                          'pt-BR',
+                          { minimumFractionDigits: 2 }
+                        )}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+              </div>
+
+              <div className="total-box">
+                <div className="total-label">
+                  TOTAL DA VENDA
+                </div>
+
+                <div className="total-value">
+                  R$ {Number(lastSaleData.total || 0).toLocaleString(
+                    'pt-BR',
+                    { minimumFractionDigits: 2 }
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* ASSINATURAS */}
+            <div className="assinaturas">
+              <div className="assinatura">
+                <div></div>
+                <span>RESPONSÁVEL / CLIENTE</span>
+              </div>
+
+              <div className="assinatura">
+                <div></div>
+                <span>VENDEDOR</span>
+              </div>
+            </div>
+
+            {/* RODAPÉ */}
+            <div className="romaneio-footer">
+              <span>
+                DOCUMENTO EMITIDO EM {lastSaleData.date || new Date().toLocaleString('pt-BR')}
+              </span>
+
+              <span>
+                ROMANEIO DE VENDA
+              </span>
+            </div>
+
+          </div>
+        )}
       </div>
 
       <header className="flex items-center justify-between px-8 py-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 z-30 shadow-sm shrink-0 print:hidden">
@@ -1069,7 +1257,7 @@ const PDV: React.FC = () => {
                     </div>
                  )}
                  <div className="grid grid-cols-2 gap-3 pt-4">
-                    <button onClick={() => { if(successType === 'SALE') window.print(); setShowSuccessModal(false); }} className={`py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg flex items-center justify-center gap-2 hover:bg-black transition-all ${successType === 'CANCEL' ? 'opacity-20 pointer-events-none' : ''}`}><span className="material-symbols-outlined text-lg">print</span> Imprimir Recibo</button>
+                    <button onClick={() => { if(successType === 'SALE') window.print(); setShowSuccessModal(false); }} className={`py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg flex items-center justify-center gap-2 hover:bg-black transition-all ${successType === 'CANCEL' ? 'opacity-20 pointer-events-none' : ''}`}><span className="material-symbols-outlined text-lg">print</span> Imprimir Romaneio</button>
                     <button onClick={() => setShowSuccessModal(false)} className="py-4 bg-primary text-white rounded-2xl font-black text-[10px] uppercase shadow-lg hover:bg-blue-600 transition-all">Concluir</button>
                  </div>
               </div>
@@ -1189,12 +1377,440 @@ const PDV: React.FC = () => {
         .custom-scrollbar::-webkit-scrollbar { width: 5px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 20px; }
         @media print {
-          body * { visibility: hidden !important; }
-          #root { display: block !important; }
-          aside, header, main, .print\\:hidden, div[class*="fixed"], div[class*="backdrop-blur"] { display: none !important; opacity: 0 !important; }
-          #receipt-print-area, #receipt-print-area * { visibility: visible !important; display: block !important; }
-          #receipt-print-area { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; max-width: 80mm !important; padding: 10px !important; margin: 0 !important; background: white !important; color: black !important; border: none !important; }
-          @page { size: auto; margin: 0mm; }
+
+          @page {
+            size: A4 portrait;
+            margin: 0;
+          }
+
+          html,
+          body {
+            width: 100% !important;
+            min-width: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #fff !important;
+          }
+
+          body {
+            overflow: visible !important;
+          }
+
+          body * {
+            visibility: hidden !important;
+          }
+
+          #root,
+          #root > *,
+          main,
+          main > div {
+            overflow: visible !important;
+            transform: none !important;
+            zoom: 1 !important;
+          }
+
+          #receipt-print-area {
+            visibility: visible !important;
+            display: block !important;
+
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
+
+            width: 100vw !important;
+            min-width: 100vw !important;
+            max-width: 100vw !important;
+
+            min-height: 100vh !important;
+            height: auto !important;
+
+            margin: 0 !important;
+            padding: 0 !important;
+
+            overflow: visible !important;
+            transform: none !important;
+            zoom: 1 !important;
+
+            background: #fff !important;
+            color: #111827 !important;
+          }
+
+          #receipt-print-area * {
+            visibility: visible !important;
+          }
+
+          .romaneio-a4 {
+            width: 100% !important;
+            min-width: 0 !important;
+            max-width: none !important;
+
+            min-height: 297mm !important;
+
+            margin: 0 !important;
+            padding: 10mm !important;
+
+            box-sizing: border-box !important;
+
+            background: #fff !important;
+            color: #111827 !important;
+
+            font-family: Arial, Helvetica, sans-serif !important;
+            font-size: 10px !important;
+            line-height: 1.3 !important;
+
+            overflow: visible !important;
+          }
+
+          .empresa-info {
+            display: flex !important;
+            align-items: flex-start !important;
+            gap: 10px !important;
+          }
+
+          .empresa-logo {
+            width: 42px !important;
+            height: 42px !important;
+            object-fit: contain !important;
+            filter: grayscale(1) !important;
+          }
+
+          .romaneio-header {
+            width: 100% !important;
+
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: flex-start !important;
+
+            gap: 15px !important;
+
+            padding-bottom: 8px !important;
+            margin-bottom: 8px !important;
+
+            border-bottom: 2px solid #111827 !important;
+
+            box-sizing: border-box !important;
+          }
+
+          .empresa-info h1 {
+            margin: 0 !important;
+            font-size: 19px !important;
+            line-height: 1.1 !important;
+            font-weight: 900 !important;
+          }
+
+          .empresa-info h2 {
+            margin: 3px 0 0 !important;
+            font-size: 14px !important;
+            line-height: 1.1 !important;
+            font-weight: 900 !important;
+          }
+
+          .empresa-info p {
+            margin: 3px 0 0 !important;
+            font-size: 8px !important;
+            color: #4b5563 !important;
+            font-weight: 700 !important;
+          }
+
+          .documento-info {
+            flex: 0 0 190px !important;
+            width: 190px !important;
+
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important;
+
+            border: 1px solid #111827 !important;
+          }
+
+          .documento-info > div {
+            padding: 6px !important;
+            min-width: 0 !important;
+          }
+
+          .documento-info strong {
+            display: block !important;
+            font-size: 7px !important;
+            font-weight: 900 !important;
+          }
+
+          .documento-info span {
+            display: block !important;
+            margin-top: 2px !important;
+            font-size: 9px !important;
+            font-weight: 900 !important;
+            word-break: break-word !important;
+          }
+
+          .romaneio-section-title {
+            width: 100% !important;
+
+            margin-top: 7px !important;
+            margin-bottom: 4px !important;
+
+            padding: 5px 7px !important;
+
+            background: #e5e7eb !important;
+            border: 1px solid #9ca3af !important;
+
+            box-sizing: border-box !important;
+
+            font-size: 8px !important;
+            line-height: 1.1 !important;
+            font-weight: 900 !important;
+          }
+
+          .dados-grid {
+            width: 100% !important;
+
+            display: grid !important;
+            grid-template-columns: 2.2fr 1.4fr 1.2fr 1.5fr !important;
+
+            border: 1px solid #d1d5db !important;
+
+            box-sizing: border-box !important;
+          }
+
+          .campo {
+            min-width: 0 !important;
+            min-height: 42px !important;
+
+            padding: 5px 7px !important;
+
+            border-right: 1px solid #d1d5db !important;
+
+            box-sizing: border-box !important;
+          }
+
+          .campo:last-child {
+            border-right: none !important;
+          }
+
+          .campo label {
+            display: block !important;
+            font-size: 6.5px !important;
+            margin-bottom: 2px !important;
+            font-weight: 900 !important;
+          }
+
+          .campo span {
+            display: block !important;
+
+            font-size: 8px !important;
+            line-height: 1.2 !important;
+
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+          }
+
+          .romaneio-table {
+            width: 100% !important;
+
+            table-layout: fixed !important;
+            border-collapse: collapse !important;
+
+            font-size: 8px !important;
+
+            margin: 0 !important;
+          }
+
+          .romaneio-table th {
+            padding: 5px 4px !important;
+
+            background: #1f2937 !important;
+            color: #fff !important;
+
+            font-size: 7px !important;
+            line-height: 1.1 !important;
+            font-weight: 900 !important;
+
+            border: 1px solid #1f2937 !important;
+          }
+
+          .romaneio-table td {
+            padding: 5px 4px !important;
+
+            font-size: 8px !important;
+            line-height: 1.2 !important;
+
+            border: 1px solid #d1d5db !important;
+
+            vertical-align: middle !important;
+
+            overflow-wrap: anywhere !important;
+            word-break: break-word !important;
+          }
+
+          .romaneio-table .col-item {
+            width: 6% !important;
+          }
+
+          .romaneio-table .col-codigo {
+            width: 19% !important;
+          }
+
+          .romaneio-table .col-descricao {
+            width: 37% !important;
+          }
+
+          .romaneio-table .col-qtd {
+            width: 9% !important;
+          }
+
+          .romaneio-table .col-unit {
+            width: 14.5% !important;
+          }
+
+          .romaneio-table .col-total {
+            width: 14.5% !important;
+          }
+
+          .romaneio-table tr {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+
+          .resumo-container {
+            width: 100% !important;
+
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: stretch !important;
+
+            gap: 10px !important;
+
+            margin-top: 9px !important;
+
+            box-sizing: border-box !important;
+          }
+
+          .resumo-left {
+            flex: 1 1 auto !important;
+            min-width: 0 !important;
+
+            display: flex !important;
+            gap: 7px !important;
+          }
+
+          .resumo-box {
+            flex: 1 1 0 !important;
+            min-width: 0 !important;
+
+            padding: 7px !important;
+
+            border: 1px solid #d1d5db !important;
+
+            box-sizing: border-box !important;
+          }
+
+          .resumo-box strong {
+            display: block !important;
+
+            font-size: 7px !important;
+            line-height: 1.1 !important;
+
+            padding-bottom: 3px !important;
+            margin-bottom: 3px !important;
+          }
+
+          .resumo-box span {
+            display: block !important;
+
+            font-size: 7px !important;
+            line-height: 1.25 !important;
+          }
+
+          .total-box {
+            flex: 0 0 190px !important;
+            width: 190px !important;
+
+            padding: 8px !important;
+
+            border: 2px solid #111827 !important;
+
+            box-sizing: border-box !important;
+
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: center !important;
+            align-items: flex-end !important;
+          }
+
+          .total-label {
+            font-size: 8px !important;
+            line-height: 1.1 !important;
+            font-weight: 900 !important;
+          }
+
+          .total-value {
+            margin-top: 3px !important;
+
+            font-size: 17px !important;
+            line-height: 1.1 !important;
+
+            font-weight: 900 !important;
+          }
+
+          .assinaturas {
+            width: 100% !important;
+
+            display: flex !important;
+            justify-content: space-between !important;
+
+            gap: 35px !important;
+
+            margin-top: 38px !important;
+
+            box-sizing: border-box !important;
+          }
+
+          .assinatura {
+            flex: 1 1 0 !important;
+            min-width: 0 !important;
+
+            text-align: center !important;
+          }
+
+          .assinatura > div {
+            width: 100% !important;
+
+            border-top: 1px solid #111827 !important;
+
+            margin-bottom: 4px !important;
+          }
+
+          .assinatura span {
+            font-size: 7px !important;
+            line-height: 1.1 !important;
+            font-weight: 900 !important;
+          }
+
+          .romaneio-footer {
+            width: 100% !important;
+
+            margin-top: 18px !important;
+            padding-top: 6px !important;
+
+            border-top: 1px solid #9ca3af !important;
+
+            display: flex !important;
+            justify-content: space-between !important;
+            gap: 10px !important;
+
+            font-size: 6.5px !important;
+            line-height: 1.1 !important;
+
+            color: #6b7280 !important;
+            font-weight: 700 !important;
+          }
+
+          .romaneio-header,
+          .dados-grid,
+          .resumo-container,
+          .assinaturas {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
         }
       `}</style>
     </div>
