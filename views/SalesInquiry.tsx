@@ -33,7 +33,7 @@ const SalesInquiry: React.FC = () => {
   const [storeFilter, setStoreFilter] = useState('TODAS');
 
   // =========================================================
-  // ESTADOS / MODAIS
+  // ESTADOS
   // =========================================================
 
   const [selectedTransaction, setSelectedTransaction] =
@@ -70,14 +70,18 @@ const SalesInquiry: React.FC = () => {
   );
 
   // =========================================================
-  // VENDAS
+  // FILTRAGEM DAS VENDAS
   // =========================================================
 
   const sales = useMemo(() => {
     return transactions.filter(t => {
+
       const isSale =
         t.type === 'INCOME' &&
-        (t.category === 'Venda' || t.category === 'Serviço');
+        (
+          t.category === 'Venda' ||
+          t.category === 'Serviço'
+        );
 
       const matchesStore = isAdmin
         ? (
@@ -106,6 +110,7 @@ const SalesInquiry: React.FC = () => {
         matchesSearch
       );
     });
+
   }, [
     transactions,
     isAdmin,
@@ -121,21 +126,25 @@ const SalesInquiry: React.FC = () => {
   // =========================================================
 
   const totals = useMemo(() => {
+
     let qtyItems = 0;
     let totalValue = 0;
 
     sales.forEach(s => {
+
       totalValue += s.value;
 
       s.items?.forEach(i => {
         qtyItems += i.quantity;
       });
+
     });
 
     return {
       qtyItems,
       totalValue
     };
+
   }, [sales]);
 
   // =========================================================
@@ -146,13 +155,14 @@ const SalesInquiry: React.FC = () => {
     users.find(u => u.id === userId);
 
   // =========================================================
-  // CARTÃO
+  // CARTÕES
   // =========================================================
 
   const getCardInfo = (
     opId?: string,
     brId?: string
   ) => {
+
     const op = cardOperators.find(
       o => o.id === opId
     );
@@ -165,20 +175,24 @@ const SalesInquiry: React.FC = () => {
       operator: op?.name || '---',
       brand: br?.name || '---'
     };
+
   };
 
   // =========================================================
-  // FORMATAÇÕES
+  // FORMATAÇÃO
   // =========================================================
 
   const formatMoney = (value: number) => {
+
     return value.toLocaleString('pt-BR', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });
+
   };
 
   const formatDate = (date?: string) => {
+
     if (!date) return '';
 
     const parts = date.split('-');
@@ -188,22 +202,27 @@ const SalesInquiry: React.FC = () => {
     }
 
     return date;
+
   };
 
   // =========================================================
-  // REIMPRESSÃO / ROMANEIO A4
+  // REIMPRESSÃO ROMANEIO A4
   // =========================================================
 
   const handleReprint = (sale: Transaction) => {
+
     setSelectedTransaction(sale);
 
     setTimeout(() => {
+
       window.print();
 
       setTimeout(() => {
         setSelectedTransaction(null);
       }, 800);
+
     }, 150);
+
   };
 
   // =========================================================
@@ -213,9 +232,11 @@ const SalesInquiry: React.FC = () => {
   const handleUpdateVendor = async (
     vendorId: string
   ) => {
+
     if (!selectedTransaction) return;
 
     try {
+
       await addTransaction({
         ...selectedTransaction,
         vendorId
@@ -225,8 +246,11 @@ const SalesInquiry: React.FC = () => {
       setSelectedTransaction(null);
 
     } catch (e) {
+
       alert('Erro ao atualizar vendedor.');
+
     }
+
   };
 
   // =========================================================
@@ -236,6 +260,7 @@ const SalesInquiry: React.FC = () => {
   const handleUpdateCustomer = async (
     customerId: string
   ) => {
+
     if (!selectedTransaction) return;
 
     const customer = customers.find(
@@ -243,6 +268,7 @@ const SalesInquiry: React.FC = () => {
     );
 
     try {
+
       await addTransaction({
         ...selectedTransaction,
         clientId: customerId,
@@ -256,8 +282,11 @@ const SalesInquiry: React.FC = () => {
       setCustomerSearch('');
 
     } catch (e) {
+
       alert('Erro ao atualizar cliente.');
+
     }
+
   };
 
   // =========================================================
@@ -275,17 +304,20 @@ const SalesInquiry: React.FC = () => {
   // =========================================================
 
   return (
+
     <div className="min-h-screen bg-slate-100 dark:bg-background-dark font-sans text-[11px] uppercase font-bold flex flex-col relative">
 
       {/* =====================================================
-          ROMANEIO A4 - ÁREA DE IMPRESSÃO
+          ROMANEIO A4
       ====================================================== */}
 
       <div
         id="receipt-reprint-area"
         className="hidden print:block"
       >
+
         {selectedTransaction && (
+
           <div className="a4-romaneio">
 
             {/* CABEÇALHO */}
@@ -293,6 +325,7 @@ const SalesInquiry: React.FC = () => {
             <div className="romaneio-header">
 
               <div className="romaneio-company">
+
                 <div className="romaneio-company-name">
                   {selectedTransaction.store}
                 </div>
@@ -300,9 +333,11 @@ const SalesInquiry: React.FC = () => {
                 <div className="romaneio-company-subtitle">
                   DOCUMENTO DE VENDA
                 </div>
+
               </div>
 
               <div className="romaneio-title-box">
+
                 <div className="romaneio-title">
                   ROMANEIO
                 </div>
@@ -310,19 +345,19 @@ const SalesInquiry: React.FC = () => {
                 <div className="romaneio-subtitle">
                   REIMPRESSÃO
                 </div>
+
               </div>
 
             </div>
 
-            {/* LINHA */}
-
             <div className="romaneio-line" />
 
-            {/* INFORMAÇÕES DO DOCUMENTO */}
+            {/* DADOS DA VENDA */}
 
             <div className="romaneio-info-grid">
 
               <div className="romaneio-info-item">
+
                 <span className="romaneio-label">
                   DOCUMENTO
                 </span>
@@ -330,19 +365,25 @@ const SalesInquiry: React.FC = () => {
                 <strong>
                   {selectedTransaction.id.slice(-8)}
                 </strong>
+
               </div>
 
               <div className="romaneio-info-item">
+
                 <span className="romaneio-label">
                   DATA DE EMISSÃO
                 </span>
 
                 <strong>
-                  {formatDate(selectedTransaction.date)}
+                  {formatDate(
+                    selectedTransaction.date
+                  )}
                 </strong>
+
               </div>
 
               <div className="romaneio-info-item">
+
                 <span className="romaneio-label">
                   LOJA / UNIDADE
                 </span>
@@ -350,9 +391,11 @@ const SalesInquiry: React.FC = () => {
                 <strong>
                   {selectedTransaction.store}
                 </strong>
+
               </div>
 
               <div className="romaneio-info-item">
+
                 <span className="romaneio-label">
                   VENDEDOR
                 </span>
@@ -364,6 +407,7 @@ const SalesInquiry: React.FC = () => {
                     )?.name || 'BALCÃO'
                   }
                 </strong>
+
               </div>
 
             </div>
@@ -373,6 +417,7 @@ const SalesInquiry: React.FC = () => {
             <div className="romaneio-customer">
 
               <div>
+
                 <span className="romaneio-label">
                   CLIENTE
                 </span>
@@ -383,9 +428,11 @@ const SalesInquiry: React.FC = () => {
                     'CONSUMIDOR FINAL'
                   }
                 </strong>
+
               </div>
 
               <div>
+
                 <span className="romaneio-label">
                   CAIXA
                 </span>
@@ -398,22 +445,23 @@ const SalesInquiry: React.FC = () => {
                     'SISTEMA'
                   }
                 </strong>
+
               </div>
 
             </div>
 
-            {/* TÍTULO ITENS */}
+            {/* PRODUTOS */}
 
             <div className="romaneio-section-title">
               ITENS DA VENDA
             </div>
 
-            {/* TABELA */}
-
             <table className="romaneio-table">
 
               <thead>
+
                 <tr>
+
                   <th className="col-seq">
                     #
                   </th>
@@ -422,7 +470,7 @@ const SalesInquiry: React.FC = () => {
                     SKU
                   </th>
 
-                  <th>
+                  <th className="col-desc">
                     DESCRIÇÃO DO PRODUTO
                   </th>
 
@@ -437,7 +485,9 @@ const SalesInquiry: React.FC = () => {
                   <th className="col-total">
                     VALOR TOTAL
                   </th>
+
                 </tr>
+
               </thead>
 
               <tbody>
@@ -450,6 +500,7 @@ const SalesInquiry: React.FC = () => {
                       item.salePrice;
 
                     return (
+
                       <tr key={index}>
 
                         <td className="text-center">
@@ -469,15 +520,21 @@ const SalesInquiry: React.FC = () => {
                         </td>
 
                         <td className="text-right">
-                          R$ {formatMoney(item.salePrice)}
+                          R$ {formatMoney(
+                            item.salePrice
+                          )}
                         </td>
 
                         <td className="text-right strong">
-                          R$ {formatMoney(itemTotal)}
+                          R$ {formatMoney(
+                            itemTotal
+                          )}
                         </td>
 
                       </tr>
+
                     );
+
                   }
                 )}
 
@@ -495,6 +552,7 @@ const SalesInquiry: React.FC = () => {
                   </td>
 
                   <td className="text-right">
+
                     {
                       selectedTransaction.items?.reduce(
                         (acc, item) =>
@@ -502,6 +560,7 @@ const SalesInquiry: React.FC = () => {
                         0
                       ).toFixed(2)
                     }
+
                   </td>
 
                   <td />
@@ -514,7 +573,7 @@ const SalesInquiry: React.FC = () => {
 
             </table>
 
-            {/* RESUMO FINANCEIRO */}
+            {/* FINANCEIRO */}
 
             <div className="romaneio-financial">
 
@@ -525,6 +584,7 @@ const SalesInquiry: React.FC = () => {
                 </div>
 
                 <div className="payment-main">
+
                   {
                     selectedTransaction.method ||
                     'DINHEIRO'
@@ -534,13 +594,18 @@ const SalesInquiry: React.FC = () => {
                     ? ` - ${selectedTransaction.installments}X`
                     : ''
                   }
+
                 </div>
 
                 {selectedTransaction.cardOperatorId && (
+
                   <div className="payment-details">
 
                     <div>
-                      <span>OPERADORA:</span>
+
+                      <span>
+                        OPERADORA:
+                      </span>
 
                       {
                         getCardInfo(
@@ -548,10 +613,14 @@ const SalesInquiry: React.FC = () => {
                           selectedTransaction.cardBrandId
                         ).operator
                       }
+
                     </div>
 
                     <div>
-                      <span>BANDEIRA:</span>
+
+                      <span>
+                        BANDEIRA:
+                      </span>
 
                       {
                         getCardInfo(
@@ -559,27 +628,37 @@ const SalesInquiry: React.FC = () => {
                           selectedTransaction.cardBrandId
                         ).brand
                       }
+
                     </div>
 
                     <div>
-                      <span>NSU:</span>
+
+                      <span>
+                        NSU:
+                      </span>
 
                       {
                         selectedTransaction.transactionSku ||
                         '---'
                       }
+
                     </div>
 
                     <div>
-                      <span>AUTORIZAÇÃO:</span>
+
+                      <span>
+                        AUTORIZAÇÃO:
+                      </span>
 
                       {
                         selectedTransaction.authNumber ||
                         '---'
                       }
+
                     </div>
 
                   </div>
+
                 )}
 
               </div>
@@ -600,7 +679,7 @@ const SalesInquiry: React.FC = () => {
 
             </div>
 
-            {/* OBSERVAÇÃO */}
+            {/* OBSERVAÇÕES */}
 
             <div className="romaneio-observation">
 
@@ -649,7 +728,7 @@ const SalesInquiry: React.FC = () => {
               </span>
 
               <span>
-                DOCUMENTO REIMPRESSO EM{' '}
+                REIMPRESSO EM{' '}
                 {new Date().toLocaleString('pt-BR')}
               </span>
 
@@ -660,7 +739,9 @@ const SalesInquiry: React.FC = () => {
             </div>
 
           </div>
+
         )}
+
       </div>
 
       {/* =====================================================
@@ -769,12 +850,14 @@ const SalesInquiry: React.FC = () => {
               </option>
 
               {establishments.map(est => (
+
                 <option
                   key={est.id}
                   value={est.name}
                 >
                   {est.name}
                 </option>
+
               ))}
 
             </select>
@@ -827,7 +910,7 @@ const SalesInquiry: React.FC = () => {
       </div>
 
       {/* =====================================================
-          TABELA
+          TABELA DE VENDAS
       ====================================================== */}
 
       <div className="flex-1 overflow-auto bg-white dark:bg-slate-900 print:hidden">
@@ -839,9 +922,11 @@ const SalesInquiry: React.FC = () => {
             <tr className="divide-x divide-white/10">
 
               <th className="px-3 py-2 text-center w-10">
+
                 <span className="material-symbols-outlined text-sm">
                   settings
                 </span>
+
               </th>
 
               <th className="px-3 py-2 w-20">
@@ -1003,12 +1088,15 @@ const SalesInquiry: React.FC = () => {
                 </td>
 
                 <td className="px-3 py-1.5">
+
                   <span className="truncate max-w-[200px] uppercase">
                     {s.client || 'Consumidor Final'}
                   </span>
+
                 </td>
 
                 <td className="px-3 py-1.5 text-right font-black tabular-nums">
+
                   {s.items
                     ?.reduce(
                       (acc, i) =>
@@ -1016,10 +1104,13 @@ const SalesInquiry: React.FC = () => {
                       0
                     )
                     .toFixed(2)}
+
                 </td>
 
                 <td className="px-3 py-1.5 text-right font-black text-slate-900 dark:text-white tabular-nums">
+
                   R$ {formatMoney(s.value)}
+
                 </td>
 
               </tr>
@@ -1055,7 +1146,9 @@ const SalesInquiry: React.FC = () => {
           </span>
 
           <span className="text-[12px] tabular-nums">
-            R$ {formatMoney(totals.totalValue)}
+            R$ {formatMoney(
+              totals.totalValue
+            )}
           </span>
 
         </div>
@@ -1104,18 +1197,22 @@ const SalesInquiry: React.FC = () => {
               <div className="grid grid-cols-12 gap-2">
 
                 <div className="col-span-2">
+
                   <DetailField
                     label="ID:"
                     value={viewingDetail.id.slice(-6)}
                   />
+
                 </div>
 
                 <div className="col-span-10">
+
                   <DetailField
                     label="LOJA:"
                     value={viewingDetail.store}
                     borderHighlight
                   />
+
                 </div>
 
               </div>
@@ -1123,6 +1220,7 @@ const SalesInquiry: React.FC = () => {
               <div className="grid grid-cols-12 gap-2">
 
                 <div className="col-span-10">
+
                   <DetailField
                     label="CLIENTE:"
                     value={
@@ -1131,14 +1229,17 @@ const SalesInquiry: React.FC = () => {
                     }
                     borderHighlight
                   />
+
                 </div>
 
                 <div className="col-span-2">
+
                   <DetailField
                     label="DATA EMISSÃO:"
                     value={viewingDetail.date}
                     borderHighlight
                   />
+
                 </div>
 
               </div>
@@ -1180,7 +1281,9 @@ const SalesInquiry: React.FC = () => {
 
                   <button
                     onClick={() =>
-                      handleReprint(viewingDetail)
+                      handleReprint(
+                        viewingDetail
+                      )
                     }
                     className="w-full h-12 bg-primary text-white rounded font-black uppercase text-[10px] shadow flex items-center justify-center gap-2 hover:bg-blue-600"
                   >
@@ -1282,18 +1385,26 @@ const SalesInquiry: React.FC = () => {
                               </td>
 
                               <td className="px-2 py-1 text-right font-black">
+
                                 {item.quantity.toFixed(2)}
+
                               </td>
 
                               <td className="px-2 py-1 text-right">
-                                R$ {formatMoney(item.salePrice)}
+
+                                R$ {formatMoney(
+                                  item.salePrice
+                                )}
+
                               </td>
 
                               <td className="px-2 py-1 text-right font-black">
+
                                 R$ {formatMoney(
                                   item.quantity *
                                   item.salePrice
                                 )}
+
                               </td>
 
                             </tr>
@@ -1335,9 +1446,11 @@ const SalesInquiry: React.FC = () => {
                         </p>
 
                         <p className="text-sm font-black text-emerald-600">
+
                           R$ {formatMoney(
                             viewingDetail.value
                           )}
+
                         </p>
 
                       </div>
@@ -1393,10 +1506,12 @@ const SalesInquiry: React.FC = () => {
                           </p>
 
                           <p className="text-[10px] font-bold">
+
                             {
                               viewingDetail.transactionSku ||
                               '---'
                             }
+
                           </p>
 
                         </div>
@@ -1408,10 +1523,12 @@ const SalesInquiry: React.FC = () => {
                           </p>
 
                           <p className="text-[10px] font-bold">
+
                             {
                               viewingDetail.authNumber ||
                               '---'
                             }
+
                           </p>
 
                         </div>
@@ -1435,7 +1552,7 @@ const SalesInquiry: React.FC = () => {
       )}
 
       {/* =====================================================
-          MODAL ALTERAR VENDEDOR
+          MODAL VENDEDOR
       ====================================================== */}
 
       {showVendorModal && (
@@ -1470,7 +1587,7 @@ const SalesInquiry: React.FC = () => {
 
                 Selecione o novo vendedor para o documento{' '}
 
-                {selectedTransaction?.id.slice(-6)}
+                {selectedTransaction?.id.slice(-6)}:
 
               </p>
 
@@ -1538,7 +1655,7 @@ const SalesInquiry: React.FC = () => {
       )}
 
       {/* =====================================================
-          MODAL ALTERAR CLIENTE
+          MODAL CLIENTE
       ====================================================== */}
 
       {showCustomerModal && (
@@ -1655,6 +1772,10 @@ const SalesInquiry: React.FC = () => {
 
       <style>{`
 
+        /* ===================================================
+           SCROLLBAR
+        =================================================== */
+
         .custom-scrollbar::-webkit-scrollbar {
           width: 4px;
           height: 4px;
@@ -1666,393 +1787,894 @@ const SalesInquiry: React.FC = () => {
         }
 
         /* ===================================================
-           ROMANEIO A4
+           ROMANEIO
         =================================================== */
 
         .a4-romaneio {
+
           width: 100%;
+          max-width: none;
+
           min-height: 277mm;
+
           background: #ffffff;
           color: #111827;
-          font-family: Arial, Helvetica, sans-serif;
+
+          font-family:
+            Arial,
+            Helvetica,
+            sans-serif;
+
           font-size: 10px;
           font-weight: 500;
+
           text-transform: uppercase;
-          padding: 0;
+
           box-sizing: border-box;
-        }
 
-        .romaneio-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          padding-bottom: 12px;
-        }
-
-        .romaneio-company {
-          flex: 1;
-        }
-
-        .romaneio-company-name {
-          font-size: 22px;
-          font-weight: 900;
-          line-height: 1.1;
-        }
-
-        .romaneio-company-subtitle {
-          font-size: 9px;
-          margin-top: 5px;
-          color: #64748b;
-          font-weight: 700;
-        }
-
-        .romaneio-title-box {
-          width: 170px;
-          text-align: right;
-        }
-
-        .romaneio-title {
-          font-size: 24px;
-          font-weight: 900;
-          line-height: 1;
-        }
-
-        .romaneio-subtitle {
-          font-size: 9px;
-          margin-top: 5px;
-          color: #64748b;
-          font-weight: 800;
-        }
-
-        .romaneio-line {
-          border-top: 2px solid #111827;
-          margin-bottom: 12px;
-        }
-
-        .romaneio-info-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr 1.4fr 1.4fr;
-          border: 1px solid #cbd5e1;
-          margin-bottom: 10px;
-        }
-
-        .romaneio-info-item {
-          padding: 8px 10px;
-          border-right: 1px solid #cbd5e1;
-          display: flex;
-          flex-direction: column;
-          gap: 3px;
-        }
-
-        .romaneio-info-item:last-child {
-          border-right: none;
-        }
-
-        .romaneio-label {
-          display: block;
-          font-size: 7px;
-          color: #64748b;
-          font-weight: 900;
-          letter-spacing: 0.4px;
-        }
-
-        .romaneio-info-item strong {
-          font-size: 10px;
-          font-weight: 900;
-        }
-
-        .romaneio-customer {
-          display: grid;
-          grid-template-columns: 3fr 1fr;
-          border: 1px solid #cbd5e1;
-          margin-bottom: 14px;
-        }
-
-        .romaneio-customer > div {
-          padding: 8px 10px;
-          border-right: 1px solid #cbd5e1;
-          display: flex;
-          flex-direction: column;
-          gap: 3px;
-        }
-
-        .romaneio-customer > div:last-child {
-          border-right: none;
-        }
-
-        .romaneio-section-title {
-          background: #111827;
-          color: white;
-          padding: 7px 10px;
-          font-size: 9px;
-          font-weight: 900;
-          letter-spacing: 0.5px;
-          margin-top: 10px;
-        }
-
-        .romaneio-section-title.small {
-          margin-top: 0;
-          background: #e2e8f0;
-          color: #111827;
-        }
-
-        .romaneio-table {
-          width: 100%;
-          border-collapse: collapse;
-          margin-bottom: 12px;
-          table-layout: fixed;
-        }
-
-        .romaneio-table th {
-          background: #f1f5f9;
-          border: 1px solid #cbd5e1;
-          padding: 6px 7px;
-          font-size: 7px;
-          font-weight: 900;
-          text-align: left;
-        }
-
-        .romaneio-table td {
-          border: 1px solid #cbd5e1;
-          padding: 6px 7px;
-          font-size: 8px;
-          vertical-align: middle;
-        }
-
-        .romaneio-table tbody tr:nth-child(even) {
-          background: #f8fafc;
-        }
-
-        .romaneio-table .col-seq {
-          width: 28px;
-          text-align: center;
-        }
-
-        .romaneio-table .col-sku {
-          width: 90px;
-        }
-
-        .romaneio-table .col-qtd {
-          width: 65px;
-          text-align: right;
-        }
-
-        .romaneio-table .col-unit {
-          width: 95px;
-          text-align: right;
-        }
-
-        .romaneio-table .col-total {
-          width: 105px;
-          text-align: right;
-        }
-
-        .product-description {
-          font-weight: 700;
-        }
-
-        .text-right {
-          text-align: right !important;
-        }
-
-        .text-center {
-          text-align: center !important;
-        }
-
-        .strong {
-          font-weight: 900 !important;
-        }
-
-        .table-footer-label {
-          text-align: right;
-          font-weight: 900;
-          background: #f1f5f9;
-        }
-
-        .romaneio-financial {
-          display: grid;
-          grid-template-columns: 1fr 260px;
-          gap: 12px;
-          margin-top: 8px;
-        }
-
-        .payment-box {
-          border: 1px solid #cbd5e1;
-        }
-
-        .payment-main {
-          padding: 10px;
-          font-size: 12px;
-          font-weight: 900;
-        }
-
-        .payment-details {
-          border-top: 1px solid #e2e8f0;
-          padding: 8px 10px;
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 5px 15px;
-          font-size: 8px;
-        }
-
-        .payment-details span {
-          color: #64748b;
-          font-size: 7px;
-          margin-right: 4px;
-          font-weight: 900;
-        }
-
-        .total-box {
-          border: 2px solid #111827;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          align-items: flex-end;
-          padding: 15px;
-        }
-
-        .total-label {
-          font-size: 8px;
-          font-weight: 900;
-          color: #64748b;
-        }
-
-        .total-box strong {
-          font-size: 20px;
-          font-weight: 900;
-          margin-top: 4px;
-        }
-
-        .romaneio-observation {
-          margin-top: 18px;
-        }
-
-        .observation-line {
-          height: 22px;
-          border-bottom: 1px solid #cbd5e1;
-        }
-
-        .signature-area {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 100px;
-          margin-top: 55px;
-          padding: 0 50px;
-        }
-
-        .signature {
-          text-align: center;
-          font-size: 8px;
-          font-weight: 900;
-          color: #475569;
-        }
-
-        .signature-line {
-          border-top: 1px solid #111827;
-          margin-bottom: 6px;
-        }
-
-        .romaneio-footer {
-          display: flex;
-          justify-content: space-between;
-          border-top: 1px solid #cbd5e1;
-          margin-top: 40px;
-          padding-top: 8px;
-          color: #64748b;
-          font-size: 7px;
-          font-weight: 700;
         }
 
         /* ===================================================
-           IMPRESSÃO A4
+           CABEÇALHO
+        =================================================== */
+
+        .romaneio-header {
+
+          width: 100%;
+
+          display: flex;
+
+          justify-content: space-between;
+
+          align-items: flex-start;
+
+          padding-bottom: 10px;
+
+          box-sizing: border-box;
+
+        }
+
+        .romaneio-company {
+
+          flex: 1;
+
+          min-width: 0;
+
+        }
+
+        .romaneio-company-name {
+
+          font-size: 24px;
+
+          font-weight: 900;
+
+          line-height: 1.1;
+
+          word-break: break-word;
+
+        }
+
+        .romaneio-company-subtitle {
+
+          font-size: 9px;
+
+          margin-top: 4px;
+
+          color: #64748b;
+
+          font-weight: 700;
+
+        }
+
+        .romaneio-title-box {
+
+          width: 220px;
+
+          flex-shrink: 0;
+
+          text-align: right;
+
+        }
+
+        .romaneio-title {
+
+          font-size: 24px;
+
+          font-weight: 900;
+
+          line-height: 1;
+
+        }
+
+        .romaneio-subtitle {
+
+          font-size: 9px;
+
+          margin-top: 5px;
+
+          color: #64748b;
+
+          font-weight: 800;
+
+        }
+
+        .romaneio-line {
+
+          width: 100%;
+
+          border-top: 2px solid #111827;
+
+          margin-bottom: 10px;
+
+        }
+
+        /* ===================================================
+           INFORMAÇÕES
+        =================================================== */
+
+        .romaneio-info-grid {
+
+          width: 100%;
+
+          display: grid;
+
+          grid-template-columns:
+            1fr
+            1fr
+            1.5fr
+            1.5fr;
+
+          border: 1px solid #cbd5e1;
+
+          margin-bottom: 8px;
+
+          box-sizing: border-box;
+
+        }
+
+        .romaneio-info-item {
+
+          padding: 7px 9px;
+
+          border-right: 1px solid #cbd5e1;
+
+          display: flex;
+
+          flex-direction: column;
+
+          gap: 3px;
+
+          min-width: 0;
+
+        }
+
+        .romaneio-info-item:last-child {
+
+          border-right: none;
+
+        }
+
+        .romaneio-label {
+
+          display: block;
+
+          font-size: 7px;
+
+          color: #64748b;
+
+          font-weight: 900;
+
+          letter-spacing: 0.4px;
+
+        }
+
+        .romaneio-info-item strong {
+
+          font-size: 9px;
+
+          font-weight: 900;
+
+          word-break: break-word;
+
+        }
+
+        /* ===================================================
+           CLIENTE
+        =================================================== */
+
+        .romaneio-customer {
+
+          width: 100%;
+
+          display: grid;
+
+          grid-template-columns: 3fr 1fr;
+
+          border: 1px solid #cbd5e1;
+
+          margin-bottom: 10px;
+
+          box-sizing: border-box;
+
+        }
+
+        .romaneio-customer > div {
+
+          padding: 7px 9px;
+
+          border-right: 1px solid #cbd5e1;
+
+          display: flex;
+
+          flex-direction: column;
+
+          gap: 3px;
+
+          min-width: 0;
+
+        }
+
+        .romaneio-customer > div:last-child {
+
+          border-right: none;
+
+        }
+
+        /* ===================================================
+           SEÇÃO
+        =================================================== */
+
+        .romaneio-section-title {
+
+          width: 100%;
+
+          background: #111827;
+
+          color: white;
+
+          padding: 6px 9px;
+
+          font-size: 8px;
+
+          font-weight: 900;
+
+          letter-spacing: 0.5px;
+
+          margin-top: 8px;
+
+          box-sizing: border-box;
+
+        }
+
+        .romaneio-section-title.small {
+
+          margin-top: 0;
+
+          background: #e2e8f0;
+
+          color: #111827;
+
+        }
+
+        /* ===================================================
+           TABELA
+        =================================================== */
+
+        .romaneio-table {
+
+          width: 100%;
+
+          max-width: none;
+
+          min-width: 0;
+
+          border-collapse: collapse;
+
+          table-layout: fixed;
+
+          margin: 0 0 10px 0;
+
+          box-sizing: border-box;
+
+        }
+
+        .romaneio-table th {
+
+          background: #f1f5f9;
+
+          border: 1px solid #cbd5e1;
+
+          padding: 5px 6px;
+
+          font-size: 7px;
+
+          font-weight: 900;
+
+          text-align: left;
+
+          box-sizing: border-box;
+
+        }
+
+        .romaneio-table td {
+
+          border: 1px solid #cbd5e1;
+
+          padding: 5px 6px;
+
+          font-size: 8px;
+
+          vertical-align: middle;
+
+          box-sizing: border-box;
+
+          overflow-wrap: anywhere;
+
+        }
+
+        .romaneio-table tbody tr:nth-child(even) {
+
+          background: #f8fafc;
+
+        }
+
+        /* COLUNAS */
+
+        .romaneio-table .col-seq {
+
+          width: 5%;
+
+          text-align: center;
+
+        }
+
+        .romaneio-table .col-sku {
+
+          width: 13%;
+
+        }
+
+        .romaneio-table .col-desc {
+
+          width: 39%;
+
+        }
+
+        .romaneio-table .col-qtd {
+
+          width: 10%;
+
+          text-align: right;
+
+        }
+
+        .romaneio-table .col-unit {
+
+          width: 16%;
+
+          text-align: right;
+
+        }
+
+        .romaneio-table .col-total {
+
+          width: 17%;
+
+          text-align: right;
+
+        }
+
+        .product-description {
+
+          font-weight: 700;
+
+          white-space: normal;
+
+          word-break: break-word;
+
+          overflow-wrap: anywhere;
+
+        }
+
+        .text-right {
+
+          text-align: right !important;
+
+        }
+
+        .text-center {
+
+          text-align: center !important;
+
+        }
+
+        .strong {
+
+          font-weight: 900 !important;
+
+        }
+
+        .table-footer-label {
+
+          text-align: right;
+
+          font-weight: 900;
+
+          background: #f1f5f9;
+
+        }
+
+        /* ===================================================
+           FINANCEIRO
+        =================================================== */
+
+        .romaneio-financial {
+
+          width: 100%;
+
+          display: grid;
+
+          grid-template-columns: 1fr 270px;
+
+          gap: 10px;
+
+          margin-top: 6px;
+
+          box-sizing: border-box;
+
+        }
+
+        .payment-box {
+
+          border: 1px solid #cbd5e1;
+
+          min-width: 0;
+
+        }
+
+        .payment-main {
+
+          padding: 9px;
+
+          font-size: 11px;
+
+          font-weight: 900;
+
+        }
+
+        .payment-details {
+
+          border-top: 1px solid #e2e8f0;
+
+          padding: 7px 9px;
+
+          display: grid;
+
+          grid-template-columns: 1fr 1fr;
+
+          gap: 5px 15px;
+
+          font-size: 8px;
+
+        }
+
+        .payment-details span {
+
+          color: #64748b;
+
+          font-size: 7px;
+
+          margin-right: 4px;
+
+          font-weight: 900;
+
+        }
+
+        .total-box {
+
+          border: 2px solid #111827;
+
+          display: flex;
+
+          flex-direction: column;
+
+          justify-content: center;
+
+          align-items: flex-end;
+
+          padding: 12px;
+
+          box-sizing: border-box;
+
+        }
+
+        .total-label {
+
+          font-size: 8px;
+
+          font-weight: 900;
+
+          color: #64748b;
+
+        }
+
+        .total-box strong {
+
+          font-size: 20px;
+
+          font-weight: 900;
+
+          margin-top: 3px;
+
+        }
+
+        /* ===================================================
+           OBSERVAÇÕES
+        =================================================== */
+
+        .romaneio-observation {
+
+          width: 100%;
+
+          margin-top: 14px;
+
+          box-sizing: border-box;
+
+        }
+
+        .observation-line {
+
+          height: 20px;
+
+          border-bottom: 1px solid #cbd5e1;
+
+        }
+
+        /* ===================================================
+           ASSINATURAS
+        =================================================== */
+
+        .signature-area {
+
+          width: 100%;
+
+          display: grid;
+
+          grid-template-columns: 1fr 1fr;
+
+          gap: 80px;
+
+          margin-top: 45px;
+
+          padding: 0 50px;
+
+          box-sizing: border-box;
+
+        }
+
+        .signature {
+
+          text-align: center;
+
+          font-size: 8px;
+
+          font-weight: 900;
+
+          color: #475569;
+
+        }
+
+        .signature-line {
+
+          border-top: 1px solid #111827;
+
+          margin-bottom: 5px;
+
+        }
+
+        /* ===================================================
+           RODAPÉ
+        =================================================== */
+
+        .romaneio-footer {
+
+          width: 100%;
+
+          display: flex;
+
+          justify-content: space-between;
+
+          gap: 10px;
+
+          border-top: 1px solid #cbd5e1;
+
+          margin-top: 30px;
+
+          padding-top: 7px;
+
+          color: #64748b;
+
+          font-size: 7px;
+
+          font-weight: 700;
+
+          box-sizing: border-box;
+
+        }
+
+        /* ===================================================
+           IMPRESSÃO
         =================================================== */
 
         @media print {
 
           @page {
+
             size: A4 portrait;
-            margin: 10mm;
+
+            /*
+             * Margem pequena para aproveitar
+             * praticamente toda a folha.
+             */
+
+            margin: 5mm;
+
           }
 
           html,
           body {
-            width: 210mm;
-            min-height: 297mm;
+
+            width: 100% !important;
+
+            min-width: 0 !important;
+
+            max-width: none !important;
+
             margin: 0 !important;
+
             padding: 0 !important;
+
             background: white !important;
+
+            overflow: visible !important;
+
           }
 
           body * {
+
             visibility: hidden !important;
+
           }
 
           #root {
+
             display: block !important;
+
             width: 100% !important;
+
+            min-width: 0 !important;
+
+            max-width: none !important;
+
             margin: 0 !important;
+
             padding: 0 !important;
+
+          }
+
+          #receipt-reprint-area {
+
+            display: block !important;
+
+            position: absolute !important;
+
+            left: 0 !important;
+
+            top: 0 !important;
+
+            width: 100% !important;
+
+            max-width: none !important;
+
+            min-width: 0 !important;
+
+            margin: 0 !important;
+
+            padding: 0 !important;
+
+            background: white !important;
+
+            border: none !important;
+
+            box-sizing: border-box !important;
+
           }
 
           #receipt-reprint-area,
           #receipt-reprint-area * {
-            visibility: visible !important;
-          }
 
-          #receipt-reprint-area {
-            display: block !important;
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
-            width: 100% !important;
-            max-width: none !important;
-            min-height: 277mm !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            background: white !important;
-            color: black !important;
-            border: none !important;
+            visibility: visible !important;
+
           }
 
           .a4-romaneio {
+
+            display: block !important;
+
             width: 100% !important;
-            min-height: 277mm !important;
-            padding: 0 !important;
+
+            max-width: none !important;
+
+            min-width: 0 !important;
+
             margin: 0 !important;
+
+            padding: 0 !important;
+
+            box-sizing: border-box !important;
+
             background: white !important;
+
             color: #111827 !important;
+
           }
+
+          /*
+           * GARANTE TODA A LARGURA DA TABELA
+           */
 
           .romaneio-table {
-            page-break-inside: auto;
+
+            width: 100% !important;
+
+            max-width: none !important;
+
+            min-width: 0 !important;
+
+            table-layout: fixed !important;
+
+            margin-left: 0 !important;
+
+            margin-right: 0 !important;
+
           }
 
-          .romaneio-table tr {
-            page-break-inside: avoid;
-            page-break-after: auto;
+          /*
+           * LARGURA DAS COLUNAS NO A4
+           */
+
+          .romaneio-table .col-seq {
+
+            width: 5% !important;
+
           }
+
+          .romaneio-table .col-sku {
+
+            width: 13% !important;
+
+          }
+
+          .romaneio-table .col-desc {
+
+            width: 39% !important;
+
+          }
+
+          .romaneio-table .col-qtd {
+
+            width: 10% !important;
+
+          }
+
+          .romaneio-table .col-unit {
+
+            width: 16% !important;
+
+          }
+
+          .romaneio-table .col-total {
+
+            width: 17% !important;
+
+          }
+
+          /*
+           * EVITA CORTE DE TEXTO
+           */
+
+          .product-description {
+
+            white-space: normal !important;
+
+            overflow-wrap: anywhere !important;
+
+            word-break: break-word !important;
+
+          }
+
+          /*
+           * REPETE CABEÇALHO DA TABELA
+           * EM NOVAS PÁGINAS
+           */
 
           .romaneio-table thead {
+
             display: table-header-group;
+
           }
 
-          .romaneio-table tfoot {
-            display: table-footer-group;
+          /*
+           * EVITA DIVIDIR UMA LINHA
+           */
+
+          .romaneio-table tr {
+
+            page-break-inside: avoid;
+
+            break-inside: avoid;
+
           }
+
+          /*
+           * MANTÉM BLOCOS JUNTOS
+           */
 
           .romaneio-section-title,
           .romaneio-financial,
           .romaneio-observation,
           .signature-area {
+
             page-break-inside: avoid;
+
+            break-inside: avoid;
+
           }
 
+          /*
+           * CABEÇALHO / CAMPOS
+           */
+
+          .romaneio-header,
+          .romaneio-info-grid,
+          .romaneio-customer,
+          .romaneio-financial,
+          .romaneio-observation,
+          .romaneio-footer {
+
+            width: 100% !important;
+
+            max-width: none !important;
+
+            box-sizing: border-box !important;
+
+          }
+
+          /*
+           * NÃO MOSTRAR ELEMENTOS DA TELA
+           */
+
+          header,
+          footer,
           button,
           input,
           select,
-          header,
-          footer {
+          textarea {
+
             display: none !important;
+
+          }
+
+          /*
+           * GARANTE QUE O FUNDO SEJA BRANCO
+           */
+
+          * {
+
+            -webkit-print-color-adjust: exact !important;
+
+            print-color-adjust: exact !important;
+
           }
 
         }
@@ -2060,6 +2682,7 @@ const SalesInquiry: React.FC = () => {
       `}</style>
 
     </div>
+
   );
 };
 
