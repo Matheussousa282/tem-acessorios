@@ -3454,6 +3454,12 @@ const SalesInquiry: React.FC = () => {
             margin: 0;
           }
 
+          html {
+            width: 100% !important;
+            min-width: 0 !important;
+            max-width: none !important;
+          }
+
           html,
           body {
             width: 100% !important;
@@ -3465,6 +3471,19 @@ const SalesInquiry: React.FC = () => {
 
           body {
             overflow: visible !important;
+          }
+
+          /*
+           * Neutraliza as características do Layout que são ótimas para
+           * a tela, mas não devem controlar a folha impressa.
+           */
+          #root,
+          #root > *,
+          main,
+          main > div {
+            overflow: visible !important;
+            transform: none !important;
+            zoom: 1 !important;
           }
 
           body * {
@@ -3479,22 +3498,37 @@ const SalesInquiry: React.FC = () => {
             display: block !important;
           }
 
+          /*
+           * IMPORTANTE:
+           * O romaneio fica dentro do Layout principal, que usa flex,
+           * overflow-hidden e overflow-y-auto. Em impressão isso pode
+           * fazer o conteúdo herdar uma largura menor.
+           *
+           * Por isso o container de impressão é retirado do fluxo normal
+           * e passa a ocupar diretamente a página inteira.
+           */
           #receipt-reprint-area {
             visibility: visible !important;
             display: block !important;
-            position: static !important;
 
-            width: 100% !important;
-            min-width: 0 !important;
-            max-width: none !important;
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
+
+            width: 100vw !important;
+            min-width: 100vw !important;
+            max-width: 100vw !important;
 
             height: auto !important;
+            min-height: 100vh !important;
 
             margin: 0 !important;
             padding: 0 !important;
 
-            left: auto !important;
-            top: auto !important;
+            overflow: visible !important;
+
+            transform: none !important;
+            zoom: 1 !important;
 
             background: #ffffff !important;
           }
@@ -3507,6 +3541,11 @@ const SalesInquiry: React.FC = () => {
             visibility: visible !important;
             display: block !important;
 
+            /*
+             * A folha A4 tem 210mm de largura.
+             * 100% aqui é a largura do container FIXED acima,
+             * e não a largura do <main> do Layout.
+             */
             width: 100% !important;
             min-width: 0 !important;
             max-width: none !important;
@@ -3515,6 +3554,10 @@ const SalesInquiry: React.FC = () => {
 
             margin: 0 !important;
             padding: 10mm !important;
+
+            overflow: visible !important;
+            transform: none !important;
+            zoom: 1 !important;
 
             box-sizing: border-box !important;
 
